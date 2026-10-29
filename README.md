@@ -1,5 +1,5 @@
 # SOFT TECH • BEYOND PLAY
-Corporate game provider showcase for the 9dbit studio portfolio, running Next.js 15 and TypeScript.
+Corporate game provider showcase for the 9dbit studio portfolio, running Next.js 16 and TypeScript.
 
 ## Locally
 ```bash
@@ -9,7 +9,7 @@ npm run build
 ```
 
 ## Railway
-Connect GitHub repository `9dbit/Soft-Tech`, branch `main`, Node 20+, standard Next.js build/start commands. Configure `/api/health` as optional service healthcheck. No database is required for the public showcase.
+Active dependencies: Next.js 16.4.3 and React 19.3.1.\n\nConnect GitHub repository `9dbit/Soft-Tech`, branch `main`, Node 20+, standard Next.js build/start commands. Configure `/api/health` as optional service healthcheck. No database is required for the public showcase.
 
 ## Featured demos
 - [Skygate 5000](https://skygate-web-production.up.railway.app/play/?utm_source=softtech)
