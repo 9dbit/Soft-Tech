@@ -1,0 +1,1 @@
+import {NextResponse} from "next/server";export function GET(){return NextResponse.json({status:"ok",service:"soft-tech-portal",at:new Date().toISOString()},{headers:{"Cache-Control":"no-store"}})}

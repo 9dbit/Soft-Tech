@@ -1,0 +1,3 @@
+import type { Metadata } from "next";import "./globals.css";
+export const metadata:Metadata={title:"SOFT TECH | Beyond Play",description:"Creative worlds. Intelligent technology. Extraordinary experiences. Explore the original games from Soft Tech.",icons:{icon:"https://raw.githubusercontent.com/9dbit/mahjong-legend/main/web/assets/approved-v082/icon-192.png"},openGraph:{title:"SOFT TECH | Beyond Play",description:"Explore the next generation of interactive entertainment.",images:["https://raw.githubusercontent.com/9dbit/Skygate/main/play/assets/splash/soft-tech.png"]}};
+export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body>{children}</body></html>}
