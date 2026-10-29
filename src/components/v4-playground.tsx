@@ -96,16 +96,31 @@ export function V4Playground({ active, setActive, lang, navigate }: Props) {
     const y = (event.clientY - rect.top) / rect.height - .5;
     cancelAnimationFrame(frame.current);
     frame.current = requestAnimationFrame(() => {
-      node.style.setProperty("--mx", x.toFixed(3));
-      node.style.setProperty("--my", y.toFixed(3));
+      const offsets: Record<string, number> = {
+        "--v4-ax": x * 20, "--v4-ay": y * 12,
+        "--v4-fx": x * 37, "--v4-fy": y * 23,
+        "--v4-bx": x * -20, "--v4-by": y * -13,
+        "--v4-dx": x * -16, "--v4-dy": y * -12,
+        "--v4-tx": x * 24, "--v4-ty": y * 14,
+        "--v4-lx": x * -23, "--v4-ly": y * 18,
+        "--v4-srx": x * -10
+      };
+      for (const [property, amount] of Object.entries(offsets)) {
+        node.style.setProperty(property, amount.toFixed(1) + "px");
+      }
       node.style.setProperty("--light-left", ((x + .5) * 100).toFixed(1) + "%");
       node.style.setProperty("--light-top", ((y + .5) * 100).toFixed(1) + "%");
     });
   };
   const leave = () => {
     cancelAnimationFrame(frame.current);
-    stage.current?.style.setProperty("--mx", "0");
-    stage.current?.style.setProperty("--my", "0");
+    const node = stage.current;
+    if (node) {
+      for (const property of [
+        "--v4-ax","--v4-ay","--v4-fx","--v4-fy","--v4-bx","--v4-by",
+        "--v4-dx","--v4-dy","--v4-tx","--v4-ty","--v4-lx","--v4-ly","--v4-srx"
+      ]) node.style.setProperty(property, "0px");
+    }
     setHover(false);
   };
   const keydown = (event: KeyboardEvent<HTMLElement>) => {
