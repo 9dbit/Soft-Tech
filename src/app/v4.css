@@ -407,8 +407,8 @@ body {font-family:var(--v4-copy);color:var(--v4-ink);}
   animation:v4-letter-reveal 1.15s .22s cubic-bezier(.19,1,.22,1) both;
 }
 @keyframes v4-letter-reveal {
-  from {clip-path:inset(0 100% 0 0);filter:blur(4px);opacity:0;}
-  to {clip-path:inset(0 0 0 0);filter:blur(0);opacity:1;}
+  from {clip-path:inset(0 100% 0 0);filter:blur(4px);}
+  to {clip-path:inset(0 0 0 0);filter:blur(0);}
 }
 .v4-playground {touch-action:pan-y;}
 @media (prefers-reduced-motion:reduce) {
