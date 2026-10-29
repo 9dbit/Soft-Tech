@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type KeyboardEvent, type TouchEvent } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Play, Sparkles, MoveUpRight } from "lucide-react";
 import { games, type Game } from "@/data/games";
 import { Reveal, TiltCard } from "./motion";
@@ -74,6 +74,7 @@ export function V4Playground({ active, setActive, lang, navigate }: Props) {
   const game = games[active] || games[0];
   const reduced = useReducedMotion();
   const stage = useRef<HTMLElement>(null);
+  const touchOrigin = useRef<{x:number;y:number}|null>(null);
   const frame = useRef(0);
   const [hover, setHover] = useState(false);
   const title = lang === "ID" ? "CIPTAKAN DUNIA YANG TAK TERBATAS." : "IMAGINATION IS OUR PLAYGROUND.";
@@ -133,12 +134,26 @@ export function V4Playground({ active, setActive, lang, navigate }: Props) {
     }
   };
 
+  const touchStart = (event: TouchEvent<HTMLElement>) => {
+    const touch = event.touches[0];
+    touchOrigin.current = touch ? {x:touch.clientX,y:touch.clientY} : null;
+  };
+  const touchEnd = (event: TouchEvent<HTMLElement>) => {
+    const start = touchOrigin.current;
+    touchOrigin.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch) return;
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 58 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+    setActive((active + (dx < 0 ? 1 : games.length - 1)) % games.length);
+  };
   return (
     <section id="featured" aria-label="Soft Tech featured worlds" tabIndex={0}
       className="v4-playground" ref={stage}
-      onPointerMove={move} onPointerEnter={() => setHover(true)}
+      onPointerMove={move} onPointerEnter={(event) => { if (event.pointerType === "mouse") setHover(true); }}
       onPointerLeave={leave} onBlur={() => setHover(false)}
-      onKeyDown={keydown} style={{ "--v4-accent": game.accent } as CSSProperties}>
+      onTouchStart={touchStart} onTouchEnd={touchEnd} onKeyDown={keydown} style={{ "--v4-accent": game.accent } as CSSProperties}>
       <div className="v4-hero-grid" aria-hidden="true" />
       <div className="v4-hero-ambient" aria-hidden="true" />
       <div className="v4-hero-topline">
