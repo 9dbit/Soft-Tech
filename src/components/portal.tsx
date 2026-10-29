@@ -355,11 +355,18 @@ export default function Portal() {
         <header className="top-header">
           <div className="header-left">
             <button className="hamburger" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation">{mobileMenu ? <X size={21}/> : <Menu size={21}/>}</button>
-            <button className="top-brand" onClick={() => navigate("/")}><span className="top-brand-symbol">✳</span> SOFT<span>TECH</span></button>
+            <button className="top-brand" onClick={() => navigate("/")} aria-label="Soft Tech homepage"><img src={logo} alt="Soft Tech" /></button>
             <div className="header-breadcrumb"><span>STUDIO</span><ChevronRight size={13}/><strong>{game?.name || ({home:"DISCOVER",games:"OUR GAMES",company:"COMPANY",technology:"TECHNOLOGY",partners:"PARTNERSHIPS",contact:"CONTACT"} as Record<string,string>)[section] || "DISCOVER"}</strong></div>
           </div>
+          <nav className="desktop-nav" aria-label="Main navigation">
+            {links.map(link => <button key={link.path}
+              className={pathname === link.path || (link.path !== "/" && pathname.startsWith(link.path + "/")) ? "selected" : ""}
+              onClick={() => navigate(link.path)}>
+              {language === "EN" ? link.label : link.id}
+            </button>)}
+          </nav>
           <div className="header-right">
-            <span className="header-live"><span className="online-pulse"/> ALL SYSTEMS LIVE</span>
+            <span className="header-live"><span className="online-pulse"/> 03 ORIGINAL GAMES</span>
             <button className="language-switch" onClick={() => setLanguage(language === "EN" ? "ID" : "EN")} aria-label="Change language"><Globe2 size={15}/> {language}<ChevronDown size={12}/></button>
             <button className="contact-header" onClick={() => navigate("/contact")}>{t("LET'S TALK", "KONTAK")} <ArrowUpRight size={15}/></button>
           </div>
@@ -367,11 +374,26 @@ export default function Portal() {
 
         <main id="main-content" className="main-content">
           {section === "home" && <>
+            <div className="home-hero-grid">
             <section className="home-intro">
               <Reveal className="intro-main" delay={50}>
                 <span className="eyebrow"><span className="blink-dot"/> AN INDEPENDENT INTERACTIVE GAME STUDIO <span className="eyebrow-line"/></span>
-                <h1>BEYOND <span>PLAY.</span></h1>
-                <div className="intro-bottom"><p>{t("We create impossible worlds and make them feel real.", "Kami menciptakan dunia imajinatif yang terasa begitu nyata.")}</p><div className="intro-ident">THE FUTURE OF<br/>INTERACTIVE WORLDS. <span>↗</span></div></div>
+                <h1>BEYOND<br/><span>PLAY.</span></h1>
+                <div className="intro-bottom"><p>{t("A new spectrum of imaginative worlds, extraordinary moments, and unforgettable play.", "Spektrum baru dunia imajinatif, pengalaman luar biasa, dan permainan yang berkesan.")}</p><div className="intro-ident">THE FUTURE OF<br/>INTERACTIVE WORLDS. <span>↗</span></div></div>
+                <div className="hero-quicklinks">
+                  <span>{t("PICK YOUR WORLD / 03 ORIGINAL TITLES", "PILIH DUNIAMU / 03 GAME ORIGINAL")}</span>
+                  <div className="hero-quick-grid">
+                    {games.map((item, index) => <button key={item.id}
+                      className={active === index ? "selected" : ""}
+                      aria-label={"Show " + item.name}
+                      aria-pressed={active === index}
+                      onClick={() => setActive(index)}>
+                      <img src={item.cover} alt="" loading="lazy" />
+                      <span><small>0{index + 1} / {item.genre.toUpperCase()}</small><strong>{item.name}</strong></span>
+                      <ArrowUpRight size={17}/>
+                    </button>)}
+                  </div>
+                </div>
               </Reveal>
               <a className="intro-scroll" href="#featured" aria-label="Scroll to featured games"><span>SCROLL TO EXPLORE</span><ArrowDown size={16}/></a>
             </section>
@@ -380,6 +402,8 @@ export default function Portal() {
               <Reveal><div className="section-header"><div><span className="section-index">01</span><span className="section-slash">/</span><span>FEATURED WORLDS</span></div><span className="header-note">DESIGNED TO BE DISCOVERED. BUILT TO BE PLAYED.</span></div></Reveal>
               <Reveal><HeroShowcase active={active} setActive={setActive} lang={language} navigate={navigate}/></Reveal>
             </section>
+
+            </div>
 
             <div className="marquee" aria-label="Creative worlds, new experiences"><div className="marquee-track" aria-hidden="true">
               {Array.from({ length: 4 }, (_, i) => <span key={i}><i>✳</i> MORE THAN GAMES <b>·</b> NEW WORLDS <b>·</b> BEYOND PLAY <b>·</b></span>)}
