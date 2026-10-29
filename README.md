@@ -1,5 +1,10 @@
 # SOFT TECH • BEYOND PLAY
 
+
+## V3 Light Neon Design
+
+Soft Tech now uses an editorial light-grey 5% / white visual system with cyan-blue-magenta-pink neon illumination, Outfit headings and Plus Jakarta Sans UI. A floating desktop nav replaces the old permanent sidebar, while the homepage uses a new two-column hero and interactive game quicklinks. Existing 3D poster parallax and smooth card tilt remain. See `DESIGN_SYSTEM_V3.md` and `CHECKPOINT_2026-10-30_V3_LIGHT_NEON.md` for design tokens and production QA notes.
+
 ## V2 Cinematic Interactive Showcase
 
 The V2 redesign adds a layered, pointer-reactive 3D flagship carousel, luminous tilt cards, scroll-reveal transitions, adaptive ambient glow and a responsive editorial design system. Smooth motion uses native CSS transforms, `requestAnimationFrame` and `IntersectionObserver`, with a `prefers-reduced-motion` fallback. Production deployment: https://soft-tech-web-production.up.railway.app. See `CHECKPOINT_2026-10-30_V2_INTERACTIVE.md`.
