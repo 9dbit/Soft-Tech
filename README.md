@@ -1,4 +1,8 @@
 # SOFT TECH • BEYOND PLAY
+
+## V2 Cinematic Interactive Showcase
+
+The V2 redesign adds a layered, pointer-reactive 3D flagship carousel, luminous tilt cards, scroll-reveal transitions, adaptive ambient glow and a responsive editorial design system. Smooth motion uses native CSS transforms, `requestAnimationFrame` and `IntersectionObserver`, with a `prefers-reduced-motion` fallback. Production deployment: https://soft-tech-web-production.up.railway.app. See `CHECKPOINT_2026-10-30_V2_INTERACTIVE.md`.
 Corporate game provider showcase for the 9dbit studio portfolio, running Next.js 16 and TypeScript.
 
 ## Locally
