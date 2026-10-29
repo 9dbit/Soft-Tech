@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { games, logo, type Game } from "@/data/games";
 import { ParallaxScene, Reveal, ScrollProgress, TiltCard } from "./motion";
+import { V4Playground, V4WorldStory } from "./v4-playground";
 
 type Language = "EN" | "ID";
 const links = [
@@ -374,36 +375,7 @@ export default function Portal() {
 
         <main id="main-content" className="main-content">
           {section === "home" && <>
-            <div className="home-hero-grid">
-            <section className="home-intro">
-              <Reveal className="intro-main" delay={50}>
-                <span className="eyebrow"><span className="blink-dot"/> AN INDEPENDENT INTERACTIVE GAME STUDIO <span className="eyebrow-line"/></span>
-                <h1>BEYOND<br/><span>PLAY.</span></h1>
-                <div className="intro-bottom"><p>{t("A new spectrum of imaginative worlds, extraordinary moments, and unforgettable play.", "Spektrum baru dunia imajinatif, pengalaman luar biasa, dan permainan yang berkesan.")}</p><div className="intro-ident">THE FUTURE OF<br/>INTERACTIVE WORLDS. <span>↗</span></div></div>
-                <div className="hero-quicklinks">
-                  <span>{t("PICK YOUR WORLD / 03 ORIGINAL TITLES", "PILIH DUNIAMU / 03 GAME ORIGINAL")}</span>
-                  <div className="hero-quick-grid">
-                    {games.map((item, index) => <button key={item.id}
-                      className={active === index ? "selected" : ""}
-                      aria-label={"Show " + item.name}
-                      aria-pressed={active === index}
-                      onClick={() => setActive(index)}>
-                      <img src={item.cover} alt="" loading="lazy" />
-                      <span><small>0{index + 1} / {item.genre.toUpperCase()}</small><strong>{item.name}</strong></span>
-                      <ArrowUpRight size={17}/>
-                    </button>)}
-                  </div>
-                </div>
-              </Reveal>
-              <a className="intro-scroll" href="#featured" aria-label="Scroll to featured games"><span>SCROLL TO EXPLORE</span><ArrowDown size={16}/></a>
-            </section>
-
-            <section className="home-showcase" id="featured">
-              <Reveal><div className="section-header"><div><span className="section-index">01</span><span className="section-slash">/</span><span>FEATURED WORLDS</span></div><span className="header-note">DESIGNED TO BE DISCOVERED. BUILT TO BE PLAYED.</span></div></Reveal>
-              <Reveal><HeroShowcase active={active} setActive={setActive} lang={language} navigate={navigate}/></Reveal>
-            </section>
-
-            </div>
+            <V4Playground active={active} setActive={setActive} lang={language} navigate={navigate}/>
 
             <div className="marquee" aria-label="Creative worlds, new experiences"><div className="marquee-track" aria-hidden="true">
               {Array.from({ length: 4 }, (_, i) => <span key={i}><i>✳</i> MORE THAN GAMES <b>·</b> NEW WORLDS <b>·</b> BEYOND PLAY <b>·</b></span>)}
@@ -415,6 +387,8 @@ export default function Portal() {
               <div className="game-grid">{games.map((item, index) =>
                 <Reveal key={item.id} delay={index * 95}><GameCard game={item} navigate={navigate} index={index}/></Reveal>)}</div>
             </section>
+
+            <V4WorldStory lang={language} navigate={navigate}/>
 
             <section className="studio-section">
               <Reveal><div className="section-header"><div><span className="section-index">03</span><span className="section-slash">/</span><span>THE STUDIO</span></div><span className="header-note">THE CREATIVE ENGINE BEHIND THE WORLDS.</span></div></Reveal>
