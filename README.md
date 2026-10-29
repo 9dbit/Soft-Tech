@@ -1,6 +1,10 @@
 # SOFT TECH • BEYOND PLAY
 
 
+## V4 Neo-Digital Playground
+
+This release replaces the old split hero with a full-bleed **BEYOND PLAY** editorial scene, authentic 3D game artwork, pointer-driven parallax, magnetized CTA, touch-swipe/keyboard carousel, motion typography and sticky scroll storytelling. Brand canvas stays 5% light grey with logo-spectrum neon. Fonts: Barlow Condensed, Manrope, DM Mono and Pixelify Sans. Source files: `src/components/v4-playground.tsx`, `src/app/v4.css`, `src/app/v4-responsive.css`. Design specification: [DESIGN_SYSTEM_V4.md](DESIGN_SYSTEM_V4.md). Production checkpoint: [CHECKPOINT_2026-10-30_V4_NEO_DIGITAL.md](CHECKPOINT_2026-10-30_V4_NEO_DIGITAL.md).
+
 ## V3 Light Neon Design
 
 Soft Tech now uses an editorial light-grey 5% / white visual system with cyan-blue-magenta-pink neon illumination, Outfit headings and Plus Jakarta Sans UI. A floating desktop nav replaces the old permanent sidebar, while the homepage uses a new two-column hero and interactive game quicklinks. Existing 3D poster parallax and smooth card tilt remain. See `DESIGN_SYSTEM_V3.md` and `CHECKPOINT_2026-10-30_V3_LIGHT_NEON.md` for design tokens and production QA notes.
