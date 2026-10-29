@@ -17,7 +17,7 @@ Connect GitHub repository `9dbit/Soft-Tech`, branch `main`, Node 20+, standard N
 - [Mahjong Wild](https://mahjong-legend-web-production.up.railway.app/?utm_source=softtech)
 
 ## Art
-Logo and game previews are from studio-owned public GitHub repos at `raw.githubusercontent.com/9dbit`. Keep these asset locations public or migrate them to this repo before changing access. No third-party game art is used.
+Exact Soft Tech logo and game cover assets have been copied into `public/assets/` from the studio-owned repositories (9dbit/Skygate, 9dbit/uno-luck, 9dbit/mahjong-legend). All files are now served by Soft Tech itself; changes to source repo visibility won't break the portal. The logo file is byte-identical to the supplied reference.
 
 ## Contact
 The site provides a partnership enquiry email template via mailto; no unconfigured server is claimed to deliver emails. A backend contact delivery integration can be added once an official studio mailbox is confirmed.

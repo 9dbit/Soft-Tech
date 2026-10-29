@@ -1,1 +1,1 @@
-import type {MetadataRoute} from "next";export default function robots():MetadataRoute.Robots{const base=process.env.NEXT_PUBLIC_SITE_URL||"https://soft-tech-production.up.railway.app";return {rules:{userAgent:"*",allow:"/"},sitemap:base.replace(/\/$/,"")+"/sitemap.xml"}}
+import type {MetadataRoute} from "next";export default function robots():MetadataRoute.Robots{const base=process.env.NEXT_PUBLIC_SITE_URL||"https://soft-tech-web-production.up.railway.app";return {rules:{userAgent:"*",allow:"/"},sitemap:base.replace(/\/$/,"")+"/sitemap.xml"}}
