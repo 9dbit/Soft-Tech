@@ -40,11 +40,16 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
   const update=()=>{
    cancelAnimationFrame(rafRef.current);
    rafRef.current=requestAnimationFrame(()=>{
-    if(motion.matches){scene.style.setProperty("--v52-scroll","0px");scene.style.setProperty("--v52-tilt","0deg");return;}
     const r=scene.getBoundingClientRect();
-    const progress=clamp((window.innerHeight*.52-r.top-r.height*.5)/window.innerHeight,-1,1);
+    const progress=motion.matches?0:clamp((window.innerHeight*.52-r.top-r.height*.5)/window.innerHeight,-1,1);
     scene.style.setProperty("--v52-scroll",(progress*17).toFixed(2)+"px");
+    scene.style.setProperty("--v52-soft-shift",(progress*-4).toFixed(2)+"px");
+    scene.style.setProperty("--v52-tech-shift",(progress*-6).toFixed(2)+"px");
     scene.style.setProperty("--v52-tilt",(progress*1.2).toFixed(2)+"deg");
+    scene.querySelectorAll<HTMLElement>(".v52-depth-part").forEach(el=>{
+      const depth=Number(el.dataset.depth||0);
+      el.style.setProperty("--v52-shift",(progress*17*depth).toFixed(2)+"px");
+    });
    });
   };
   update();window.addEventListener("scroll",update,{passive:true});window.addEventListener("resize",update,{passive:true});motion.addEventListener("change",update);
@@ -86,7 +91,7 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
        <div className="v52-model" aria-hidden="true">
          {hasFullAsset&&<img src="/assets/v5/orange-computer-cutout.webp" alt="" className={"v52-full-art"+(ready?" v52-full-art-hidden":"")} onError={()=>setHasFullAsset(false)}/>}
          <div className={"v52-layered-art"+(ready?" v52-art-ready":"")}>
-           {LAYERS.map(part=><div key={part.id} className={"v52-depth-part v52-part-"+part.id} style={layerStyle(part)}>
+           {LAYERS.map(part=><div key={part.id} className={"v52-depth-part v52-part-"+part.id} data-depth={part.depth} style={layerStyle(part)}>
              <img src={"/assets/v5/"+part.id+"-layer.webp"} alt="" loading="eager"/>
            </div>)}
          </div>
