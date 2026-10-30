@@ -88,13 +88,21 @@ try {
   const navPage = await browser.newPage({ viewport: {width:1586,height:992} });
   await navPage.goto(root,{waitUntil:"domcontentloaded"});
   await navPage.locator(".v5-button-primary").click();
-  if (!new URL(navPage.url()).pathname.startsWith("/games")) errors.push("Explore Games CTA failed navigation.");
+  try {
+    await navPage.waitForURL("**/games", {timeout:12000});
+  } catch {
+    errors.push("Explore Games CTA failed navigation.");
+  }
   await navPage.goto(root,{waitUntil:"domcontentloaded"});
   await navPage.locator(".v5-login").click();
   const dialog = navPage.locator('[role="dialog"][aria-label="Partner account notice"]');
-  if (!(await dialog.isVisible())) errors.push("Partner access dialog not interactive.");
-  await dialog.locator(".v5-dialog-close").click();
-  if (await dialog.isVisible()) errors.push("Partner access dialog did not close.");
+  try { await dialog.waitFor({state:"visible", timeout:10000}); }
+  catch { errors.push("Partner access dialog not interactive."); }
+  if (await dialog.isVisible()) {
+    await dialog.locator(".v5-dialog-close").click();
+    try { await dialog.waitFor({state:"hidden", timeout:10000}); }
+    catch { errors.push("Partner access dialog did not close."); }
+  }
   await navPage.close();
 } finally {
   await browser.close();
