@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type PointerEvent, type CSSProperties } fr
 import { ArrowRight, ArrowDown, Globe2, Gamepad2, Instagram, Facebook, X, ChevronDown, LockKeyhole, Mail } from "lucide-react";
 
 const V5_LAYERS = [
-  { id: "cable", left: 230, top: 784, width: 455, height: 683, depthX: .44, depthY: .4 },
+  { id: "cable", left: 160, top: 784, width: 525, height: 683, depthX: .44, depthY: .4 },
   { id: "monitor", left: 120, top: 40, width: 860, height: 800, depthX: .35, depthY: .35 },
   { id: "keyboard", left: 20, top: 774, width: 716, height: 516, depthX: .67, depthY: .68 },
   { id: "printer", left: 556, top: 902, width: 468, height: 473, depthX: 1.12, depthY: 1.1 },
