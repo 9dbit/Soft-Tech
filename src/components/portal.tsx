@@ -339,7 +339,7 @@ export default function Portal() {
       {mobileMenu && <button className="mobile-backdrop" aria-label="Close navigation" onClick={() => setMobileMenu(false)}/>}
       <aside id="v52-site-navigation" className={"side-panel " + (mobileMenu ? "side-open" : "")}>
         <button className="brand-logo" onClick={() => navigate("/")} aria-label="Soft Tech homepage">
-          <img src="/assets/v5/soft-tech-neon-header.webp" alt="SOFT TECH"/><span>INDEPENDENT GAME STUDIO</span>
+          <img src="/assets/v5/soft-tech-header-cropped.png" alt="SOFT TECH"/><span>INDEPENDENT GAME STUDIO</span>
         </button>
         <div className="side-divider"/>
         <div className="side-navigation"><span className="side-caption">NAVIGATION / 001</span>
@@ -358,7 +358,7 @@ export default function Portal() {
         <header className="top-header">
           <div className="header-left">
             <button className="hamburger" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation">{mobileMenu ? <X size={21}/> : <Menu size={21}/>}</button>
-            <button className="top-brand" onClick={() => navigate("/")} aria-label="Soft Tech homepage"><img src={logo} alt="Soft Tech" /></button>
+            <button className="top-brand" onClick={() => navigate("/")} aria-label="Soft Tech homepage"><img src="/assets/v5/soft-tech-header-cropped.png" alt="Soft Tech" /></button>
             <div className="header-breadcrumb"><span>STUDIO</span><ChevronRight size={13}/><strong>{game?.name || ({home:"DISCOVER",games:"OUR GAMES",company:"COMPANY",technology:"TECHNOLOGY",partners:"PARTNERSHIPS",contact:"CONTACT"} as Record<string,string>)[section] || "DISCOVER"}</strong></div>
           </div>
           <nav className="desktop-nav" aria-label="Main navigation">
