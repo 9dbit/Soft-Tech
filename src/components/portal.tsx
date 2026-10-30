@@ -10,7 +10,8 @@ import {
 } from "lucide-react";
 import { games, logo, type Game } from "@/data/games";
 import { ParallaxScene, Reveal, ScrollProgress, TiltCard } from "./motion";
-import { V4Playground, V4WorldStory } from "./v4-playground";
+import { V4WorldStory } from "./v4-playground";
+import V52MobileHero from "./v52-mobile-hero";
 import V5DesktopHero from "./v5-desktop-hero";
 
 type Language = "EN" | "ID";
@@ -336,7 +337,7 @@ export default function Portal() {
       <div className="screen-grain" aria-hidden="true"/>
       <a className="skip-link" href="#main-content">SKIP TO CONTENT</a>
       {mobileMenu && <button className="mobile-backdrop" aria-label="Close navigation" onClick={() => setMobileMenu(false)}/>}
-      <aside className={"side-panel " + (mobileMenu ? "side-open" : "")}>
+      <aside id="v52-site-navigation" className={"side-panel " + (mobileMenu ? "side-open" : "")}>
         <button className="brand-logo" onClick={() => navigate("/")} aria-label="Soft Tech homepage">
           <img src={logo} alt="SOFT TECH"/><span>INDEPENDENT GAME STUDIO</span>
         </button>
@@ -377,7 +378,9 @@ export default function Portal() {
         <main id="main-content" className="main-content">
           {section === "home" && <>
             <div className="v5-desktop-only"><V5DesktopHero navigate={navigate} lang={language}/></div>
-            <div className="v5-v4-fallback"><V4Playground active={active} setActive={setActive} lang={language} navigate={navigate}/></div>
+            <div className="v52-mobile-only"><V52MobileHero navigate={navigate} lang={language}
+              menuOpen={mobileMenu} toggleMenu={() => setMobileMenu(current => !current)}
+              toggleLanguage={() => setLanguage(current => current === "EN" ? "ID" : "EN")}/></div>
 
             <div className="marquee" aria-label="Creative worlds, new experiences"><div className="marquee-track" aria-hidden="true">
               {Array.from({ length: 4 }, (_, i) => <span key={i}><i>✳</i> MORE THAN GAMES <b>·</b> NEW WORLDS <b>·</b> BEYOND PLAY <b>·</b></span>)}
