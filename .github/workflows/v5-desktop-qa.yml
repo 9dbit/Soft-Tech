@@ -1,4 +1,8 @@
 name: V5 Desktop Prototype QA
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
 on:
   pull_request:
     branches: [main]
@@ -68,3 +72,51 @@ jobs:
           path: qa-artifacts/v5/
           if-no-files-found: warn
           retention-days: 14
+
+      - name: Post browser QA summary to pull request
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- soft-tech-v5-visual-qa -->';
+            let report;
+            try {
+              report = JSON.parse(fs.readFileSync('qa-artifacts/v5/report.json', 'utf8'));
+            } catch (error) {
+              report = { errors: ['QA report missing: ' + error.message], checks: [] };
+            }
+            const rows = report.checks.map(c =>
+              '- ' + c.viewport.name + ': viewport ' + c.windowWidth + 'px, scrollWidth ' + c.scrollWidth +
+              'px, artwork ' + (c.artReady ? 'loaded' : 'not ready') +
+              ', stage ' + (c.stage ? c.stage.x + ',' + c.stage.y : 'not mounted')
+            );
+            const body = [
+              marker,
+              '### V5 automated real-browser QA',
+              '**Result:** ' + (report.errors.length ? 'FAILED (' + report.errors.length + ' issues)' : 'PASSED'),
+              '',
+              ...rows,
+              '',
+              '#### Findings',
+              ...(report.errors.length ? report.errors.map(e => '- ' + e) : ['- No browser QA violations reported.']),
+              '',
+              'Screenshots (1586×992 master, 1440, 1366, 1920, iPhone 390) and JSON metrics are available in this workflow run’s **soft-tech-v5-desktop-visual-qa** artifact.',
+              '',
+              'Commit: ' + context.sha
+            ].join('\n');
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number, per_page: 100
+            });
+            const existing = comments.find(c => c.user?.type === 'Bot' && c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, body
+              });
+            }
