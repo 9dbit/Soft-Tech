@@ -282,3 +282,38 @@
  .v52-depth-part{transform:none!important;transition:none!important;}
  .v52-pixel-word{transform:none!important;transition:none!important;}
 }
+
+/* V5.5: original artwork remains whole, component layers are feathered overlays.
+   This eliminates the hard rectangular edges exposed by previous extreme translations. */
+@media(max-width:1099px){
+ .v52-header{background:transparent!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;}
+ .v52-logo-button{width:clamp(180px,51vw,240px)!important;height:70px!important;max-width:240px!important;
+   overflow:visible!important;flex:1 1 auto!important;}
+ .v52-logo-button img{position:relative!important;inset:auto!important;width:100%!important;height:100%!important;
+   object-fit:contain!important;transform:scale(1.26)!important;transform-origin:center left!important;
+   filter:drop-shadow(0 2px 5px #d737b83d)!important;}
+ .v52-header-controls{position:relative!important;z-index:4!important;}
+ .v52-language-button,.v52-menu-button{background:#ffffffa8!important;
+   -webkit-backdrop-filter:blur(18px) saturate(1.5)!important;backdrop-filter:blur(18px) saturate(1.5)!important;}
+ .v52-full-art{opacity:1!important;display:block!important;filter:drop-shadow(0 16px 14px #39242a24)!important;}
+ .v52-full-art-hidden{opacity:1!important;}
+ .v52-layered-art.v52-art-ready{opacity:1!important;}
+ .v52-depth-part{opacity:calc(var(--v52-reveal,0) * .92)!important;
+   transform:translate3d(var(--v52-xshift,0px),var(--v52-shift,0px),0) rotate(calc(var(--v52-tilt) * .35))!important;
+   -webkit-mask-image:radial-gradient(ellipse 72% 74% at center,#000 42%,#000b 67%,transparent 100%)!important;
+   mask-image:radial-gradient(ellipse 72% 74% at center,#000 42%,#000b 67%,transparent 100%)!important;
+   filter:drop-shadow(0 6px 8px #402a2112)!important;}
+ .v52-part-cable{opacity:calc(var(--v52-reveal,0) * .5)!important;}
+ .v52-part-monitor{opacity:calc(var(--v52-reveal,0) * .96)!important;}
+ .v52-part-keyboard{opacity:calc(var(--v52-reveal,0) * .92)!important;}
+ .v52-part-printer{opacity:calc(var(--v52-reveal,0) * .92)!important;}
+ .v52-art-scene{isolation:isolate!important;}
+}
+@media(max-width:390px){
+ .v52-logo-button{width:clamp(157px,46vw,192px)!important;}
+ .v52-logo-button img{transform:scale(1.18)!important;}
+ .v52-language-button{padding:0 7px!important;}
+}
+@media(prefers-reduced-motion:reduce){
+ .v52-depth-part{opacity:0!important;}
+}
