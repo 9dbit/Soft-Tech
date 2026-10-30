@@ -44,15 +44,16 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
     const r=scene.getBoundingClientRect();
     const section=sectionRef.current?.getBoundingClientRect();
     const timeline=section?clamp((window.innerHeight*.45-section.top)/Math.max(section.height-window.innerHeight*.3,1),0,1):0;
-    const progress=motion.matches?0:clamp((timeline-.35)*2,-1,1);
+    const progress=motion.matches?0:clamp((timeline-.48)*2.65,-1,1);
     scene.style.setProperty("--v52-sequence",String(timeline));
-    scene.style.setProperty("--v52-scroll",(progress*17).toFixed(2)+"px");
-    scene.style.setProperty("--v52-soft-shift",(progress*-4).toFixed(2)+"px");
-    scene.style.setProperty("--v52-tech-shift",(progress*-6).toFixed(2)+"px");
-    scene.style.setProperty("--v52-tilt",(progress*1.2).toFixed(2)+"deg");
+    scene.style.setProperty("--v52-scroll",(progress*148).toFixed(2)+"px");
+    scene.style.setProperty("--v52-soft-shift",(progress*-90).toFixed(2)+"px");
+    scene.style.setProperty("--v52-tech-shift",(progress*104).toFixed(2)+"px");
+    scene.style.setProperty("--v52-tilt",(progress*4.5).toFixed(2)+"deg");
     scene.querySelectorAll<HTMLElement>(".v52-depth-part").forEach(el=>{
       const depth=Number(el.dataset.depth||0);
-      el.style.setProperty("--v52-shift",(progress*17*depth).toFixed(2)+"px");
+      el.style.setProperty("--v52-shift",(progress*155*(depth-.58)).toFixed(2)+"px");
+      el.style.setProperty("--v52-xshift",(progress*75*(depth-.58)).toFixed(2)+"px");
     });
    });
   };
@@ -71,7 +72,7 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
    <section ref={sectionRef} className="v52-hero-surface" aria-label="Soft Tech mobile game studio">
      <header className="v52-header">
        <button className="v52-logo-button" onClick={()=>navigate("/")} aria-label="Soft Tech homepage">
-         <img src="/assets/v5/soft-tech-neon-header.webp" alt="Soft Tech original neon logo" width={159} height={86}/>
+         <img src="/assets/soft-tech-logo.png" alt="Soft Tech original neon logo" width={1448} height={1086}/>
        </button>
        <div className="v52-header-controls">
          <button className="v52-language-button" onClick={toggleLanguage} aria-label={t("Switch language","Ganti bahasa")}><Globe2 size={16}/>{lang}</button>
