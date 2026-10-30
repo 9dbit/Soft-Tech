@@ -55,8 +55,8 @@
   font:700 clamp(130px,10.8vw,172px)/.86 'Pixelify Sans',monospace;
   letter-spacing:.007em;color:#fff;white-space:nowrap;
 }
-.v5-soft{left:2.0%;top:58.6%}
-.v5-tech{right:1.5%;bottom:6.9%}
+.v5-soft{left:2.0%;top:60.1%}
+.v5-tech{right:1.5%;bottom:5.2%}
 .v5-art-layer{position:absolute;inset:0;z-index:14;pointer-events:none}
 .v5-ground-shadow{position:absolute;left:34%;top:86%;width:40%;height:7%;background:#2f1d2633;filter:blur(30px);border-radius:50%}
 .v5-orange-computer{
