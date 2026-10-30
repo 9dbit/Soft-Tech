@@ -90,6 +90,21 @@ export default function V5DesktopHero({ navigate, lang }: {
 
   const [showPartnerNotice, setShowPartnerNotice] = useState(false);
   const [language, setLanguage] = useState<"EN"|"ID">(lang);
+  useEffect(() => {
+    const images = Array.from(stageRef.current?.querySelectorAll<HTMLImageElement>(".v5-depth-part img") ?? []);
+    const synchronize = () => setLoadedParts(images.filter(img => img.complete && img.naturalWidth > 0).length);
+    for (const img of images) {
+      img.addEventListener("load", synchronize);
+      img.addEventListener("error", synchronize);
+    }
+    synchronize();
+    return () => {
+      for (const img of images) {
+        img.removeEventListener("load", synchronize);
+        img.removeEventListener("error", synchronize);
+      }
+    };
+  }, []);
   const t = (english: string, indonesian: string) => language === "EN" ? english : indonesian;
   return (
     <section className="v5-hero" aria-label="SOFT TECH digital game studio">
@@ -147,9 +162,7 @@ export default function V5DesktopHero({ navigate, lang }: {
             {V5_LAYERS.map(part => (
               <div key={part.id} className={"v5-depth-part v5-depth-" + part.id}
                 style={depthStyle(part)} data-depth-x={part.depthX} data-depth-y={part.depthY}>
-                <img src={"/assets/v5/" + part.id + "-layer.webp"} alt=""
-                  onLoad={() => setLoadedParts(count => Math.min(PARTS_TOTAL, count + 1))}
-                  onError={() => { /* the full image remains visible as a fallback */ }} />
+                <img src={"/assets/v5/" + part.id + "-layer.webp"} alt="" />
               </div>
             ))}
           </div>
