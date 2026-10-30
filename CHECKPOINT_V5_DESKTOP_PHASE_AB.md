@@ -1,4 +1,7 @@
 # Soft Tech V5 Desktop • Phase A/B Checkpoint
+> **Superseded by [V5.1 deep parallax checkpoint](CHECKPOINT_2026-10-30_V5_1_PARALLAX.md).** The original Phase A/B file below is retained as a historical record only. The source WebP assets have now been uploaded, the deep parallax implementation is complete on the branch, and real-browser screenshot QA is available. Do not interpret its historical “pending source upload” statements as current status.
+
+
 Date: 2026-10-30 (Asia/Jakarta)
 Branch: `feat/v5-desktop-pixel-match-20261030`
 Base: `main` (production remains on V4)
@@ -19,7 +22,7 @@ The source orange retro computer photograph `IMG_3543.jpeg` was processed offlin
 - Local integrated preview at 1586 x 992 generated for comparison.
 - Some cream coiled-cable regions remain imperfectly segmented. These need final manual retouch before the source artwork can be called pixel-perfect.
 
-**Pending source upload:** `public/assets/v5/orange-computer-cutout.webp` is intentionally NOT yet included in the remote repository. GitHub's connected write action accepts textual/base64 content but cannot consume a local container path. The component currently has an honest CSS fallback computer shape for branch preview, while the actual cutout is in the downloadable Phase A/B asset bundle. Do not deploy or merge the branch as visually approved until the real cutout asset is installed and browser visual QA has passed.
+**Historical note (superseded 2026-10-30):** `public/assets/v5/orange-computer-cutout.webp` is intentionally NOT yet included in the remote repository. GitHub's connected write action accepts textual/base64 content but cannot consume a local container path. The component currently has an honest CSS fallback computer shape for branch preview, while the actual cutout is in the downloadable Phase A/B asset bundle. Do not deploy or merge the branch as visually approved until the real cutout asset is installed and browser visual QA has passed.
 
 ## QA gates still required
 1. Install original transparent foreground asset into `public/assets/v5/orange-computer-cutout.webp`.
