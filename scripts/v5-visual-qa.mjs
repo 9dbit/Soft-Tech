@@ -141,8 +141,10 @@ try {
           promoBackground:css(".side-panel .side-card").backgroundColor,
           ctaBackground:css(".footer-cta").backgroundColor,
           ctaRadius:css(".footer-cta").borderRadius,
+          landscapeCards:[...document.querySelectorAll(".catalog-grid .game-card-media")].map(el=>{const r=el.getBoundingClientRect();return {width:r.width,height:r.height};}),
           scrollWidth:document.documentElement.scrollWidth,windowWidth:innerWidth};
       });
+      if(route==="/games" && (audit.landscapeCards.length!==3||audit.landscapeCards.some(c=>c.width<=c.height)))errors.push(viewport.name+" "+route+": game catalog must have three landscape covers");
       if(audit.badEm.length)errors.push(viewport.name+" "+route+": gradient rectangles "+audit.badEm.join(","));
       if(["rgb(0, 0, 0)","rgb(23, 21, 27)"].includes(audit.logoBackground))errors.push(viewport.name+" "+route+": black logo plaque");
       if(audit.promoBackground==="rgb(25, 22, 29)")errors.push(viewport.name+" "+route+": black promo panel");
@@ -184,8 +186,11 @@ try {
     errors.push("Escape did not close the mobile navigation.");
   await mobile.locator(".v52-language-button").click();
   await mobile.waitForFunction(()=>document.querySelector(".v52-language-button")?.textContent?.includes("ID"));
-  await mobile.locator(".v52-rail-arrows button").last().click();
-  await mobile.waitForFunction(()=>document.querySelector(".v52-games-rail")?.scrollLeft>10);
+  if(await mobile.locator(".v52-games-rail .v52-game-card").count()!==3)errors.push("Homepage must display exactly three landscape cards.");
+  const cardLayout=await mobile.locator(".v52-games-rail").evaluate(el=>getComputedStyle(el).gridTemplateColumns);
+  if(cardLayout.split(" ").length!==1)errors.push("Homepage game cards must stack in one column.");
+  const firstCard=await mobile.locator(".v52-card-cover").first().boundingBox();
+  if(!firstCard||firstCard.width<=firstCard.height)errors.push("Homepage game covers must be landscape.");
   await mobile.locator(".v52-primary-cta").click();
   try {await mobile.waitForURL("**/games",{timeout:12000});}
   catch {errors.push("Mobile Explore Games CTA failed navigation.");}

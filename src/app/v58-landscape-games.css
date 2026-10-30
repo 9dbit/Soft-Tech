@@ -1,0 +1,142 @@
+/* V5.8: three original games deserve three full-width landscape showcases. */
+.v5-home .home-collection .game-grid,
+.catalog-grid.game-grid{
+ display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+ gap:34px!important;align-items:stretch!important;
+}
+.v5-home .home-collection .game-grid>.reveal,
+.catalog-grid.game-grid>.reveal,
+.v5-home .home-collection .game-grid>.reveal:nth-child(2),
+.v5-home .home-collection .game-grid>.reveal:nth-child(3){
+ grid-column:auto!important;max-width:none!important;margin-top:0!important;
+ width:100%!important;
+}
+.v5-home .home-collection .game-card,
+.catalog-grid .game-card{width:100%!important;}
+.v5-home .home-collection .game-card-media,
+.catalog-grid .game-card-media{
+ aspect-ratio:16/7.4!important;width:100%!important;
+ border:0!important;border-radius:28px!important;
+ background:#ebe4ee!important;box-shadow:0 12px 30px #70477b17!important;
+}
+.v5-home .home-collection .game-card-media>img,
+.catalog-grid .game-card-media>img{
+ width:100%!important;height:100%!important;object-fit:cover!important;
+ object-position:center 38%!important;
+}
+.v5-home .home-collection .game-card-media:before,
+.catalog-grid .game-card-media:before{
+ background:linear-gradient(90deg,rgba(28,18,34,.65) 0%,rgba(35,23,41,.28) 48%,transparent 80%),
+ linear-gradient(0deg,rgba(30,21,37,.44),transparent 55%)!important;
+}
+.v5-home .home-collection .card-cover-name,
+.catalog-grid .card-cover-name{
+ left:clamp(20px,4vw,55px)!important;bottom:clamp(25px,5vw,65px)!important;
+ right:20px!important;
+}
+.v5-home .home-collection .card-cover-name h3,
+.catalog-grid .card-cover-name h3{
+ color:#fff!important;-webkit-text-fill-color:#fff!important;
+ font-family:var(--v57-font)!important;font-weight:900!important;
+ font-size:clamp(32px,5.2vw,76px)!important;letter-spacing:-.06em!important;
+ text-shadow:0 3px 20px #2011268c!important;max-width:85%;
+}
+.v5-home .home-collection .card-cover-name .small-label,
+.catalog-grid .card-cover-name .small-label,
+.v5-home .home-collection .card-top,
+.catalog-grid .card-top,
+.v5-home .home-collection .card-top span,
+.catalog-grid .card-top span{
+ color:#fff!important;-webkit-text-fill-color:#fff!important;
+ text-shadow:0 2px 9px #291b30b8!important;
+}
+.v5-home .home-collection .game-card-foot,
+.catalog-grid .game-card-foot{
+ flex-direction:row!important;align-items:center!important;
+ justify-content:space-between!important;gap:20px!important;
+ padding:18px 7px 4px!important;
+}
+.v5-home .home-collection .game-card-foot p,
+.catalog-grid .game-card-foot p{color:#706b76!important;font:700 clamp(13px,1.5vw,17px)/1.5 var(--v57-font)!important;}
+.v5-home .home-collection .game-card-foot .eyebrow,
+.catalog-grid .game-card-foot .eyebrow{color:var(--v57-purple)!important;}
+.v5-home .home-collection .card-play,
+.catalog-grid .card-play{
+ background:var(--v57-purple)!important;color:#fff!important;
+ border-radius:999px!important;border:0!important;
+ min-height:48px!important;padding:0 24px!important;
+ font-family:var(--v57-font)!important;font-size:11px!important;
+}
+/* Homepage mobile: remove the swipe rail, show all 3 titles vertically. */
+@media(max-width:1099px){
+ .v52-games-rail{
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  gap:22px!important;overflow:visible!important;scroll-snap-type:none!important;
+  padding:0!important;scroll-behavior:auto!important;
+ }
+ .v52-games-rail .v52-game-card{
+  width:100%!important;max-width:none!important;min-width:0!important;
+  flex:none!important;scroll-snap-align:none!important;overflow:hidden!important;
+  border-radius:24px!important;background:#fff!important;
+  box-shadow:0 10px 26px #88668c14!important;
+ }
+ .v52-games-rail .v52-card-cover{
+  height:auto!important;aspect-ratio:16/9!important;min-height:0!important;
+  border-radius:22px!important;overflow:hidden!important;
+ }
+ .v52-games-rail .v52-card-cover img{
+  height:100%!important;width:100%!important;object-fit:cover!important;
+  object-position:center 35%!important;
+ }
+ .v52-games-rail .v52-card-cover>span{
+  color:#fff!important;-webkit-text-fill-color:#fff!important;
+  font:700 11px var(--v57-font)!important;text-shadow:0 2px 9px #302035b0!important;
+ }
+ .v52-games-rail .v52-card-info{padding:19px 20px 21px!important;}
+ .v52-games-rail .v52-card-info h2{
+  color:var(--v57-grey)!important;-webkit-text-fill-color:var(--v57-grey)!important;
+  font:900 clamp(25px,6.5vw,36px)/1.06 var(--v57-font)!important;
+  letter-spacing:-.045em!important;margin:8px 0!important;
+ }
+ .v52-games-rail .v52-card-info>span{color:var(--v57-purple)!important;font:800 10px var(--v57-font)!important;}
+ .v52-games-rail .v52-card-info p{color:#77717c!important;font:600 13px/1.5 var(--v57-font)!important;min-height:0!important;}
+ .v52-games-rail .v52-card-info a{
+  display:inline-flex!important;justify-content:center!important;gap:14px!important;
+  min-height:44px!important;padding:0 25px!important;
+  background:var(--v57-purple)!important;color:#fff!important;
+  border-radius:999px!important;font:800 11px var(--v57-font)!important;
+ }
+ .v52-featured-header strong,.v52-featured-header small,.v52-rail-arrows>span{
+  color:var(--v57-grey)!important;font-family:var(--v57-font)!important;
+ }
+ .v52-featured-header{align-items:center!important;}
+ .v52-rail-arrows>span{font-size:10px!important;letter-spacing:.04em!important;}
+ .catalog-grid.game-grid{gap:27px!important;}
+ .catalog-grid .game-card-media{aspect-ratio:16/9!important;border-radius:22px!important;}
+ .catalog-grid .card-cover-name{left:19px!important;bottom:21px!important;}
+ .catalog-grid .card-cover-name h3{font-size:clamp(26px,6.7vw,40px)!important;}
+ .catalog-grid .game-card-foot{flex-wrap:wrap!important;align-items:flex-start!important;gap:13px!important;}
+ .catalog-grid .card-play{min-height:44px!important;}
+}
+/* Keep black out of the text system: grey editorial headings, white artwork labels. */
+.site .section-header,.site .section-header span,.site .section-header button,
+.site .section-tag,.site .section-index,.site .section-slash,
+.site .catalog-count,.site .catalog-search input,
+.site .v52-studio-summary h2,.site .v52-studio-summary p,
+.site .v52-count-label,.site .v52-count-label strong,
+.site .v52-featured-header strong,.site .v52-studio-label,
+.site .card-hover-prompt,.site .v52-card-info h2,
+.site .game-card-foot p{
+ color:var(--v57-grey)!important;-webkit-text-fill-color:var(--v57-grey)!important;
+}
+.site .card-hover-prompt{
+ color:#fff!important;-webkit-text-fill-color:#fff!important;
+}
+.site .v52-studio-summary h2 em{color:var(--v57-purple)!important;-webkit-text-fill-color:var(--v57-purple)!important;}
+.site .v52-studio-summary button{color:#fff!important;-webkit-text-fill-color:#fff!important;}
+@media(max-width:560px){
+ .catalog-grid .game-card-foot{flex-direction:column!important;}
+ .catalog-grid .card-play{width:100%!important;justify-content:center!important;}
+ .v52-featured{padding:20px 15px 28px!important;}
+ .v52-rail-arrows>span{font-size:9px!important;}
+}

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Gamepad2, Globe2, Menu, X } from "lucide-react";
+import { ArrowDown, ArrowUpRight, Gamepad2, Globe2, Menu, X } from "lucide-react";
 import { games } from "@/data/games";
 
 type Props = {navigate:(path:string)=>void;lang:"EN"|"ID";menuOpen:boolean;toggleMenu:()=>void;toggleLanguage:()=>void};
@@ -20,7 +20,6 @@ function layerStyle(part:typeof LAYERS[number]):CSSProperties {
 export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleLanguage}:Props) {
  const sceneRef=useRef<HTMLDivElement>(null);
  const sectionRef=useRef<HTMLElement>(null);
- const railRef=useRef<HTMLDivElement>(null);
  const rafRef=useRef(0);
  const [ready,setReady]=useState(false);
  const [hasFullAsset,setHasFullAsset]=useState(true);
@@ -62,12 +61,6 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
   return ()=>{cancelAnimationFrame(rafRef.current);window.removeEventListener("scroll",update);window.removeEventListener("resize",update);motion.removeEventListener("change",update);};
  },[ready]);
 
- const slide=(direction:1|-1)=>{
-   const rail=railRef.current;if(!rail)return;
-   const card=rail.querySelector<HTMLElement>(".v52-game-card");
-   const distance=(card?.getBoundingClientRect().width||246)+14;
-   rail.scrollBy({left:distance*direction,behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});
- };
 
  return <div className="v52-mobile-home">
    <section ref={sectionRef} className="v52-hero-surface" aria-label="Soft Tech mobile game studio">
@@ -129,9 +122,9 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
    <section className="v52-featured" id="v52-featured" aria-label="Featured games">
      <div className="v52-featured-header">
        <div><i aria-hidden="true"/><strong>OUR FLAGSHIP GAMES</strong><small>01 / 03</small></div>
-       <div className="v52-rail-arrows"><span>SWIPE</span><button onClick={()=>slide(-1)} aria-label="Previous game"><ArrowLeft size={18}/></button><button onClick={()=>slide(1)} aria-label="Next game"><ArrowRight size={18}/></button></div>
+       <div className="v52-rail-arrows"><span>03 ORIGINAL TITLES</span></div>
      </div>
-     <div className="v52-games-rail" ref={railRef}>
+     <div className="v52-games-rail">
        {games.map((game,index)=><article className="v52-game-card" key={game.id}>
          <button className="v52-card-cover" onClick={()=>navigate("/games/"+game.id)} aria-label={"View "+game.name+" details"}>
            <img src={game.cover} alt={game.name+" original game artwork"} loading="lazy"/><span>0{index+1} / ORIGINAL</span>
