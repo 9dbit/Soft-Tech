@@ -53,14 +53,14 @@ export default function V5DesktopHero({ navigate, lang }: {
 
         <div className="v5-art-layer" aria-label="Original orange retro computer illustration">
           <div className="v5-ground-shadow" aria-hidden="true"/>
-          <div className="v5-computer-vector" aria-hidden="true">
+          {missingAsset && <div className="v5-computer-vector" aria-hidden="true">
             <div className="v5-vector-display">
               <div className="v5-vector-screen">IDEA FOUND<br/>KEEP GOING_</div>
               <div className="v5-vector-knobs">●<br/>●<br/>●</div>
             </div>
             <div className="v5-vector-keyboard"/>
             <div className="v5-vector-printer">CREATE</div>
-          </div>
+          </div>}
           {!missingAsset && (
             <img className="v5-orange-computer"
               src="/assets/v5/orange-computer-cutout.webp"
