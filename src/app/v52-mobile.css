@@ -269,3 +269,9 @@
  .v52-depth-part{transform:none!important;transition:none!important;will-change:auto!important;}
  .v52-pixel-word{transform:none!important;}
 }
+
+/* V5.6.1: keep exported PNG artwork crisp on high-density iPhone screens. */
+@media(max-width:1099px){
+ .v52-depth-part img,.v52-logo-button img{image-rendering:auto!important;backface-visibility:hidden!important;}
+ .v52-depth-part{transform-style:preserve-3d!important;}
+}
