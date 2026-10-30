@@ -8,6 +8,8 @@ on:
     branches: [main]
     paths:
       - 'src/components/v5-desktop-hero.tsx'
+      - 'src/components/v52-mobile-hero.tsx'
+      - 'src/app/v52-mobile.css'
       - 'src/components/portal.tsx'
       - 'src/app/v5-desktop.css'
       - 'src/app/layout.tsx'
@@ -34,7 +36,7 @@ jobs:
         run: npm run build
 
   visual:
-    name: V5 Browser Screenshot & Interaction QA
+    name: V5.2 Desktop & Mobile Browser QA
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -68,7 +70,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: soft-tech-v5-desktop-visual-qa
+          name: soft-tech-v5-2-cross-device-qa
           path: qa-artifacts/v5/
           if-no-files-found: warn
           retention-days: 14
@@ -101,7 +103,7 @@ jobs:
               '#### Findings',
               ...(report.errors.length ? report.errors.map(e => '- ' + e) : ['- No browser QA violations reported.']),
               '',
-              'Screenshots (1586×992 master, 1440, 1366, 1920, iPhone 390) and JSON metrics are available in this workflow run’s **soft-tech-v5-desktop-visual-qa** artifact.',
+              'Screenshots (1586/1440/1366/1920 desktop, 1024/768 tablet, 430/393/390/375/360 mobile) and JSON metrics are available in this workflow run’s **soft-tech-v5-desktop-visual-qa** artifact.',
               '',
               'Commit: ' + context.sha
             ].join('\n');
