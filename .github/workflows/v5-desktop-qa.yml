@@ -10,6 +10,7 @@ on:
       - 'src/components/v5-desktop-hero.tsx'
       - 'src/components/v52-mobile-hero.tsx'
       - 'src/app/v52-mobile.css'
+      - 'src/app/v57-unified-ui.css'
       - 'src/components/portal.tsx'
       - 'src/app/v5-desktop.css'
       - 'src/app/layout.tsx'

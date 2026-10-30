@@ -122,6 +122,37 @@ try {
       await page.close();
     }
   }
+
+  // V5.7 checks every inner page, not only the homepage.
+  for(const viewport of [{width:393,height:852,name:"iphone"},{width:1440,height:900,name:"desktop"}]){
+    const routePage=await browser.newPage({viewport});
+    for(const route of ["/games","/company","/technology","/partners","/contact"]){
+      await routePage.goto(root+route,{waitUntil:"domcontentloaded",timeout:30000});
+      await routePage.locator("#main-content").waitFor();
+      await routePage.screenshot({path:output+"/v57-"+viewport.name+"-"+route.slice(1)+".png",fullPage:true,animations:"disabled"});
+      const audit=await routePage.evaluate(()=>{
+        const css=s=>getComputedStyle(document.querySelector(s));
+        const headline=document.querySelector(".page-head h1,.corp-two h2");
+        const badEm=[...document.querySelectorAll(".page-head h1 em,.corp-two h2 em,.site-footer h2 em,.studio-copy h2 em,.technology-feature h2 em")].filter(el=>{
+          const x=getComputedStyle(el);return x.backgroundImage!=="none" || (x.backgroundColor!=="rgba(0, 0, 0, 0)" && x.backgroundColor!=="transparent");
+        }).map(el=>el.textContent);
+        return {headlineFont:headline?getComputedStyle(headline).fontFamily:null,badEm,
+          logoBackground:css(".side-panel .brand-logo").backgroundColor,
+          promoBackground:css(".side-panel .side-card").backgroundColor,
+          ctaBackground:css(".footer-cta").backgroundColor,
+          ctaRadius:css(".footer-cta").borderRadius,
+          scrollWidth:document.documentElement.scrollWidth,windowWidth:innerWidth};
+      });
+      if(audit.badEm.length)errors.push(viewport.name+" "+route+": gradient rectangles "+audit.badEm.join(","));
+      if(["rgb(0, 0, 0)","rgb(23, 21, 27)"].includes(audit.logoBackground))errors.push(viewport.name+" "+route+": black logo plaque");
+      if(audit.promoBackground==="rgb(25, 22, 29)")errors.push(viewport.name+" "+route+": black promo panel");
+      if(audit.ctaBackground!=="rgb(166, 56, 212)")errors.push(viewport.name+" "+route+": CTA not purple");
+      if(audit.scrollWidth>audit.windowWidth+8)errors.push(viewport.name+" "+route+": horizontal overflow");
+      checks.push({viewport:{...viewport,name:viewport.name+"-"+route.slice(1)},...audit});
+      console.log("V57_ROUTE_QA",viewport.name,route,JSON.stringify(audit));
+    }
+    await routePage.close();
+  }
   const navPage = await browser.newPage({ viewport: {width:1586,height:992} });
   await navPage.goto(root,{waitUntil:"domcontentloaded"});
   await navPage.locator(".v5-button-primary").click();
