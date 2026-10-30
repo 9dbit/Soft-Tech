@@ -11,6 +11,7 @@ import {
 import { games, logo, type Game } from "@/data/games";
 import { ParallaxScene, Reveal, ScrollProgress, TiltCard } from "./motion";
 import { V4Playground, V4WorldStory } from "./v4-playground";
+import V5DesktopHero from "./v5-desktop-hero";
 
 type Language = "EN" | "ID";
 const links = [
@@ -328,7 +329,7 @@ export default function Portal() {
   ), [category, search]);
 
   return (
-    <div className="site" style={{ "--active-accent": selected.accent } as CSSProperties}>
+    <div className={"site " + (section === "home" ? "v5-home" : "")} style={{ "--active-accent": selected.accent } as CSSProperties}>
       <ScrollProgress/>
       <div className="ambient-orb ambient-one" aria-hidden="true"/>
       <div className="ambient-orb ambient-two" aria-hidden="true"/>
@@ -375,7 +376,8 @@ export default function Portal() {
 
         <main id="main-content" className="main-content">
           {section === "home" && <>
-            <V4Playground active={active} setActive={setActive} lang={language} navigate={navigate}/>
+            <div className="v5-desktop-only"><V5DesktopHero navigate={navigate} lang={language}/></div>
+            <div className="v5-v4-fallback"><V4Playground active={active} setActive={setActive} lang={language} navigate={navigate}/></div>
 
             <div className="marquee" aria-label="Creative worlds, new experiences"><div className="marquee-track" aria-hidden="true">
               {Array.from({ length: 4 }, (_, i) => <span key={i}><i>✳</i> MORE THAN GAMES <b>·</b> NEW WORLDS <b>·</b> BEYOND PLAY <b>·</b></span>)}
