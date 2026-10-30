@@ -140,3 +140,25 @@
  .v52-featured{padding:20px 15px 28px!important;}
  .v52-rail-arrows>span{font-size:9px!important;}
 }
+
+/* Black-free typography across the visible mobile editorial, without changing game artwork. */
+@media(max-width:1099px){
+ .v52-mobile-home .v52-editorial h1,
+ .v52-mobile-home .v52-editorial h1 span,
+ .v52-mobile-home .v52-count-label,
+ .v52-mobile-home .v52-count-label strong,
+ .v52-mobile-home .v52-studio-summary h2,
+ .v52-mobile-home .v52-studio-summary h2:not(em),
+ .v52-mobile-home .v52-featured-header strong,
+ .v52-mobile-home .v52-card-info h2,
+ .v52-mobile-home .v52-rail-arrows>span{
+  color:var(--v57-grey)!important;-webkit-text-fill-color:var(--v57-grey)!important;
+ }
+ .v52-mobile-home .v52-card-info a,
+ .v52-mobile-home .v52-primary-cta,
+ .v52-mobile-home .v52-secondary-cta{
+  color:#fff!important;-webkit-text-fill-color:#fff!important;
+ }
+ .v52-mobile-home .v52-editorial h1{font-family:var(--v57-font)!important;font-weight:900!important;}
+ .v52-mobile-home .v52-featured-header strong{font-family:var(--v57-font)!important;}
+}
