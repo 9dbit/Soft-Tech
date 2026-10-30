@@ -19,6 +19,7 @@ function layerStyle(part:typeof LAYERS[number]):CSSProperties {
 
 export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleLanguage}:Props) {
  const sceneRef=useRef<HTMLDivElement>(null);
+ const sectionRef=useRef<HTMLElement>(null);
  const railRef=useRef<HTMLDivElement>(null);
  const rafRef=useRef(0);
  const [ready,setReady]=useState(false);
@@ -41,7 +42,10 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
    cancelAnimationFrame(rafRef.current);
    rafRef.current=requestAnimationFrame(()=>{
     const r=scene.getBoundingClientRect();
-    const progress=motion.matches?0:clamp((window.innerHeight*.52-r.top-r.height*.5)/window.innerHeight,-1,1);
+    const section=sectionRef.current?.getBoundingClientRect();
+    const timeline=section?clamp((window.innerHeight*.45-section.top)/Math.max(section.height-window.innerHeight*.3,1),0,1):0;
+    const progress=motion.matches?0:clamp((timeline-.35)*2,-1,1);
+    scene.style.setProperty("--v52-sequence",String(timeline));
     scene.style.setProperty("--v52-scroll",(progress*17).toFixed(2)+"px");
     scene.style.setProperty("--v52-soft-shift",(progress*-4).toFixed(2)+"px");
     scene.style.setProperty("--v52-tech-shift",(progress*-6).toFixed(2)+"px");
@@ -64,7 +68,7 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
  };
 
  return <div className="v52-mobile-home">
-   <section className="v52-hero-surface" aria-label="Soft Tech mobile game studio">
+   <section ref={sectionRef} className="v52-hero-surface" aria-label="Soft Tech mobile game studio">
      <header className="v52-header">
        <button className="v52-logo-button" onClick={()=>navigate("/")} aria-label="Soft Tech homepage">
          <img src="/assets/v5/soft-tech-neon-header.webp" alt="Soft Tech original neon logo" width={159} height={86}/>

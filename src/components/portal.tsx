@@ -339,7 +339,7 @@ export default function Portal() {
       {mobileMenu && <button className="mobile-backdrop" aria-label="Close navigation" onClick={() => setMobileMenu(false)}/>}
       <aside id="v52-site-navigation" className={"side-panel " + (mobileMenu ? "side-open" : "")}>
         <button className="brand-logo" onClick={() => navigate("/")} aria-label="Soft Tech homepage">
-          <img src={logo} alt="SOFT TECH"/><span>INDEPENDENT GAME STUDIO</span>
+          <img src="/assets/v5/soft-tech-neon-header.webp" alt="SOFT TECH"/><span>INDEPENDENT GAME STUDIO</span>
         </button>
         <div className="side-divider"/>
         <div className="side-navigation"><span className="side-caption">NAVIGATION / 001</span>
