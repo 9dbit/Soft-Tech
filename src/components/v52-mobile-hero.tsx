@@ -44,23 +44,23 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
     const r=scene.getBoundingClientRect();
     const section=sectionRef.current?.getBoundingClientRect();
     const timeline=section?clamp((window.innerHeight*.45-section.top)/Math.max(section.height-window.innerHeight*.3,1),0,1):0;
-    const progress=motion.matches?0:clamp((timeline-.48)*2.65,-1,1);
+    const progress=motion.matches?0:clamp((timeline-.44)*1.8,-1,1);
     scene.style.setProperty("--v52-sequence",String(timeline));
-    scene.style.setProperty("--v52-reveal",String(clamp((timeline-.1)*1.65,0,1)));
+    scene.style.setProperty("--v52-reveal",String(ready?1:0));
     scene.style.setProperty("--v52-scroll",(progress*148).toFixed(2)+"px");
-    scene.style.setProperty("--v52-soft-shift",(progress*-90).toFixed(2)+"px");
-    scene.style.setProperty("--v52-tech-shift",(progress*104).toFixed(2)+"px");
-    scene.style.setProperty("--v52-tilt",(progress*4.5).toFixed(2)+"deg");
+    scene.style.setProperty("--v52-soft-shift",(progress*-22).toFixed(2)+"px");
+    scene.style.setProperty("--v52-tech-shift",(progress*24).toFixed(2)+"px");
+    scene.style.setProperty("--v52-tilt",(progress*.7).toFixed(2)+"deg");
     scene.querySelectorAll<HTMLElement>(".v52-depth-part").forEach(el=>{
       const depth=Number(el.dataset.depth||0);
-      el.style.setProperty("--v52-shift",(progress*76*(depth-.58)).toFixed(2)+"px");
-      el.style.setProperty("--v52-xshift",(progress*32*(depth-.58)).toFixed(2)+"px");
+      el.style.setProperty("--v52-shift",(progress*42*(depth-.58)).toFixed(2)+"px");
+      el.style.setProperty("--v52-xshift",(progress*16*(depth-.58)).toFixed(2)+"px");
     });
    });
   };
   update();window.addEventListener("scroll",update,{passive:true});window.addEventListener("resize",update,{passive:true});motion.addEventListener("change",update);
   return ()=>{cancelAnimationFrame(rafRef.current);window.removeEventListener("scroll",update);window.removeEventListener("resize",update);motion.removeEventListener("change",update);};
- },[]);
+ },[ready]);
 
  const slide=(direction:1|-1)=>{
    const rail=railRef.current;if(!rail)return;
@@ -73,7 +73,7 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
    <section ref={sectionRef} className="v52-hero-surface" aria-label="Soft Tech mobile game studio">
      <header className="v52-header">
        <button className="v52-logo-button" onClick={()=>navigate("/")} aria-label="Soft Tech homepage">
-         <img src="/assets/soft-tech-logo.png" alt="Soft Tech original neon logo" width={1448} height={1086}/>
+         <img src="/assets/v5/soft-tech-header-cropped.png" alt="Soft Tech" width={440} height={232}/>
        </button>
        <div className="v52-header-controls">
          <button className="v52-language-button" onClick={toggleLanguage} aria-label={t("Switch language","Ganti bahasa")}><Globe2 size={16}/>{lang}</button>
@@ -95,10 +95,10 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
        <span className="v52-pixel-word v52-soft-word" aria-hidden="true">SOFT</span>
        <span className="v52-pixel-word v52-tech-word" aria-hidden="true">TECH</span>
        <div className="v52-model" aria-hidden="true">
-         {hasFullAsset&&<img src="/assets/v5/orange-computer-cutout.webp" alt="" className="v52-full-art" onError={()=>setHasFullAsset(false)}/>}
+         {hasFullAsset&&!ready&&<img src="/assets/v5/orange-computer-cutout.webp" alt="" className="v52-full-art" onError={()=>setHasFullAsset(false)}/>}
          <div className={"v52-layered-art"+(ready?" v52-art-ready":"")}>
            {LAYERS.map(part=><div key={part.id} className={"v52-depth-part v52-part-"+part.id} data-depth={part.depth} style={layerStyle(part)}>
-             <img src={"/assets/v5/"+part.id+"-layer.webp"} alt="" loading="eager"/>
+             <img src={"/assets/v5/png/"+part.id+"-layer.png"} alt="" loading="eager"/>
            </div>)}
          </div>
        </div>

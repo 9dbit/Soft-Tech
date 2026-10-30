@@ -1,0 +1,45 @@
+name: Prepare V5.6 transparent PNG assets
+on:
+  push:
+    branches: [feat/v5-desktop-pixel-match-20261030]
+    paths:
+      - 'scripts/export-v56-png-assets.py'
+      - '.github/workflows/v56-assets.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  export-assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image tools
+        run: python -m pip install pillow==11.3.0
+      - name: Export real transparent PNG parts
+        run: python scripts/export-v56-png-assets.py
+      - name: Validate PNG transparency and completeness
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          for file in list(Path('public/assets/v5/png').glob('*.png'))+[Path('public/assets/v5/soft-tech-header-cropped.png')]:
+              im=Image.open(file)
+              assert im.mode=='RGBA',file
+              assert im.getchannel('A').getextrema()[0]==0,file
+              print(file,im.size)
+          assert len(list(Path('public/assets/v5/png').glob('*.png')))==6
+          PY
+      - name: Commit separate PNG files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/assets/v5/png/*.png public/assets/v5/soft-tech-header-cropped.png
+          if ! git diff --cached --quiet; then
+            git commit -m "assets(v5.6): export six isolated transparent PNGs and cropped brand logo"
+            git push
+          fi
