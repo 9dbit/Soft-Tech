@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type PointerEvent, type CSSProperties } from "react";
 import { ArrowRight, ArrowDown, Globe2, Gamepad2, Instagram, Facebook, X, ChevronDown, LockKeyhole, Mail } from "lucide-react";
-import { logo } from "@/data/games";
 
 const V5_LAYERS = [
   { id: "cable", left: 230, top: 784, width: 455, height: 683, depthX: .44, depthY: .4 },
@@ -97,7 +96,7 @@ export default function V5DesktopHero({ navigate, lang }: {
       <div className="v5-stage" ref={stageRef} onPointerMove={handlePointer} onPointerLeave={handleLeave}>
         <header className="v5-header">
           <button className="v5-brand" onClick={() => navigate("/")} aria-label="Soft Tech homepage">
-            <img src={logo} alt="Soft Tech official logo" />
+            <img src="/assets/v5/soft-tech-neon-header.webp" alt="Soft Tech official neon logo" />
           </button>
           <nav className="v5-navigation" aria-label="Main navigation">
             <button className="v5-current" onClick={() => navigate("/")}>{t("Home","Beranda")}</button>
