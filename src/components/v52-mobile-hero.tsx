@@ -46,14 +46,15 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
     const timeline=section?clamp((window.innerHeight*.45-section.top)/Math.max(section.height-window.innerHeight*.3,1),0,1):0;
     const progress=motion.matches?0:clamp((timeline-.48)*2.65,-1,1);
     scene.style.setProperty("--v52-sequence",String(timeline));
+    scene.style.setProperty("--v52-reveal",String(clamp((timeline-.1)*1.65,0,1)));
     scene.style.setProperty("--v52-scroll",(progress*148).toFixed(2)+"px");
     scene.style.setProperty("--v52-soft-shift",(progress*-90).toFixed(2)+"px");
     scene.style.setProperty("--v52-tech-shift",(progress*104).toFixed(2)+"px");
     scene.style.setProperty("--v52-tilt",(progress*4.5).toFixed(2)+"deg");
     scene.querySelectorAll<HTMLElement>(".v52-depth-part").forEach(el=>{
       const depth=Number(el.dataset.depth||0);
-      el.style.setProperty("--v52-shift",(progress*155*(depth-.58)).toFixed(2)+"px");
-      el.style.setProperty("--v52-xshift",(progress*75*(depth-.58)).toFixed(2)+"px");
+      el.style.setProperty("--v52-shift",(progress*76*(depth-.58)).toFixed(2)+"px");
+      el.style.setProperty("--v52-xshift",(progress*32*(depth-.58)).toFixed(2)+"px");
     });
    });
   };
@@ -94,7 +95,7 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
        <span className="v52-pixel-word v52-soft-word" aria-hidden="true">SOFT</span>
        <span className="v52-pixel-word v52-tech-word" aria-hidden="true">TECH</span>
        <div className="v52-model" aria-hidden="true">
-         {hasFullAsset&&<img src="/assets/v5/orange-computer-cutout.webp" alt="" className={"v52-full-art"+(ready?" v52-full-art-hidden":"")} onError={()=>setHasFullAsset(false)}/>}
+         {hasFullAsset&&<img src="/assets/v5/orange-computer-cutout.webp" alt="" className="v52-full-art" onError={()=>setHasFullAsset(false)}/>}
          <div className={"v52-layered-art"+(ready?" v52-art-ready":"")}>
            {LAYERS.map(part=><div key={part.id} className={"v52-depth-part v52-part-"+part.id} data-depth={part.depth} style={layerStyle(part)}>
              <img src={"/assets/v5/"+part.id+"-layer.webp"} alt="" loading="eager"/>
