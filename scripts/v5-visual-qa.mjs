@@ -10,7 +10,13 @@ const viewports = [
   { width: 1440, height: 900, name: "desktop-1440" },
   { width: 1366, height: 768, name: "laptop-1366" },
   { width: 1920, height: 1080, name: "wide-1920" },
-  { width: 390, height: 844, name: "iphone-390" }
+  { width: 1024, height: 768, name: "tablet-landscape-1024" },
+  { width: 768, height: 1024, name: "tablet-portrait-768" },
+  { width: 430, height: 932, name: "iphone-430" },
+  { width: 393, height: 852, name: "iphone-393" },
+  { width: 390, height: 844, name: "iphone-390" },
+  { width: 375, height: 812, name: "iphone-375" },
+  { width: 360, height: 780, name: "android-360" }
 ];
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
@@ -36,10 +42,33 @@ try {
           null, { timeout: 10000 }
         );
       } else {
-        await page.locator(".v5-v4-fallback").waitFor({ state: "visible" });
+        await page.locator(".v52-mobile-only .v52-hero-surface").waitFor({ state: "visible" });
+        await page.waitForFunction(
+          () => [...document.querySelectorAll(".v52-depth-part img")].length === 6 &&
+            [...document.querySelectorAll(".v52-depth-part img")].every(img => img.complete && img.naturalWidth > 0),
+          null,{timeout:15000}
+        );
+        await page.waitForFunction(
+          () => document.querySelector(".v52-layered-art")?.classList.contains("v52-art-ready"),
+          null,{timeout:12000}
+        );
+        await page.waitForFunction(
+          () => { const logo=document.querySelector(".v52-logo-button img");return logo?.complete&&logo.naturalWidth>0; },
+          null,{timeout:12000}
+        );
       }
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: `${output}/${viewport.name}.png`, animations: "disabled" });
+      if(!isDesktop) {
+        await page.locator(".v52-hero-surface").screenshot({
+          path: `${output}/${viewport.name}-hero.png`,
+          animations:"disabled",timeout:20000
+        });
+        if (viewport.width === 393) await page.screenshot({
+          path: `${output}/iphone-393-full-page.png`,
+          animations:"disabled",fullPage:true
+        });
+      }
       const result = await page.evaluate(isDesktop => {
         const $ = s => document.querySelector(s);
         const rect = s => {
@@ -51,6 +80,11 @@ try {
           scrollWidth: document.documentElement.scrollWidth,
           windowWidth: window.innerWidth,
           desktopVisible: !!$(".v5-desktop-only") && getComputedStyle($(".v5-desktop-only")).display !== "none",
+          mobileVisible: !!$(".v52-mobile-only") && getComputedStyle($(".v52-mobile-only")).display !== "none",
+          mobileArtReady:!!$(".v52-art-ready"),
+          mobileLogoLoaded:(() => {const l=$(".v52-logo-button img");return !!l&&l.complete&&l.naturalWidth>0;})(),
+          mobileHeading:$(".v52-editorial h1")?.innerText.replace(/\s+/g," ").trim(),
+          mobileHero:rect(".v52-hero-surface"),
           stage,
           logo: rect(".v5-brand"),
           navigation: rect(".v5-navigation"),
@@ -65,7 +99,10 @@ try {
           background: stage ? getComputedStyle($(".v5-stage")).backgroundColor : null
         };
       }, isDesktop);
-      if (result.desktopVisible !== isDesktop) errors.push(`${viewport.name}: incorrect desktop/mobile routing`);
+      if (result.desktopVisible !== isDesktop || result.mobileVisible === isDesktop) errors.push(`${viewport.name}: incorrect desktop/mobile routing`);
+      if (!isDesktop && (!result.mobileArtReady || !result.mobileLogoLoaded || !result.mobileHeading?.includes("GAME WORLDS"))) {
+        errors.push(`${viewport.name}: mobile artwork, original logo or editorial typography incomplete`);
+      }
       if (result.scrollWidth > result.windowWidth + 8) errors.push(`${viewport.name}: horizontal page overflow ${result.scrollWidth}px`);
       if (isDesktop && (!result.artReady || result.layers.length !== 6 || result.layers.some(x => !x.loaded))) {
         errors.push(`${viewport.name}: original six-layer computer artwork failed to load`);
@@ -104,6 +141,24 @@ try {
     catch { errors.push("Partner access dialog did not close."); }
   }
   await navPage.close();
+
+  const mobile = await browser.newPage({viewport:{width:393,height:852}});
+  await mobile.emulateMedia({reducedMotion:"reduce"});
+  await mobile.goto(root,{waitUntil:"domcontentloaded"});
+  await mobile.locator(".v52-menu-button").click();
+  if (!(await mobile.locator("#v52-site-navigation").evaluate(el=>el.classList.contains("side-open"))))
+    errors.push("Mobile hamburger did not open site navigation.");
+  await mobile.keyboard.press("Escape");
+  if (await mobile.locator("#v52-site-navigation").evaluate(el=>el.classList.contains("side-open")))
+    errors.push("Escape did not close the mobile navigation.");
+  await mobile.locator(".v52-language-button").click();
+  await mobile.waitForFunction(()=>document.querySelector(".v52-language-button")?.textContent?.includes("ID"));
+  await mobile.locator(".v52-rail-arrows button").last().click();
+  await mobile.waitForFunction(()=>document.querySelector(".v52-games-rail")?.scrollLeft>10);
+  await mobile.locator(".v52-primary-cta").click();
+  try {await mobile.waitForURL("**/games",{timeout:12000});}
+  catch {errors.push("Mobile Explore Games CTA failed navigation.");}
+  await mobile.close();
 } finally {
   await browser.close();
 }
