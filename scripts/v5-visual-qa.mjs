@@ -61,7 +61,7 @@ try {
           layers: [...document.querySelectorAll(".v5-depth-part img")].map(img => ({
             src:img.getAttribute("src"), loaded:img.complete && img.naturalWidth > 0
           })),
-          headline: $(".v5-headline")?.innerText.replace(/\\s+/g, " "),
+          headline: $(".v5-headline")?.innerText.replace(/\s+/g, " "),
           background: stage ? getComputedStyle($(".v5-stage")).backgroundColor : null
         };
       }, isDesktop);
