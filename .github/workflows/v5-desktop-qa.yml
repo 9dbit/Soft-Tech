@@ -7,6 +7,7 @@ on:
       - 'src/components/portal.tsx'
       - 'src/app/v5-desktop.css'
       - 'src/app/layout.tsx'
+      - 'scripts/v5-visual-qa.mjs'
       - 'package.json'
       - '.github/workflows/v5-desktop-qa.yml'
   workflow_dispatch:
@@ -27,3 +28,43 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build
         run: npm run build
+
+  visual:
+    name: V5 Browser Screenshot & Interaction QA
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build Next.js
+        run: npm run build
+      - name: Install screenshot browser
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Start local production server
+        run: |
+          nohup npm run start -- -p 3000 > /tmp/soft-tech-v5-next.log 2>&1 &
+          for i in $(seq 1 35); do
+            if curl -fsS http://127.0.0.1:3000/api/health >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/soft-tech-v5-next.log
+          exit 1
+      - name: Capture real-browser screenshots and QA
+        run: node scripts/v5-visual-qa.mjs
+      - name: Upload visual QA screenshots and metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soft-tech-v5-desktop-visual-qa
+          path: qa-artifacts/v5/
+          if-no-files-found: warn
+          retention-days: 14
