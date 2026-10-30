@@ -1,18 +1,25 @@
-# V5 Asset Handoff
+# V5 Asset Handoff — current release
 
-Original reference files were supplied in the ChatGPT conversation.
-- Reference master: `soft_tech_pixel_game_studio_hero.png` (1586x992)
-- Computer photography: `IMG_3543.jpeg` (1024x1536)
-- Soft Tech logo: `IMG_3020(1).PNG` (original, already in repo under `public/assets/soft-tech-logo.png`)
+**Master image:** `soft_tech_pixel_game_studio_hero.png`, user-approved, 1586 × 992.  
+**Source photo:** `IMG_3543.jpeg` (orange computer, 1024 × 1536).  
+**Soft Tech logo:** original attached, source preserved in `public/assets/soft-tech-logo.png`.
 
-The local artifact bundle contains:
-- `assets/orange-computer-cutout.webp`: extracted RGBA foreground asset, 1024 x 1536
-- `preview/v5-composition-preview-1586x992.png`: static composition review
-- `reference/soft_tech_pixel_game_studio_hero.png`: exact approved master reference
-- `prototype/index.html` + `prototype/v5-static-desktop.css`: standalone HTML prototype
-- `scripts/extract_assets.py` and `scripts/render_v5_preview.py`: offline reconstruction/preview scripts
+## Assets already in the V5 branch
+- `public/assets/v5/orange-computer-cutout.webp` (original RGBA full image)
+- `public/assets/v5/soft-tech-neon-header.webp` (cropped original logo)
+- `public/assets/v5/monitor-layer.webp`
+- `public/assets/v5/keyboard-layer.webp` (duplicate cartridge fragment removed)
+- `public/assets/v5/printer-layer.webp`
+- `public/assets/v5/cable-layer.webp` (continuous lower coil repaired from original source)
+- `public/assets/v5/cartridge-layer.webp`
+- `public/assets/v5/cursor-layer.webp`
 
-The homepage React component expects:
-`public/assets/v5/orange-computer-cutout.webp`
+All files are committed and deployed to the isolated `soft-tech-v5-preview` Railway service. No manual asset copying remains necessary.
 
-This must be copied into the repository branch before release. Work in a branch, not production.
+## Browser QA assets
+Run: https://github.com/9dbit/Soft-Tech/actions/runs/40995269575
+Download GitHub Actions artifact named `soft-tech-v5-desktop-visual-qa`. It contains real Chromium screenshots for 1586×992, 1440, 1366, 1920 and 390, and `report.json` showing zero violations.
+
+The approved original master and experimental extraction scripts are retained in the conversation handoff ZIP, not copied into the public production site to avoid unnecessary bytes.
+
+See `CHECKPOINT_2026-10-30_V5_1_PARALLAX.md` for remaining design review and merge criteria. This is still a **Draft PR**, not yet merged to `main`.

@@ -7,6 +7,8 @@
 **Approved master:** `soft_tech_pixel_game_studio_hero.png` — 1586 × 992 pixels, user-provided  
 **Preview:** https://soft-tech-v5-preview-production.up.railway.app/  
 **Production V4:** https://soft-tech-web-production.up.railway.app/ (UNCHANGED)
+**Verified preview deployment:** `d7433776-4413-450e-90f5-203d8ecf8494` = SUCCESS, commit `a3dbcc4e194f2ec509116e6da3102440f58cc281`.
+**Runtime:** 1 running replica, 0 crashed, 0 warning/critical issues. Original production V4 also remains Online.
 
 ## Release status
 
@@ -48,7 +50,7 @@ No merge of this PR to `main` has been performed. The original V4 production ser
 - Verifies all six layer assets have nonzero naturalWidth; tests full image readiness, zero horizontal page overflow, correct breakpoint routing, Explore Games CTA, partner dialog open/close.
 - Baseline successful QA: https://github.com/9dbit/Soft-Tech/actions/runs/40993603722.
 - Design-polish QA successful: https://github.com/9dbit/Soft-Tech/actions/runs/40994912164.
-- Latest QA (for asset de-duplication): https://github.com/9dbit/Soft-Tech/actions/runs/40995269575. Verify latest terminal status before claiming final release.
+- **Final QA PASSED** after duplicate-cartridge repair: https://github.com/9dbit/Soft-Tech/actions/runs/40995269575. All 5 viewports passed; 0 browser errors, all 6 layers loaded, no horizontal overflow, real CTA/modal checks passed.
 - Screenshots attached as artifact `soft-tech-v5-desktop-visual-qa` to runs.
 
 ## Remaining before merge to production
