@@ -162,3 +162,12 @@
  .v52-mobile-home .v52-editorial h1{font-family:var(--v57-font)!important;font-weight:900!important;}
  .v52-mobile-home .v52-featured-header strong{font-family:var(--v57-font)!important;}
 }
+
+/* Fixed navigation hierarchy: logo left, language + menu always right. */
+@media(max-width:1099px){
+ .v52-header{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;}
+ .v52-header .v52-logo-button{order:0!important;margin-right:auto!important;}
+ .v52-header .v52-header-controls{order:2!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-end!important;margin-left:auto!important;}
+ .v52-header .v52-language-button{order:0!important;}
+ .v52-header .v52-menu-button{order:1!important;margin-left:8px!important;flex-shrink:0!important;}
+}
