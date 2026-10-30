@@ -1,0 +1,29 @@
+name: V5 Desktop Prototype QA
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/v5-desktop-hero.tsx'
+      - 'src/components/portal.tsx'
+      - 'src/app/v5-desktop.css'
+      - 'src/app/layout.tsx'
+      - 'package.json'
+      - '.github/workflows/v5-desktop-qa.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Next.js build & TypeScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build
+        run: npm run build
