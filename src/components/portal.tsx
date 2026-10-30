@@ -357,7 +357,7 @@ export default function Portal() {
       <div className="site-body">
         <header className="top-header">
           <div className="header-left">
-            <button className="hamburger" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation">{mobileMenu ? <X size={21}/> : <Menu size={21}/>}</button>
+            
             <button className="top-brand" onClick={() => navigate("/")} aria-label="Soft Tech homepage"><img src="/assets/v5/soft-tech-header-cropped.png" alt="Soft Tech" /></button>
             <div className="header-breadcrumb"><span>STUDIO</span><ChevronRight size={13}/><strong>{game?.name || ({home:"DISCOVER",games:"OUR GAMES",company:"COMPANY",technology:"TECHNOLOGY",partners:"PARTNERSHIPS",contact:"CONTACT"} as Record<string,string>)[section] || "DISCOVER"}</strong></div>
           </div>
@@ -372,6 +372,7 @@ export default function Portal() {
             <span className="header-live"><span className="online-pulse"/> 03 ORIGINAL GAMES</span>
             <button className="language-switch" onClick={() => setLanguage(language === "EN" ? "ID" : "EN")} aria-label="Change language"><Globe2 size={15}/> {language}<ChevronDown size={12}/></button>
             <button className="contact-header" onClick={() => navigate("/contact")}>{t("LET'S TALK", "KONTAK")} <ArrowUpRight size={15}/></button>
+            <button className="hamburger" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation">{mobileMenu ? <X size={21}/> : <Menu size={21}/>}</button>
           </div>
         </header>
 
