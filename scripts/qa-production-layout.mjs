@@ -29,16 +29,28 @@ for(const viewport of [
  const faces=await page.evaluate(async()=>await document.fonts.load('32px "SoftTech Minecraft"').then(x=>x.length));
  await page.evaluate(()=>document.fonts.ready);
  
- // Exercise real scroll/reveal instead of capturing unobserved blank sections.
- await page.evaluate(async()=>{
-   const max=document.documentElement.scrollHeight-innerHeight;
-   for(let y=0;y<=max;y+=Math.max(440,Math.floor(innerHeight*.82))){
-     window.scrollTo(0,y);
-     await new Promise(resolve=>setTimeout(resolve,65));
-   }
-   window.scrollTo(0,0);
-   await new Promise(resolve=>setTimeout(resolve,100));
+ // Actually enter every reveal's viewport. CSS smooth-scroll can make
+ // scrollTo() asynchronous, so use explicit Playwright visibility passes.
+ await page.evaluate(()=>{
+   document.documentElement.style.scrollBehavior="auto";
+   document.body.style.scrollBehavior="auto";
  });
+ const reveals=page.locator(".reveal");
+ const count=await reveals.count();
+ for(let n=0;n<count;n++){
+   const element=reveals.nth(n);
+   if(!(await element.isVisible()))continue;
+   await element.scrollIntoViewIfNeeded({timeout:8000});
+   await page.waitForTimeout(90);
+ }
+ await page.evaluate(()=>window.scrollTo({top:0,behavior:"instant"}));
+ await page.waitForTimeout(190);
+ const revealStats=await page.evaluate(()=>{
+   const elements=[...document.querySelectorAll(".reveal")].filter(x=>getComputedStyle(x).display!=="none");
+   return {total:elements.length,shown:elements.filter(x=>x.classList.contains("is-visible")).length};
+ });
+ if(revealStats.total>0&&revealStats.shown<revealStats.total-1)
+   errors.push(viewport.name+": content reveal missed "+(revealStats.total-revealStats.shown)+" section(s)");
  await page.screenshot({path:path.join(out,viewport.name+".png"),fullPage:true,animations:"disabled"});
  const metric=await page.evaluate(()=>{
   const find=s=>document.querySelector(s);
@@ -74,7 +86,7 @@ for(const viewport of [
   if(w*h>metric.heroTitleBox.width*metric.heroTitleBox.height*.2)errors.push(viewport.name+": game poster occludes title");
  }
  if(runtimeErrors.length)errors.push(viewport.name+": browser exception(s) "+runtimeErrors.join(" | "));
- checks.push({viewport,...metric,loadedFaces:faces,runtimeErrors});
+ checks.push({viewport,...metric,loadedFaces:faces,revealStats,runtimeErrors});
  await page.close();
 }
 for(const route of ["/games","/company","/technology","/partners","/contact"]){
