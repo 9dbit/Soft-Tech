@@ -19,3 +19,6 @@ This is a font extension; **never merge the broad V6.3/V6.4 global font override
 
 ## Deployment gate
 A release is allowed only after GitHub Actions build, UI-hash guard and real-browser typography/geometry tests pass. Railway production will remain pinned to the last approved commit; visual changes first go to the independent preview service.
+
+## Hero headline
+The desktop `BUILDING / DIGITAL / GAME WORLDS / THAT STICK` and equivalent mobile homepage hero text are also editorial headings and use Minecraft. Their existing line structure and absolute/flow positions remain unchanged. Font size is capped independently at each breakpoint to avoid overlapping the orange-computer parallax artwork. Screenshots are now captured with reduced motion enabled so IntersectionObserver-revealed sections are visible in full-page evidence.

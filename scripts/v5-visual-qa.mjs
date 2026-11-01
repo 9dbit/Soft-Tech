@@ -232,6 +232,7 @@ try {
     for (const route of ["/", "/games", "/company", "/technology", "/partners", "/contact", "/games/skygate-5000"]) {
       const typePage = await browser.newPage({viewport});
       try {
+        await typePage.emulateMedia({reducedMotion:"reduce"});
         await typePage.goto(root + route, {waitUntil:"domcontentloaded",timeout:30000});
         await typePage.locator("#main-content").waitFor({timeout:12000});
         const fontStates = await typePage.evaluate(async () => {
@@ -240,7 +241,7 @@ try {
           const head = document.querySelector(".collection-heading h2, .v52-studio-summary h2, .page-head h1, .detail-description h2, .corp-two h2");
           const paragraphs = [...document.querySelectorAll(".main-content p")].filter(x=>getComputedStyle(x).display!=="none");
           const copy = paragraphs.find(x=>x.textContent?.trim().length > 25) || paragraphs[0];
-          const hero = document.querySelector(".v5-desktop-only .v5-headline, .v52-mobile-only .v52-editorial h1");
+          const hero = window.innerWidth>=1100 ? document.querySelector(".v5-desktop-only .v5-headline") : document.querySelector(".v52-mobile-only .v52-editorial h1");
           const nav = document.querySelector(".top-header .desktop-nav button");
           const rect = s => { const e=document.querySelector(s);const b=e?.getBoundingClientRect();return b?{x:b.x,width:b.width}:null;};
           return {
@@ -260,8 +261,8 @@ try {
           errors.push(tag+": section heading is not Minecraft");
         if (!fontStates.copy?.font.includes("monospace"))
           errors.push(tag+": editorial paragraph is not monospace");
-        if (fontStates.heroFont?.includes("SoftTech Minecraft"))
-          errors.push(tag+": legacy hero composition font was overwritten");
+        if (route==="/" && !fontStates.heroFont?.includes("SoftTech Minecraft"))
+          errors.push(tag+": main hero headline did not use Minecraft");
         if (fontStates.navFont?.includes("SoftTech Minecraft"))
           errors.push(tag+": universal navbar font was overwritten");
         if (fontStates.scrollWidth > fontStates.width + 8)
