@@ -16,3 +16,6 @@ The orange computer, six motion layers, full-bleed hero, universal desktop navba
 The V5/V6 Playwright suite now also tests actual Minecraft font loading, computed heading fonts, monospace paragraphs, full-width hero geometry and horizontal overflow across home, games, studio, technology, partners, contact and game detail routes at desktop and mobile widths. Screenshots are uploaded to the GitHub Actions artifact.
 
 This is a font extension; **never merge the broad V6.3/V6.4 global font override commits**. To modify the locked UI, explicitly update the guard manifest only after visual review.
+
+## Deployment gate
+A release is allowed only after GitHub Actions build, UI-hash guard and real-browser typography/geometry tests pass. Railway production will remain pinned to the last approved commit; visual changes first go to the independent preview service.
