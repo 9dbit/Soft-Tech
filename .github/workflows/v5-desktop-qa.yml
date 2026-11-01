@@ -8,6 +8,7 @@ on:
     branches:
       - "fix/soft-tech-v6-1-universal-restore-20261102"
       - "feat/v61-minecraft-mono-uilock-20261102"
+      - "fix/v61-complete-minecraft-coverage-20261102"
   pull_request:
     branches: [main]
     paths:
