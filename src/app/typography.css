@@ -1,0 +1,9 @@
+/* Typography checkpoint: compact Minecraft headlines, legible monospace copy. */
+@font-face{font-family:"SoftTech Minecraft";src:url("/fonts/Minecraft.ttf") format("truetype");font-display:swap;font-style:normal;font-weight:400}
+:root{--soft-pixel-font:"SoftTech Minecraft","Press Start 2P",monospace;--soft-content-font:"DM Mono","Courier New",monospace}
+html body :is(h1,h2,h3,h4,h5,h6),
+html body :is(.v4-story h2,.v4-story-card-content h3,.v4-left-rail h2,.collection-heading h2,.studio-copy h2,.page-head h1,.corp-two h2,.card-cover-name h3,.footer-upper h2){
+ font-family:var(--soft-pixel-font)!important;font-weight:400!important;line-height:1.09!important;letter-spacing:-.035em!important;overflow-wrap:break-word;
+}
+html body :is(p,.studio-copy p,.corp-copy p,.v4-story-left p,.v4-story-card-content p){font-family:var(--soft-content-font)!important;line-height:1.65!important}
+@media(max-width:700px){html body :is(h1,h2,h3,h4,h5,h6){line-height:1.08!important;letter-spacing:-.025em!important}}
