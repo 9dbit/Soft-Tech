@@ -7,6 +7,7 @@ on:
   push:
     branches:
       - "fix/soft-tech-v6-1-universal-restore-20261102"
+      - "feat/v61-minecraft-mono-uilock-20261102"
   pull_request:
     branches: [main]
     paths:
@@ -30,6 +31,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Verify locked V6.1 UI and orange-computer assets
+        run: node scripts/verify-ui-lock.mjs
       - name: Setup Node 22
         uses: actions/setup-node@v4
         with:
@@ -47,6 +50,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Verify locked V6.1 UI and orange-computer assets
+        run: node scripts/verify-ui-lock.mjs
       - name: Setup Node 22
         uses: actions/setup-node@v4
         with:

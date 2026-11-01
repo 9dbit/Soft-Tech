@@ -222,6 +222,64 @@ try {
   try {await mobile.waitForURL("**/games",{timeout:12000});}
   catch {errors.push("Mobile Explore Games CTA failed navigation.");}
   await mobile.close();
+
+  // V6.1 UI-locked typography regression: Minecraft only for section headers,
+  // monospace for descriptive text, and original hero/nav geometry untouched.
+  for (const viewport of [
+    { width: 1440, height: 900, name: "type-desktop" },
+    { width: 393, height: 852, name: "type-mobile" }
+  ]) {
+    for (const route of ["/", "/games", "/company", "/technology", "/partners", "/contact", "/games/skygate-5000"]) {
+      const typePage = await browser.newPage({viewport});
+      try {
+        await typePage.goto(root + route, {waitUntil:"domcontentloaded",timeout:30000});
+        await typePage.locator("#main-content").waitFor({timeout:12000});
+        const fontStates = await typePage.evaluate(async () => {
+          const fonts = await document.fonts.load('24px "SoftTech Minecraft"', 'MINECRAFT');
+          await document.fonts.ready;
+          const head = document.querySelector(".collection-heading h2, .v52-studio-summary h2, .page-head h1, .detail-description h2, .corp-two h2");
+          const paragraphs = [...document.querySelectorAll(".main-content p")].filter(x=>getComputedStyle(x).display!=="none");
+          const copy = paragraphs.find(x=>x.textContent?.trim().length > 25) || paragraphs[0];
+          const hero = document.querySelector(".v5-desktop-only .v5-headline, .v52-mobile-only .v52-editorial h1");
+          const nav = document.querySelector(".top-header .desktop-nav button");
+          const rect = s => { const e=document.querySelector(s);const b=e?.getBoundingClientRect();return b?{x:b.x,width:b.width}:null;};
+          return {
+            loadedFaces: fonts.length, fontStatus: fonts.map(f=>f.status),
+            heading: head?{font:getComputedStyle(head).fontFamily,text:head.textContent?.replace(/\s+/g," ").slice(0,90)}:null,
+            copy: copy?{font:getComputedStyle(copy).fontFamily,text:copy.textContent?.replace(/\s+/g," ").slice(0,60)}:null,
+            heroFont: hero?getComputedStyle(hero).fontFamily:null,
+            navFont: nav?getComputedStyle(nav).fontFamily:null,
+            nav: rect(".top-header .desktop-nav"), stage:rect(".v5-stage"),
+            scrollWidth:document.documentElement.scrollWidth, width:window.innerWidth
+          };
+        });
+        const tag = viewport.name + " " + route;
+        if (!fontStates.loadedFaces || fontStates.fontStatus.some(s=>s!=="loaded"))
+          errors.push(tag+": Minecraft webfont failed loading");
+        if (!fontStates.heading?.font.includes("SoftTech Minecraft"))
+          errors.push(tag+": section heading is not Minecraft");
+        if (!fontStates.copy?.font.includes("monospace"))
+          errors.push(tag+": editorial paragraph is not monospace");
+        if (fontStates.heroFont?.includes("SoftTech Minecraft"))
+          errors.push(tag+": legacy hero composition font was overwritten");
+        if (fontStates.navFont?.includes("SoftTech Minecraft"))
+          errors.push(tag+": universal navbar font was overwritten");
+        if (fontStates.scrollWidth > fontStates.width + 8)
+          errors.push(tag+": typography introduced horizontal overflow");
+        if (viewport.width>=1100 && route==="/" && Math.abs((fontStates.stage?.width||0)-viewport.width)>4)
+          errors.push(tag+": full-width orange-computer stage was changed");
+        checks.push({viewport:{...viewport,name:tag},...fontStates});
+        if (route==="/" || route==="/company" || route==="/games")
+          await typePage.screenshot({path:output+"/"+viewport.name+"-"+(route==="/"
+            ?"home":route.slice(1))+".png",fullPage:true,animations:"disabled"});
+      } catch (error) {
+        errors.push(viewport.name+" "+route+": typography QA exception "+error.message);
+      } finally {
+        await typePage.close();
+      }
+    }
+  }
+
 } finally {
   await browser.close();
 }
