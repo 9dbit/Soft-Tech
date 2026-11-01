@@ -281,6 +281,110 @@ try {
     }
   }
 
+
+  // V6.1 screenshot-derived comprehensive font audit, including the mobile
+  // flagship cards, feature headings, full sidebar and footer navigation.
+  for(const vp of [
+    {width:360,height:780,name:"font-360"},
+    {width:393,height:852,name:"font-393"},
+    {width:1440,height:900,name:"font-1440"}
+  ]){
+    for(const route of ["/","/games","/company","/technology","/partners","/contact","/games/skygate-5000"]){
+      const page=await browser.newPage({viewport:vp});
+      try{
+        await page.emulateMedia({reducedMotion:"reduce"});
+        await page.goto(root+route,{waitUntil:"domcontentloaded",timeout:35000});
+        await page.locator("#main-content").waitFor({timeout:10000});
+        const result=await page.evaluate(async()=>{
+          await document.fonts.load('14px "SoftTech Minecraft"',"MINECRAFT");
+          await document.fonts.ready;
+          const sample=(selector)=>[...document.querySelectorAll(selector)].map(el=>{
+            const css=getComputedStyle(el),b=el.getBoundingClientRect();
+            return {
+              text:(el.textContent||"").trim().replace(/\s+/g," ").slice(0,55),
+              font:css.fontFamily,visible:b.width>1&&b.height>1,
+              overflow:el.scrollWidth>el.clientWidth+8
+            };
+          });
+          const styles={
+            headings:sample(".site :is(h1,h2,h3,h4)"),
+            flagshipTitle:sample(".v52-featured-header strong"),
+            mobileGameNames:sample(".v52-games-rail .v52-card-info h2"),
+            threeFeatureTitles:sample(".worlds-strip strong"),
+            sidebarPromo:sample(".side-panel .side-card > strong"),
+            sidebarNav:sample(".side-panel .side-navigation button > span:nth-child(2)"),
+            footerNav:sample(".site-footer .footer-nav button"),
+            desktopNav:sample(".top-header .desktop-nav button"),
+            prominentActions:sample(".v52-card-info a,.footer-cta,.v52-studio-summary button,.v52-ctas button,.card-play"),
+            copy:sample(".site p,.site li,.footer-brand span,.v52-featured-header small,.v52-rail-arrows > span")
+          };
+          let headerCollision=false;
+          const hdr=document.querySelector(".v52-featured-header");
+          if(innerWidth<1100&&hdr){
+            const title=hdr.querySelector("strong"),small=hdr.querySelector("small"),meta=hdr.querySelector(".v52-rail-arrows > span");
+            if(title&&small&&meta){
+              const a=title.getBoundingClientRect(),b=small.getBoundingClientRect(),c=meta.getBoundingClientRect();
+              headerCollision=(a.width>1&&b.width>1&&a.right>b.left+2)||
+                (b.width>1&&c.width>1&&b.right>c.left+2);
+            }
+          }
+          const title=document.querySelector(".v52-card-info h2"),card=title?.closest(".v52-card-info");
+          return {
+            styles,headerCollision,
+            gameTitleOverflow:!!title&&!!card&&title.scrollWidth>card.clientWidth+8,
+            scrollWidth:document.documentElement.scrollWidth,
+            viewportWidth:innerWidth,
+            fontReady:document.fonts.check('14px "SoftTech Minecraft"')
+          };
+        });
+        const mark=vp.name+" "+route;
+        for(const [kind,entries] of Object.entries(result.styles)){
+          const wanted=kind==="copy"?"monospace":"SoftTech Minecraft";
+          for(const entry of entries.filter(x=>x.visible)){
+            if(!entry.font.includes(wanted))
+              errors.push(mark+": "+kind+" ["+entry.text+"] expected "+wanted+" but got "+entry.font);
+          }
+        }
+        if(!result.fontReady) errors.push(mark+": Minecraft webfont not loaded");
+        if(result.scrollWidth>result.viewportWidth+8)
+          errors.push(mark+": horizontal overflow "+result.scrollWidth+"/"+result.viewportWidth);
+        if(result.headerCollision)errors.push(mark+": flagship section label overlaps metadata");
+        if(result.gameTitleOverflow)errors.push(mark+": Minecraft game heading clipped by card");
+        checks.push({viewport:{...vp,name:mark},fonts:result.styles,headerCollision:result.headerCollision});
+        if(route==="/"||route==="/company"||route==="/games"){
+          await page.screenshot({
+            path:output+"/"+vp.name+"-"+(route==="/"?"home":route.slice(1))+"-fontcoverage.png",
+            fullPage:true,animations:"disabled"
+          });
+        }
+        if(route==="/"&&vp.width===393){
+          await page.locator(".v52-menu-button").click();
+          if(!(await page.locator("#v52-site-navigation").evaluate(el=>el.classList.contains("side-open"))))
+            errors.push(mark+": mobile sidebar failed to open");
+          const sidebar=await page.evaluate(()=>[...document.querySelectorAll(
+            ".side-panel .side-navigation button > span:nth-child(2),.side-panel .side-card > strong"
+          )].map(el=>({
+            text:(el.textContent||"").trim(),
+            family:getComputedStyle(el).fontFamily,
+            clipped:el.scrollWidth>el.clientWidth+8
+          })));
+          for(const el of sidebar){
+            if(!el.family.includes("SoftTech Minecraft"))
+              errors.push(mark+": sidebar ["+el.text+"] is not Minecraft");
+            if(el.clipped) errors.push(mark+": sidebar ["+el.text+"] text clipped");
+          }
+          await page.screenshot({path:output+"/font-393-open-sidebar-fontcoverage.png",
+            fullPage:false,animations:"disabled"});
+          await page.keyboard.press("Escape");
+        }
+      }catch(err){
+        errors.push(vp.name+" "+route+": font audit error "+err.message);
+      }finally{
+        await page.close();
+      }
+    }
+  }
+
 } finally {
   await browser.close();
 }
