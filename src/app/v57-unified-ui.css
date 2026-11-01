@@ -1,0 +1,149 @@
+/* V5.7 / global editorial clean-up: all routes, all device sizes.
+   Flat text replaces broken gradient text blocks. Never use a black UI surface. */
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@300;400;500;600;700;800;900&display=swap');
+:root{
+ --v57-purple:#a638d4;
+ --v57-purple-hover:#8c25bd;
+ --v57-purple-soft:#f1e7f7;
+ --v57-grey:#68666e;
+ --v57-grey-dark:#55535c;
+ --v57-font:'Nunito Sans','Manrope','Plus Jakarta Sans',Arial,sans-serif;
+}
+html,body{background:#f2f2f3!important;color:var(--v57-grey)!important;}
+.site{color:var(--v57-grey)!important;}
+/* CSS background shorthand on em previously reset background-clip and made opaque rectangles. */
+.home-intro h1 span,
+.collection-heading h2 em,.studio-copy h2 em,.page-head h1 em,
+.corp-two h2 em,.technology-feature h2 em,.detail-description h2 em,
+.site-footer h2 em,.footer-upper h2 em,
+.page-head h1 span,.corp-two h2 span{
+ background:none!important;background-image:none!important;background-color:transparent!important;
+ -webkit-background-clip:initial!important;background-clip:initial!important;
+ -webkit-text-fill-color:var(--v57-grey)!important;color:var(--v57-grey)!important;
+ box-shadow:none!important;
+}
+/* Rounded-corner display face, medium grey across the whole site. */
+.collection-heading h2,.studio-copy h2,.page-head h1,
+.corp-two h2,.technology-feature h2,.detail-description h2,
+.site-footer h2,.footer-upper h2,.contact-art strong,
+.value-box h3,.cap-card h3,.card-cover-name h3,
+.side-card strong,.v4-story h2,.v4-left-rail h2{
+ font-family:var(--v57-font)!important;font-weight:800!important;
+ color:var(--v57-grey)!important;letter-spacing:-.065em!important;
+ line-height:1.03!important;
+}
+.page-head h1{font-size:clamp(43px,8vw,104px)!important;overflow-wrap:anywhere;letter-spacing:-.06em!important;}
+.footer-upper h2{font-size:clamp(45px,8vw,104px)!important;}
+.collection-heading h2,.corp-two h2,.technology-feature h2{font-size:clamp(39px,6vw,82px)!important;}
+.studio-copy h2{font-size:clamp(45px,7vw,91px)!important;}
+.contact-art strong em{color:var(--v57-purple)!important;}
+.page-head p,.corp-two p,.studio-copy p,.technology-feature p,.collection-heading p,.site-footer p,
+.detail-description p{color:#77747d!important;}
+/* Transparent logos on both the header and the sidebar, no dark plaque. */
+.side-panel .brand-logo,.brand-logo,.top-brand{
+ background:transparent!important;background-image:none!important;border:0!important;
+ box-shadow:none!important;filter:none!important;
+}
+.side-panel .brand-logo{
+ width:100%!important;height:136px!important;min-height:136px!important;
+ margin:0 auto 8px!important;padding:7px 4px!important;
+ border-radius:0!important;overflow:visible!important;gap:0!important;
+}
+.side-panel .brand-logo img{
+ display:block!important;width:min(100%,225px)!important;height:92px!important;
+ max-height:92px!important;object-fit:contain!important;
+ filter:drop-shadow(0 3px 7px #a54bc52e)!important;
+}
+.side-panel .brand-logo span{
+ display:block!important;margin:0!important;color:#89818d!important;
+ font-size:9px!important;line-height:1.4!important;letter-spacing:.14em!important;
+}
+.top-brand{overflow:visible!important;}
+.top-brand img{width:100%!important;height:100%!important;max-height:100%!important;
+ object-fit:contain!important;filter:none!important;}
+/* The sidebar promotional tile is a light editorial surface, not black. */
+.side-panel{background:#f7f7f8!important;color:var(--v57-grey)!important;}
+.side-panel .side-card{
+ background:#efe8f4!important;background-image:none!important;border:0!important;
+ box-shadow:none!important;border-radius:27px!important;color:var(--v57-grey)!important;
+}
+.side-panel .side-card::before,.side-panel .side-card::after{display:none!important;}
+.side-panel .side-card strong{color:var(--v57-grey-dark)!important;font-size:24px!important;}
+.side-panel .side-card-stars,.side-panel .side-card-stars svg{color:var(--v57-purple)!important;}
+.side-panel .side-card-stars span,.side-panel .side-card-bottom{color:#77717e!important;}
+.side-panel .side-navigation button{border-radius:999px!important;border:0!important;color:var(--v57-grey)!important;}
+.side-panel .side-navigation button.nav-active,.side-panel .side-navigation button:hover{
+ background:var(--v57-purple)!important;color:#fff!important;
+}
+.side-panel .side-navigation button.nav-active span,
+.side-panel .side-navigation button.nav-active svg,
+.side-panel .side-navigation button:hover span,
+.side-panel .side-navigation button:hover svg{color:#fff!important;}
+.side-panel .side-navigation button.nav-active:before{display:none!important;}
+.side-panel .side-bottom{border:0!important;color:#77747d!important;}
+/* Buttons: unified solid-purple pill language, not rectangular black blocks. */
+.btn,.footer-cta,.contact-header,.catalog-filters button,.card-play,
+.card-hover-prompt,.back-link,.detail-nav button,.game-card-foot a,
+.contact-form button,.v5-login,.v5-ctas button,.v5-navigation button,
+.v52-ctas button,.v52-studio-summary button,.v52-rail-arrows button,
+.v52-card-info a,.v4-magnetic-cta,.v4-explore-cta,.v4-story-card-content button,
+.stage-actions .btn,.footer-nav button,.header-right .contact-header{
+ border-radius:999px!important;
+}
+.btn,.footer-cta,.contact-header,.card-play,.contact-form button,
+.v5-login,.v5-ctas button,.v4-magnetic-cta,.v4-explore-cta,
+.v4-story-card-content button,.v52-ctas button,.v52-studio-summary button,
+.stage-actions .btn,.header-right .contact-header{
+ background:var(--v57-purple)!important;background-image:none!important;
+ color:#fff!important;border-color:transparent!important;
+ box-shadow:0 6px 16px #a638d420!important;
+}
+.btn:hover,.footer-cta:hover,.contact-header:hover,.card-play:hover,
+.contact-form button:hover,.v5-ctas button:hover,.v52-ctas button:hover{
+ background:var(--v57-purple-hover)!important;color:#fff!important;
+}
+.catalog-filters button,.footer-nav button,.detail-nav button{
+ background:var(--v57-purple-soft)!important;color:var(--v57-purple)!important;
+ border:0!important;box-shadow:none!important;
+}
+.catalog-filters button.selected,.catalog-filters button:hover,
+.detail-nav button:hover{background:var(--v57-purple)!important;color:#fff!important;}
+.footer-nav button{padding:9px 14px!important;}
+.footer-cta{min-height:58px!important;padding:16px 24px!important;}
+.v52-primary-cta,.v52-secondary-cta{background:var(--v57-purple)!important;color:#fff!important;}
+.v52-featured,.v52-studio-summary,.technology-feature,.contact-art{
+ background-color:#f6f4f7!important;box-shadow:none!important;
+}
+.v52-game-card{border-radius:24px!important;}
+/* Header navigation uses soft purple; never black. */
+.v5-navigation{background:#ece5f0!important;border-radius:999px!important;}
+.v5-navigation button{color:#736a7b!important;}
+.v5-navigation button.v5-current,.v5-navigation button:hover{background:var(--v57-purple)!important;color:#fff!important;}
+.v52-language-button,.v52-menu-button,.language-switch,.hamburger{
+ border-radius:999px!important;background:#f1e7f7!important;color:var(--v57-purple)!important;
+}
+.v52-language-button:hover,.v52-menu-button:hover,.language-switch:hover,.hamburger:hover{
+ background:#e9d4f3!important;
+}
+.v52-header,.top-header{background:transparent!important;box-shadow:none!important;}
+/* No black promotional panels, contact blocks or dark CTA rectangles. */
+.side-card,.contact-art{color:var(--v57-grey)!important;}
+.contact-art:before{display:none!important;}
+.site-footer{background:#f5f4f6!important;background-image:none!important;}
+.site-footer h2{color:var(--v57-grey)!important;}
+@media(max-width:1099px){
+ .side-panel .brand-logo{height:145px!important;min-height:145px!important;}
+ .side-panel .brand-logo img{width:225px!important;max-width:100%!important;}
+ .side-panel .side-card{min-height:195px!important;}
+ .page-head h1{font-size:clamp(43px,10.4vw,78px)!important;line-height:1.08!important;}
+ .footer-upper h2{font-size:clamp(43px,10.2vw,80px)!important;}
+ .corp-two h2,.technology-feature h2{font-size:clamp(36px,9vw,67px)!important;}
+ .v52-header{background:transparent!important;}
+}
+@media(max-width:430px){
+ .page-head h1{font-size:clamp(40px,10.2vw,49px)!important;letter-spacing:-.05em!important;}
+ .footer-upper h2{font-size:clamp(38px,10.3vw,48px)!important;}
+ .catalog-filters button{font-size:10px!important;padding:11px 14px!important;}
+ .side-panel .brand-logo img{height:100px!important;max-height:100px!important;}
+}
+@media(prefers-reduced-motion:reduce){.btn,.footer-cta,.catalog-filters button{transition:none!important;}}

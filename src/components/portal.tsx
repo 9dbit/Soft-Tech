@@ -10,7 +10,9 @@ import {
 } from "lucide-react";
 import { games, logo, type Game } from "@/data/games";
 import { ParallaxScene, Reveal, ScrollProgress, TiltCard } from "./motion";
-import { V4Playground, V4WorldStory } from "./v4-playground";
+import { V4WorldStory } from "./v4-playground";
+import V52MobileHero from "./v52-mobile-hero";
+import V5DesktopHero from "./v5-desktop-hero";
 
 type Language = "EN" | "ID";
 const links = [
@@ -328,16 +330,16 @@ export default function Portal() {
   ), [category, search]);
 
   return (
-    <div className="site" style={{ "--active-accent": selected.accent } as CSSProperties}>
+    <div className={"site " + (section === "home" ? "v5-home" : "")} style={{ "--active-accent": selected.accent } as CSSProperties}>
       <ScrollProgress/>
       <div className="ambient-orb ambient-one" aria-hidden="true"/>
       <div className="ambient-orb ambient-two" aria-hidden="true"/>
       <div className="screen-grain" aria-hidden="true"/>
       <a className="skip-link" href="#main-content">SKIP TO CONTENT</a>
       {mobileMenu && <button className="mobile-backdrop" aria-label="Close navigation" onClick={() => setMobileMenu(false)}/>}
-      <aside className={"side-panel " + (mobileMenu ? "side-open" : "")}>
+      <aside id="v52-site-navigation" className={"side-panel " + (mobileMenu ? "side-open" : "")}>
         <button className="brand-logo" onClick={() => navigate("/")} aria-label="Soft Tech homepage">
-          <img src={logo} alt="SOFT TECH"/><span>INDEPENDENT GAME STUDIO</span>
+          <img src="/assets/v5/soft-tech-header-cropped.png" alt="SOFT TECH"/><span>INDEPENDENT GAME STUDIO</span>
         </button>
         <div className="side-divider"/>
         <div className="side-navigation"><span className="side-caption">NAVIGATION / 001</span>
@@ -355,8 +357,8 @@ export default function Portal() {
       <div className="site-body">
         <header className="top-header">
           <div className="header-left">
-            <button className="hamburger" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation">{mobileMenu ? <X size={21}/> : <Menu size={21}/>}</button>
-            <button className="top-brand" onClick={() => navigate("/")} aria-label="Soft Tech homepage"><img src={logo} alt="Soft Tech" /></button>
+            
+            <button className="top-brand" onClick={() => navigate("/")} aria-label="Soft Tech homepage"><img src="/assets/v5/soft-tech-header-cropped.png" alt="Soft Tech" /></button>
             <div className="header-breadcrumb"><span>STUDIO</span><ChevronRight size={13}/><strong>{game?.name || ({home:"DISCOVER",games:"OUR GAMES",company:"COMPANY",technology:"TECHNOLOGY",partners:"PARTNERSHIPS",contact:"CONTACT"} as Record<string,string>)[section] || "DISCOVER"}</strong></div>
           </div>
           <nav className="desktop-nav" aria-label="Main navigation">
@@ -370,12 +372,16 @@ export default function Portal() {
             <span className="header-live"><span className="online-pulse"/> 03 ORIGINAL GAMES</span>
             <button className="language-switch" onClick={() => setLanguage(language === "EN" ? "ID" : "EN")} aria-label="Change language"><Globe2 size={15}/> {language}<ChevronDown size={12}/></button>
             <button className="contact-header" onClick={() => navigate("/contact")}>{t("LET'S TALK", "KONTAK")} <ArrowUpRight size={15}/></button>
+            <button className="hamburger" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation">{mobileMenu ? <X size={21}/> : <Menu size={21}/>}</button>
           </div>
         </header>
 
         <main id="main-content" className="main-content">
           {section === "home" && <>
-            <V4Playground active={active} setActive={setActive} lang={language} navigate={navigate}/>
+            <div className="v5-desktop-only"><V5DesktopHero navigate={navigate} lang={language}/></div>
+            <div className="v52-mobile-only"><V52MobileHero navigate={navigate} lang={language}
+              menuOpen={mobileMenu} toggleMenu={() => setMobileMenu(current => !current)}
+              toggleLanguage={() => setLanguage(current => current === "EN" ? "ID" : "EN")}/></div>
 
             <div className="marquee" aria-label="Creative worlds, new experiences"><div className="marquee-track" aria-hidden="true">
               {Array.from({ length: 4 }, (_, i) => <span key={i}><i>✳</i> MORE THAN GAMES <b>·</b> NEW WORLDS <b>·</b> BEYOND PLAY <b>·</b></span>)}

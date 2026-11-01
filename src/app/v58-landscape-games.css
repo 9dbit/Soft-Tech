@@ -1,0 +1,362 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Press+Start+2P&display=swap');
+/* Google fonts are loaded before all rules for reliable first paint. */
+/* V5.8: three original games deserve three full-width landscape showcases. */
+.v5-home .home-collection .game-grid,
+.catalog-grid.game-grid{
+ display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+ gap:34px!important;align-items:stretch!important;
+}
+.v5-home .home-collection .game-grid>.reveal,
+.catalog-grid.game-grid>.reveal,
+.v5-home .home-collection .game-grid>.reveal:nth-child(2),
+.v5-home .home-collection .game-grid>.reveal:nth-child(3){
+ grid-column:auto!important;max-width:none!important;margin-top:0!important;
+ width:100%!important;
+}
+.v5-home .home-collection .game-card,
+.catalog-grid .game-card{width:100%!important;}
+.v5-home .home-collection .game-card-media,
+.catalog-grid .game-card-media{
+ aspect-ratio:16/7.4!important;width:100%!important;
+ border:0!important;border-radius:28px!important;
+ background:#ebe4ee!important;box-shadow:0 12px 30px #70477b17!important;
+}
+.v5-home .home-collection .game-card-media>img,
+.catalog-grid .game-card-media>img{
+ width:100%!important;height:100%!important;object-fit:cover!important;
+ object-position:center 38%!important;
+}
+.v5-home .home-collection .game-card-media:before,
+.catalog-grid .game-card-media:before{
+ background:linear-gradient(90deg,rgba(28,18,34,.65) 0%,rgba(35,23,41,.28) 48%,transparent 80%),
+ linear-gradient(0deg,rgba(30,21,37,.44),transparent 55%)!important;
+}
+.v5-home .home-collection .card-cover-name,
+.catalog-grid .card-cover-name{
+ left:clamp(20px,4vw,55px)!important;bottom:clamp(25px,5vw,65px)!important;
+ right:20px!important;
+}
+.v5-home .home-collection .card-cover-name h3,
+.catalog-grid .card-cover-name h3{
+ color:#fff!important;-webkit-text-fill-color:#fff!important;
+ font-family:var(--v57-font)!important;font-weight:900!important;
+ font-size:clamp(32px,5.2vw,76px)!important;letter-spacing:-.06em!important;
+ text-shadow:0 3px 20px #2011268c!important;max-width:85%;
+}
+.v5-home .home-collection .card-cover-name .small-label,
+.catalog-grid .card-cover-name .small-label,
+.v5-home .home-collection .card-top,
+.catalog-grid .card-top,
+.v5-home .home-collection .card-top span,
+.catalog-grid .card-top span{
+ color:#fff!important;-webkit-text-fill-color:#fff!important;
+ text-shadow:0 2px 9px #291b30b8!important;
+}
+.v5-home .home-collection .game-card-foot,
+.catalog-grid .game-card-foot{
+ flex-direction:row!important;align-items:center!important;
+ justify-content:space-between!important;gap:20px!important;
+ padding:18px 7px 4px!important;
+}
+.v5-home .home-collection .game-card-foot p,
+.catalog-grid .game-card-foot p{color:#706b76!important;font:700 clamp(13px,1.5vw,17px)/1.5 var(--v57-font)!important;}
+.v5-home .home-collection .game-card-foot .eyebrow,
+.catalog-grid .game-card-foot .eyebrow{color:var(--v57-purple)!important;}
+.v5-home .home-collection .card-play,
+.catalog-grid .card-play{
+ background:var(--v57-purple)!important;color:#fff!important;
+ border-radius:999px!important;border:0!important;
+ min-height:48px!important;padding:0 24px!important;
+ font-family:var(--v57-font)!important;font-size:11px!important;
+}
+/* Homepage mobile: remove the swipe rail, show all 3 titles vertically. */
+@media(max-width:1099px){
+ .v52-games-rail{
+  display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+  gap:22px!important;overflow:visible!important;scroll-snap-type:none!important;
+  padding:0!important;scroll-behavior:auto!important;
+ }
+ .v52-games-rail .v52-game-card{
+  width:100%!important;max-width:none!important;min-width:0!important;
+  flex:none!important;scroll-snap-align:none!important;overflow:hidden!important;
+  border-radius:24px!important;background:#fff!important;
+  box-shadow:0 10px 26px #88668c14!important;
+ }
+ .v52-games-rail .v52-card-cover{
+  height:auto!important;aspect-ratio:16/9!important;min-height:0!important;
+  border-radius:22px!important;overflow:hidden!important;
+ }
+ .v52-games-rail .v52-card-cover img{
+  height:100%!important;width:100%!important;object-fit:cover!important;
+  object-position:center 35%!important;
+ }
+ .v52-games-rail .v52-card-cover>span{
+  color:#fff!important;-webkit-text-fill-color:#fff!important;
+  font:700 11px var(--v57-font)!important;text-shadow:0 2px 9px #302035b0!important;
+ }
+ .v52-games-rail .v52-card-info{padding:19px 20px 21px!important;}
+ .v52-games-rail .v52-card-info h2{
+  color:var(--v57-grey)!important;-webkit-text-fill-color:var(--v57-grey)!important;
+  font:900 clamp(25px,6.5vw,36px)/1.06 var(--v57-font)!important;
+  letter-spacing:-.045em!important;margin:8px 0!important;
+ }
+ .v52-games-rail .v52-card-info>span{color:var(--v57-purple)!important;font:800 10px var(--v57-font)!important;}
+ .v52-games-rail .v52-card-info p{color:#77717c!important;font:600 13px/1.5 var(--v57-font)!important;min-height:0!important;}
+ .v52-games-rail .v52-card-info a{
+  display:inline-flex!important;justify-content:center!important;gap:14px!important;
+  min-height:44px!important;padding:0 25px!important;
+  background:var(--v57-purple)!important;color:#fff!important;
+  border-radius:999px!important;font:800 11px var(--v57-font)!important;
+ }
+ .v52-featured-header strong,.v52-featured-header small,.v52-rail-arrows>span{
+  color:var(--v57-grey)!important;font-family:var(--v57-font)!important;
+ }
+ .v52-featured-header{align-items:center!important;}
+ .v52-rail-arrows>span{font-size:10px!important;letter-spacing:.04em!important;}
+ .catalog-grid.game-grid{gap:27px!important;}
+ .catalog-grid .game-card-media{aspect-ratio:16/9!important;border-radius:22px!important;}
+ .catalog-grid .card-cover-name{left:19px!important;bottom:21px!important;}
+ .catalog-grid .card-cover-name h3{font-size:clamp(26px,6.7vw,40px)!important;}
+ .catalog-grid .game-card-foot{flex-wrap:wrap!important;align-items:flex-start!important;gap:13px!important;}
+ .catalog-grid .card-play{min-height:44px!important;}
+}
+/* Keep black out of the text system: grey editorial headings, white artwork labels. */
+.site .section-header,.site .section-header span,.site .section-header button,
+.site .section-tag,.site .section-index,.site .section-slash,
+.site .catalog-count,.site .catalog-search input,
+.site .v52-studio-summary h2,.site .v52-studio-summary p,
+.site .v52-count-label,.site .v52-count-label strong,
+.site .v52-featured-header strong,.site .v52-studio-label,
+.site .card-hover-prompt,.site .v52-card-info h2,
+.site .game-card-foot p{
+ color:var(--v57-grey)!important;-webkit-text-fill-color:var(--v57-grey)!important;
+}
+.site .card-hover-prompt{
+ color:#fff!important;-webkit-text-fill-color:#fff!important;
+}
+.site .v52-studio-summary h2 em{color:var(--v57-purple)!important;-webkit-text-fill-color:var(--v57-purple)!important;}
+.site .v52-studio-summary button{color:#fff!important;-webkit-text-fill-color:#fff!important;}
+@media(max-width:560px){
+ .catalog-grid .game-card-foot{flex-direction:column!important;}
+ .catalog-grid .card-play{width:100%!important;justify-content:center!important;}
+ .v52-featured{padding:20px 15px 28px!important;}
+ .v52-rail-arrows>span{font-size:9px!important;}
+}
+
+/* Black-free typography across the visible mobile editorial, without changing game artwork. */
+@media(max-width:1099px){
+ .v52-mobile-home .v52-editorial h1,
+ .v52-mobile-home .v52-editorial h1 span,
+ .v52-mobile-home .v52-count-label,
+ .v52-mobile-home .v52-count-label strong,
+ .v52-mobile-home .v52-studio-summary h2,
+ .v52-mobile-home .v52-studio-summary h2:not(em),
+ .v52-mobile-home .v52-featured-header strong,
+ .v52-mobile-home .v52-card-info h2,
+ .v52-mobile-home .v52-rail-arrows>span{
+  color:var(--v57-grey)!important;-webkit-text-fill-color:var(--v57-grey)!important;
+ }
+ .v52-mobile-home .v52-card-info a,
+ .v52-mobile-home .v52-primary-cta,
+ .v52-mobile-home .v52-secondary-cta{
+  color:#fff!important;-webkit-text-fill-color:#fff!important;
+ }
+ .v52-mobile-home .v52-editorial h1{font-family:var(--v57-font)!important;font-weight:900!important;}
+ .v52-mobile-home .v52-featured-header strong{font-family:var(--v57-font)!important;}
+}
+
+/* Fixed navigation hierarchy: logo left, language + menu always right. */
+@media(max-width:1099px){
+ .v52-header{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;}
+ .v52-header .v52-logo-button{order:0!important;margin-right:auto!important;}
+ .v52-header .v52-header-controls{order:2!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-end!important;margin-left:auto!important;}
+ .v52-header .v52-language-button{order:0!important;}
+ .v52-header .v52-menu-button{order:1!important;margin-left:8px!important;flex-shrink:0!important;}
+}
+
+/* V5.9: one identical mobile header across Home, Games, Studio, Technology, Partners and Contact. */
+@media(max-width:1099px){
+ .site:not(.v5-home) .top-header{
+  display:flex!important;position:fixed!important;
+  top:calc(env(safe-area-inset-top,0px) + 12px)!important;
+  left:50%!important;transform:translateX(-50%)!important;
+  z-index:999!important;width:min(calc(100% - 32px),690px)!important;
+  height:70px!important;min-height:70px!important;
+  padding:0 9px!important;margin:0!important;
+  border:0!important;border-radius:0!important;
+  background:transparent!important;box-shadow:none!important;
+  backdrop-filter:none!important;align-items:center!important;justify-content:space-between!important;
+ }
+ .site:not(.v5-home) .top-header .header-left{
+  display:flex!important;order:0!important;flex:0 1 auto!important;
+  min-width:0!important;margin-right:auto!important;
+ }
+ .site:not(.v5-home) .top-header .top-brand{
+  display:flex!important;align-items:center!important;
+  width:clamp(124px,36vw,174px)!important;height:64px!important;
+  min-width:0!important;padding:0!important;margin:0!important;
+  background:transparent!important;border:0!important;box-shadow:none!important;
+ }
+ .site:not(.v5-home) .top-header .top-brand img{
+  width:100%!important;height:100%!important;object-fit:contain!important;
+ }
+ .site:not(.v5-home) .top-header .header-right{
+  display:flex!important;order:2!important;flex:0 0 auto!important;
+  align-items:center!important;justify-content:flex-end!important;
+  gap:8px!important;margin-left:auto!important;
+ }
+ .site:not(.v5-home) .top-header .language-switch{
+  order:0!important;height:54px!important;min-height:54px!important;
+  padding:0 14px!important;border:0!important;border-radius:999px!important;
+  background:#f1e7f7!important;color:var(--v57-purple)!important;
+  font:700 13px var(--v57-font)!important;box-shadow:none!important;
+ }
+ .site:not(.v5-home) .top-header .hamburger{
+  display:flex!important;order:2!important;align-items:center!important;justify-content:center!important;
+  flex:0 0 54px!important;width:54px!important;height:54px!important;
+  margin:0!important;padding:0!important;border:0!important;
+  border-radius:999px!important;background:#f1e7f7!important;
+  color:var(--v57-purple)!important;box-shadow:none!important;
+ }
+ .site:not(.v5-home) .top-header .contact-header{display:none!important;}
+ .site:not(.v5-home) .top-header .header-breadcrumb,
+ .site:not(.v5-home) .top-header .header-live,
+ .site:not(.v5-home) .top-header .desktop-nav{display:none!important;}
+ .site:not(.v5-home) .main-content{padding-top:100px!important;}
+}
+@media(max-width:430px){
+ .site:not(.v5-home) .top-header{
+  width:calc(100% - 24px)!important;height:60px!important;min-height:60px!important;
+ }
+ .site:not(.v5-home) .top-header .top-brand{width:128px!important;height:56px!important;}
+ .site:not(.v5-home) .top-header .language-switch{
+  height:46px!important;min-height:46px!important;padding:0 9px!important;
+ }
+ .site:not(.v5-home) .top-header .hamburger{
+  width:46px!important;height:46px!important;flex-basis:46px!important;
+ }
+}
+
+/* V6 desktop: fluid full-bleed canvas, stable unified navigation and three-up collection. */
+@media(min-width:1100px){
+ html,body{width:100%;max-width:100%;overflow-x:clip}
+ .site,.site.v5-home,.main-content{width:100%!important;max-width:none!important;min-width:0!important}
+ .site{display:block!important}
+ .site .main-content{margin:0!important;padding:0!important}
+ .v5-home .v5-hero{width:100%!important;margin:0!important;padding:0!important}
+ .v5-home .v5-stage{
+  width:100%!important;max-width:none!important;
+  margin:0!important;border-radius:0!important;
+  height:clamp(740px,61vw,1050px)!important;
+ }
+ .v5-home .v5-header{
+  position:fixed!important;top:14px!important;left:clamp(24px,3vw,58px)!important;
+  right:clamp(24px,3vw,58px)!important;height:72px!important;
+  z-index:900!important;pointer-events:none!important;
+ }
+ .v5-home .v5-header>*{pointer-events:auto!important}
+ .v5-home .v5-navigation{
+  border-radius:999px!important;background:#eee4f2ed!important;
+  box-shadow:0 8px 26px #64426b12!important;
+ }
+ .v5-home .v5-navigation button{border-radius:999px!important;color:#69656e!important}
+ .v5-home .v5-navigation button.v5-current{
+  background:#a638d4!important;color:white!important
+ }
+ .v5-home .v5-login{
+  background:#a638d4!important;border-radius:999px!important;color:white!important
+ }
+ .v5-home .v5-brand{height:72px!important}
+ .v5-home .v5-brand img{transform:none!important;height:72px!important;width:184px!important}
+ .site:not(.v5-home) .top-header{
+  position:fixed!important;top:14px!important;left:clamp(24px,3vw,58px)!important;
+  right:clamp(24px,3vw,58px)!important;width:auto!important;height:72px!important;
+  z-index:900!important;background:transparent!important;border:0!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+ }
+ .site:not(.v5-home) .top-header .top-brand{
+  width:184px!important;height:72px!important;display:flex!important;align-items:center!important
+ }
+ .site:not(.v5-home) .top-header .top-brand img{
+  width:184px!important;height:72px!important;object-fit:contain!important
+ }
+ .site:not(.v5-home) .top-header .header-right{
+  margin-left:auto!important;gap:10px!important
+ }
+ .site:not(.v5-home) .top-header .header-breadcrumb,
+ .site:not(.v5-home) .top-header .header-live{display:none!important}
+ .site:not(.v5-home) .main-content{padding-top:104px!important}
+ .v5-home .home-collection{
+  width:calc(100% - clamp(48px,6vw,116px))!important;
+  max-width:none!important;margin-left:auto!important;margin-right:auto!important;
+ }
+ .v5-home .home-collection .game-grid,
+ .catalog-grid.game-grid{
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:clamp(16px,2vw,34px)!important;align-items:start!important
+ }
+ .v5-home .home-collection .game-grid>.reveal,
+ .catalog-grid.game-grid>.reveal{
+  grid-column:auto!important;width:100%!important;min-width:0!important;
+  max-width:none!important;margin:0!important
+ }
+ .v5-home .home-collection .game-card-media,
+ .catalog-grid .game-card-media{aspect-ratio:16/10!important}
+ .v5-home .home-collection .game-card-foot,
+ .catalog-grid .game-card-foot{min-width:0!important}
+}
+
+/* V6.1: one shared sticky desktop header on every route, including home. */
+@media(min-width:1100px){
+ .site.v5-home .top-header{display:flex!important}
+ .site.v5-home .v5-header{display:none!important}
+ .site .top-header{
+  position:fixed!important;top:14px!important;
+  left:clamp(24px,3vw,58px)!important;right:clamp(24px,3vw,58px)!important;
+  width:auto!important;height:72px!important;z-index:950!important;
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  background:transparent!important;border:0!important;box-shadow:none!important;
+  backdrop-filter:none!important;padding:0!important;
+ }
+ .site .top-header .header-left{flex:0 0 184px!important}
+ .site .top-header .top-brand{width:184px!important;height:72px!important}
+ .site .top-header .top-brand img{width:184px!important;height:72px!important;object-fit:contain!important}
+ .site .top-header .header-breadcrumb,.site .top-header .header-live{display:none!important}
+ .site .top-header .desktop-nav{
+  display:flex!important;position:absolute!important;left:50%!important;top:4px!important;
+  transform:translateX(-50%)!important;align-items:center!important;justify-content:center!important;
+  height:64px!important;gap:2px!important;padding:7px 8px!important;
+  border-radius:999px!important;background:#eee4f2ed!important;
+  box-shadow:0 8px 26px #64426b12!important;
+ }
+ .site .top-header .desktop-nav button{
+  height:46px!important;padding:0 17px!important;border-radius:999px!important;
+  color:#69656e!important;background:transparent!important;white-space:nowrap!important;
+  font:500 14px 'Arimo',Arial,sans-serif!important;
+ }
+ .site .top-header .desktop-nav button.selected{
+  background:#a638d4!important;color:#fff!important;
+ }
+ .site .top-header .header-right{display:flex!important;gap:10px!important;margin-left:auto!important}
+ .site .top-header .language-switch{
+  border-radius:999px!important;background:#eee4f2ed!important;color:#69656e!important;
+  min-height:46px!important;padding:0 14px!important;
+ }
+ .site .top-header .contact-header{
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  border-radius:999px!important;background:#a638d4!important;color:#fff!important;
+  min-height:46px!important;padding:0 21px!important;font-size:13px!important;
+ }
+ .site .top-header .hamburger{display:none!important}
+ .site.v5-home .v5-stage{padding-top:0!important}
+}
+
+/* V6.4: enforce actual pixel headlines and monospace editorial copy across V5 pages. */
+
+:root{--soft-pixel:'Press Start 2P','Courier New',monospace;--soft-mono:'DM Mono','Courier New',monospace}
+html body .site p,html body .site li,html body .site blockquote,html body .site label,html body .site .corp-two p,html body .site .studio-copy p,html body .site .page-head p,html body .site .v5-home p,html body .site .v5-home .v5-stage p{font-family:var(--soft-mono)!important;font-weight:400;letter-spacing:-.015em;line-height:1.85}
+html body .site h1,html body .site h2,html body .site .v5-home h1,html body .site .v5-home h2,html body .site .v5-home .v5-stage h2,html body .site .v5-home .v5-stage h3{font-family:var(--soft-pixel)!important;font-weight:400!important;letter-spacing:-.055em!important;line-height:1.48!important;overflow-wrap:break-word}
+html body .site .v5-home h1,html body .site .v5-home h2{font-size:clamp(22px,3.3vw,53px)!important}
+html body .site .v5-home h1 span,html body .site .v5-home h2 span,html body .site .v5-home h2 em{font-family:inherit!important}
+html body .site .corp-two p,html body .site .studio-copy p{font-size:clamp(12px,1vw,15px)!important}
+@media(max-width:700px){html body .site h1,html body .site h2,html body .site .v5-home h1,html body .site .v5-home h2{font-size:clamp(17px,4.5vw,30px)!important;line-height:1.65!important;letter-spacing:-.06em!important}}
