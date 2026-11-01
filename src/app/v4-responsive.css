@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Press+Start+2P&display=swap');
 /* SOFT TECH V4 / adaptive layout and motion accessibility */
 @media (max-width:1450px) {
   .v4-word-beyond {font-size:19.4vw;}
@@ -168,4 +169,36 @@
   .v4-main-art {transform:translate(-50%,-50%) rotate(-7deg)!important;}
   .v4-magnetic-cta {transform:none!important;}
   .v4-story-card {will-change:auto!important;}
+}
+
+
+/* Typography unification: all routes, desktop and mobile */
+:root { --soft-content-font:'DM Mono','Courier New',monospace; --soft-pixel-font:'Press Start 2P','Courier New',monospace; }
+html body,html body button,html body input,html body textarea,html body select,
+html body p,html body small,html body label,html body nav,html body a,
+html body .site,html body .site-body,html body .main-content {
+  font-family:var(--soft-content-font);
+}
+html body h1,html body h2,html body h3,html body h4,html body h5,html body h6,
+html body .page-head h1,html body .collection-heading h2,html body .studio-copy h2,
+html body .technology-feature h2,html body .corp-two h2,
+html body .v4-left-rail h2,html body .v4-story h2,html body .v4-story-card-content h3,
+html body .card-cover-name h3,html body .footer-upper h2,
+html body .v4-word-beyond,html body .v4-word-play {
+  font-family:var(--soft-content-font);
+  font-weight:700;
+  letter-spacing:-.065em;
+}
+html body .v4-pixel,html body .v4-art-bottom .v4-pixel,
+html body .v4-spec-label,html body .v4-story-card-content>span,
+html body .eyebrow,html body .section-tag,html body .small-label {
+  font-family:var(--soft-pixel-font);
+  font-size:clamp(7px,.65vw,10px);
+  letter-spacing:0;
+  line-height:1.8;
+}
+html body .v4-word-beyond,html body .v4-word-play {letter-spacing:-.085em;}
+@media(max-width:700px) {
+ html body .v4-spec-label,html body .eyebrow,html body .section-tag {font-size:7px;}
+ html body h1,html body h2,html body h3 {overflow-wrap:break-word;}
 }
