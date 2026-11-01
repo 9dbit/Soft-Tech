@@ -113,3 +113,34 @@ html body .top-brand img{
 @media(prefers-reduced-motion:reduce){
  html body .v4-word-beyond,html body .v4-word-play{animation:none!important;}
 }
+
+/* Final visual cleanup: prevent background display lettering crossing hero copy. */
+html body .v4-word-play{display:none!important}
+html body .v4-word-beyond{opacity:.10!important}
+/* Keep decorative stamps clear of the cover title on narrow screens. */
+@media(max-width:700px){
+  html body .v4-stamp-two{display:none!important}
+}
+/* One consistent navigation order: neon logo left, language and hamburger right. */
+@media(max-width:1040px){
+  html body .top-header{position:sticky!important;top:8px!important;z-index:70!important}
+  html body .top-header .header-left{min-width:0!important;flex:0 1 auto!important}
+  html body .top-header .header-breadcrumb{display:none!important}
+  html body .top-header .header-right{
+    margin-left:auto!important;padding-right:58px!important;gap:9px!important
+  }
+  html body .top-header .contact-header{display:none!important}
+  html body .top-header .hamburger{
+    display:grid!important;place-items:center!important;
+    position:absolute!important;right:11px!important;top:50%!important;
+    transform:translateY(-50%)!important;
+    width:47px!important;height:47px!important;padding:0!important;
+    border-radius:999px!important;background:#f0e7f6!important;
+    color:#a638d4!important;border:0!important;z-index:4!important;
+  }
+}
+@media(max-width:430px){
+ html body .top-header .header-right{padding-right:53px!important}
+ html body .top-header .hamburger{right:8px!important;width:43px!important;height:43px!important}
+ html body .top-header .top-brand{min-width:100px!important;width:110px!important}
+}
