@@ -28,6 +28,17 @@ for(const viewport of [
  await page.locator(".v4-playground").waitFor();
  const faces=await page.evaluate(async()=>await document.fonts.load('32px "SoftTech Minecraft"').then(x=>x.length));
  await page.evaluate(()=>document.fonts.ready);
+ 
+ // Exercise real scroll/reveal instead of capturing unobserved blank sections.
+ await page.evaluate(async()=>{
+   const max=document.documentElement.scrollHeight-innerHeight;
+   for(let y=0;y<=max;y+=Math.max(440,Math.floor(innerHeight*.82))){
+     window.scrollTo(0,y);
+     await new Promise(resolve=>setTimeout(resolve,65));
+   }
+   window.scrollTo(0,0);
+   await new Promise(resolve=>setTimeout(resolve,100));
+ });
  await page.screenshot({path:path.join(out,viewport.name+".png"),fullPage:true,animations:"disabled"});
  const metric=await page.evaluate(()=>{
   const find=s=>document.querySelector(s);
@@ -39,11 +50,16 @@ for(const viewport of [
    stage:rect(".v4-playground"),heroTitleBox:rect(".v4-left-rail h2"),
    leftRail:rect(".v4-left-rail"),poster:rect(".v4-main-art"),
    story:rect(".v4-story h2"),storyColumn:rect(".v4-story-left"),
+   mobileMenu:rect(".hamburger"),languageButton:rect(".language-switch"),logoBox:rect(".top-brand"),
    logoBackground:brand?.backgroundColor,heroFont:heroTitle?.fontFamily,
    storyFont:heading?.fontFamily,heroLineHeight:heroTitle?.lineHeight,
    beyondOpacity:style(".v4-word-beyond")?.opacity
   };
  });
+ if(viewport.width<=1040&&metric.mobileMenu&&metric.languageButton){
+  if(metric.mobileMenu.x<metric.languageButton.right-2)errors.push(viewport.name+": hamburger not rightmost after language");
+  if(metric.logoBox&&metric.logoBox.right>metric.languageButton.x+2)errors.push(viewport.name+": logo collides with language");
+ }
  if(!metric.heroFont?.includes("SoftTech Minecraft"))errors.push(viewport.name+": hero title is not Minecraft");
  if(!metric.storyFont?.includes("SoftTech Minecraft"))errors.push(viewport.name+": story title is not Minecraft");
  if(!faces)errors.push(viewport.name+": font face not loaded");
