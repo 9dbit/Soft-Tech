@@ -263,8 +263,8 @@ try {
           errors.push(tag+": editorial paragraph is not monospace");
         if (route==="/" && !fontStates.heroFont?.includes("SoftTech Minecraft"))
           errors.push(tag+": main hero headline did not use Minecraft");
-        if (fontStates.navFont?.includes("SoftTech Minecraft"))
-          errors.push(tag+": universal navbar font was overwritten");
+        if (!fontStates.navFont?.includes("SoftTech Minecraft"))
+          errors.push(tag+": universal navbar must use Minecraft");
         if (fontStates.scrollWidth > fontStates.width + 8)
           errors.push(tag+": typography introduced horizontal overflow");
         if (viewport.width>=1100 && route==="/" && Math.abs((fontStates.stage?.width||0)-viewport.width)>4)
@@ -309,6 +309,8 @@ try {
           const styles={
             headings:sample(".site :is(h1,h2,h3,h4)"),
             flagshipTitle:sample(".v52-featured-header strong"),
+            statLabels:sample(".v5-stat-title > span,.v52-count-label > span"),
+            marqueeLabels:sample(".marquee-track span"),
             mobileGameNames:sample(".v52-games-rail .v52-card-info h2"),
             threeFeatureTitles:sample(".worlds-strip strong"),
             sidebarPromo:sample(".side-panel .side-card > strong"),

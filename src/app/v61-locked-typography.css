@@ -297,3 +297,34 @@
     font-size:clamp(9px,2.5vw,11px)!important;
   }
 }
+
+
+/* Remaining screenshot labels and desktop game CTA, preserving existing geometry. */
+.site.v5-home .home-collection .card-play,
+.site .catalog-grid .card-play,
+.site .v5-stat-title > span,
+.site .v52-mobile-home .v52-count-label > span,
+.site .marquee-track span {
+  font-family:var(--softtech-section-display)!important;
+  font-weight:400!important;
+  font-synthesis:none;
+  letter-spacing:0!important;
+}
+.site.v5-home .home-collection .card-play,
+.site .catalog-grid .card-play {
+  font-size:clamp(9px,.8vw,11px)!important;
+  line-height:1.45!important;
+}
+.site .v5-stat-title > span {
+  font-size:clamp(15px,1.3vw,19px)!important;
+  line-height:1.2!important;
+}
+.site .marquee-track span {
+  font-size:clamp(10px,.9vw,13px)!important;
+}
+@media(max-width:1099px){
+  .site .v52-mobile-home .v52-count-label > span {
+    font-size:clamp(9px,2.55vw,11px)!important;
+    line-height:1.25!important;
+  }
+}
