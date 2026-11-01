@@ -303,3 +303,48 @@
  .v5-home .home-collection .game-card-foot,
  .catalog-grid .game-card-foot{min-width:0!important}
 }
+
+/* V6.1: one shared sticky desktop header on every route, including home. */
+@media(min-width:1100px){
+ .site.v5-home .top-header{display:flex!important}
+ .site.v5-home .v5-header{display:none!important}
+ .site .top-header{
+  position:fixed!important;top:14px!important;
+  left:clamp(24px,3vw,58px)!important;right:clamp(24px,3vw,58px)!important;
+  width:auto!important;height:72px!important;z-index:950!important;
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  background:transparent!important;border:0!important;box-shadow:none!important;
+  backdrop-filter:none!important;padding:0!important;
+ }
+ .site .top-header .header-left{flex:0 0 184px!important}
+ .site .top-header .top-brand{width:184px!important;height:72px!important}
+ .site .top-header .top-brand img{width:184px!important;height:72px!important;object-fit:contain!important}
+ .site .top-header .header-breadcrumb,.site .top-header .header-live{display:none!important}
+ .site .top-header .desktop-nav{
+  display:flex!important;position:absolute!important;left:50%!important;top:4px!important;
+  transform:translateX(-50%)!important;align-items:center!important;justify-content:center!important;
+  height:64px!important;gap:2px!important;padding:7px 8px!important;
+  border-radius:999px!important;background:#eee4f2ed!important;
+  box-shadow:0 8px 26px #64426b12!important;
+ }
+ .site .top-header .desktop-nav button{
+  height:46px!important;padding:0 17px!important;border-radius:999px!important;
+  color:#69656e!important;background:transparent!important;white-space:nowrap!important;
+  font:500 14px 'Arimo',Arial,sans-serif!important;
+ }
+ .site .top-header .desktop-nav button.selected{
+  background:#a638d4!important;color:#fff!important;
+ }
+ .site .top-header .header-right{display:flex!important;gap:10px!important;margin-left:auto!important}
+ .site .top-header .language-switch{
+  border-radius:999px!important;background:#eee4f2ed!important;color:#69656e!important;
+  min-height:46px!important;padding:0 14px!important;
+ }
+ .site .top-header .contact-header{
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  border-radius:999px!important;background:#a638d4!important;color:#fff!important;
+  min-height:46px!important;padding:0 21px!important;font-size:13px!important;
+ }
+ .site .top-header .hamburger{display:none!important}
+ .site.v5-home .v5-stage{padding-top:0!important}
+}
