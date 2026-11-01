@@ -4,6 +4,9 @@ permissions:
   issues: write
   pull-requests: write
 on:
+  push:
+    branches:
+      - "fix/soft-tech-v6-1-universal-restore-20261102"
   pull_request:
     branches: [main]
     paths:
