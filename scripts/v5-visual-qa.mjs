@@ -88,6 +88,9 @@ try {
           stage,
           logo: rect(".v5-brand"),
           navigation: rect(".v5-navigation"),
+          sharedHeader: rect(".site.v5-home .top-header"),
+          sharedLogo: rect(".site.v5-home .top-header .top-brand"),
+          sharedNavigation: rect(".site.v5-home .top-header .desktop-nav"),
           title: rect(".v5-headline"),
           computer: rect(".v5-depth-composition"),
           cta: rect(".v5-bottom-left"),
@@ -108,9 +111,19 @@ try {
         errors.push(`${viewport.name}: original six-layer computer artwork failed to load`);
       }
       if (isDesktop && viewport.width === 1586) {
-        if (!result.stage || Math.abs(result.stage.x - 30) > 9) errors.push("Master reference panel horizontal alignment differs from target.");
-        if (!result.stage || Math.abs(result.stage.y - 20) > 9) errors.push("Master reference panel vertical alignment differs from target.");
-        if (!result.title || !result.navigation || !result.logo || !result.computer) errors.push("Missing required master layout elements.");
+        // V6 unified navigation replaces the intentionally hidden V5 header.
+        const shared = result.sharedHeader?.w > 100 && result.sharedLogo?.w > 50 &&
+          result.sharedNavigation?.w > 100;
+        const legacy = result.logo?.w > 50 && result.navigation?.w > 100;
+        if (!shared && !legacy) errors.push("No visible, complete desktop navigation header.");
+        const targetX = shared ? 0 : 30;
+        const targetY = shared ? 0 : 20;
+        if (!result.stage || Math.abs(result.stage.x - targetX) > 9)
+          errors.push("Master stage horizontal alignment differs from active layout.");
+        if (!result.stage || Math.abs(result.stage.y - targetY) > 9)
+          errors.push("Master stage vertical alignment differs from active layout.");
+        if (!result.title?.w || !result.computer?.w)
+          errors.push("Missing main headline or six-layer computer composition.");
       }
       if (jsErrors.length) errors.push(`${viewport.name}: Javascript exceptions ${jsErrors.join(" | ")}`);
       checks.push({ viewport, ...result, jsErrors });
@@ -164,14 +177,28 @@ try {
     errors.push("Explore Games CTA failed navigation.");
   }
   await navPage.goto(root,{waitUntil:"domcontentloaded"});
-  await navPage.locator(".v5-login").click();
-  const dialog = navPage.locator('[role="dialog"][aria-label="Partner account notice"]');
-  try { await dialog.waitFor({state:"visible", timeout:10000}); }
-  catch { errors.push("Partner access dialog not interactive."); }
-  if (await dialog.isVisible()) {
-    await dialog.locator(".v5-dialog-close").click();
-    try { await dialog.waitFor({state:"hidden", timeout:10000}); }
-    catch { errors.push("Partner access dialog did not close."); }
+  // The V6 shared header replaced the old V5 login and is the visible UI.
+  if (await navPage.locator(".site.v5-home .top-header").isVisible()) {
+    try {
+      await navPage.locator(".top-header .contact-header").click({timeout:6000});
+      await navPage.waitForURL("**/contact",{timeout:12000});
+      await navPage.locator(".top-header .top-brand").click({timeout:6000});
+      await navPage.waitForURL("**/",{timeout:12000});
+    } catch (error) {
+      errors.push("Shared desktop header contact/home navigation failed: "+error.message);
+    }
+  } else if (await navPage.locator(".v5-login").isVisible()) {
+    try {
+      await navPage.locator(".v5-login").click({timeout:6000});
+      const dialog = navPage.locator('[role="dialog"][aria-label="Partner account notice"]');
+      await dialog.waitFor({state:"visible",timeout:10000});
+      await dialog.locator(".v5-dialog-close").click();
+      await dialog.waitFor({state:"hidden",timeout:10000});
+    } catch (error) {
+      errors.push("Legacy partner access dialog failed: "+error.message);
+    }
+  } else {
+    errors.push("No visible desktop header action to test.");
   }
   await navPage.close();
 
