@@ -425,3 +425,15 @@ img{display:block;max-width:100%}
   .poster-prev{transform:translate(-50%,-47%) scale(.81)!important}
   .poster-next{transform:translate(-50%,-47%) scale(.81)!important}
 }
+
+/* V6.3 typography: pixel display accents + readable monospace content. */
+:root{--font-pixel:'Press Start 2P','Courier New',monospace;--font-content:'DM Mono','SFMono-Regular',Consolas,monospace}
+body,button,input,textarea,select{font-family:var(--font-content)!important}
+.site p,.site li,.site label,.site input,.site textarea,.site button,.site a,.site span{font-family:var(--font-content)}
+.site h1,.site h2,.site h3,.site h4,.site strong{font-family:var(--font-content)}
+.site .eyebrow,.site .small-label,.site .section-tag,.site .side-caption,.site .nav-index,.site .card-top,.site .card-cover-name .small-label,.site .marquee-track span,.site .footer-legal,.site .stage-controls>span{font-family:var(--font-pixel);font-weight:400;letter-spacing:.025em;line-height:1.9}
+.site .eyebrow,.site .small-label,.site .section-tag,.site .side-caption,.site .card-top{font-size:clamp(7px,.66vw,9px)}
+.site .marquee-track span{font-size:clamp(9px,1vw,13px)}
+.site h1,.site h2,.site h3{letter-spacing:-.045em;overflow-wrap:normal}
+.site p,.site li{line-height:1.8}
+@media(max-width:700px){.site .eyebrow,.site .small-label,.site .section-tag,.site .side-caption,.site .card-top{font-size:7px}.site .marquee-track span{font-size:9px}.site h1,.site h2,.site h3{letter-spacing:-.06em}}
