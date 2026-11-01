@@ -102,6 +102,77 @@ for(const route of ["/games","/company","/technology","/partners","/contact"]){
  checks.push({route,...result});
  await page.close();
 }
+// Cross-route header and copy QA. All navigation pages and original-game
+// details must share the same header, readable monospace body copy and mobile menu.
+for (const viewport of [
+ {name:"desktop-nav-1440",width:1440,height:900},
+ {name:"mobile-nav-390",width:390,height:844},
+]) {
+ let baseline=null;
+ for (const route of [
+  "/","/games","/games/skygate-5000","/games/uno-luck",
+  "/games/mahjong-wild","/company","/technology","/partners","/contact"
+ ]) {
+  const page=await browser.newPage({viewport:{width:viewport.width,height:viewport.height}});
+  const routeErrors=[];
+  page.on("pageerror",err=>routeErrors.push(err.message));
+  await page.goto(origin+route,{waitUntil:"domcontentloaded",timeout:40000});
+  await page.locator(".top-header").waitFor({timeout:10000});
+  await page.evaluate(async()=>await document.fonts.ready);
+  const sample=await page.evaluate(()=>{
+   const rect=element=>{if(!element)return null;const r=element.getBoundingClientRect();
+    return {x:r.x,right:r.right,y:r.y,bottom:r.bottom,width:r.width,height:r.height};};
+   const header=document.querySelector(".top-header");
+   const brand=document.querySelector(".top-brand");
+   const language=document.querySelector(".language-switch");
+   const menu=document.querySelector(".hamburger");
+   const copy=[...document.querySelectorAll(".main-content p")].find(el=>getComputedStyle(el).display!=="none");
+   return {
+    header:rect(header),background:header?getComputedStyle(header).backgroundColor:null,
+    brand:rect(brand),logo:brand?.querySelector("img")?.getAttribute("src")||null,
+    language:rect(language),menu:rect(menu),
+    menuVisible:!!menu&&getComputedStyle(menu).display!=="none",
+    desktopNavVisible:!!document.querySelector(".desktop-nav")&&getComputedStyle(document.querySelector(".desktop-nav")).display!=="none",
+    navCount:document.querySelectorAll(".desktop-nav button").length,
+    copyFont:copy?getComputedStyle(copy).fontFamily:null,
+    documentWidth:document.documentElement.scrollWidth,viewportWidth:innerWidth
+   };
+  });
+  const mark=viewport.name+" "+route;
+  if(!sample.header||!sample.brand||!sample.language)errors.push(mark+": header component missing");
+  if(!sample.logo?.includes("soft-tech-logo.png"))errors.push(mark+": header logo asset differs");
+  if(sample.navCount!==5)errors.push(mark+": expected five standard nav links");
+  if(sample.copyFont&&!sample.copyFont.includes("DM Mono"))errors.push(mark+": content copy is not monospace: "+sample.copyFont);
+  if(sample.documentWidth>sample.viewportWidth+4)errors.push(mark+": horizontal overflow "+sample.documentWidth);
+  if(baseline&&sample.header&&Math.abs(sample.header.height-baseline.height)>2)
+   errors.push(mark+": header height differs from home baseline");
+  if(baseline&&sample.background!==baseline.background)
+   errors.push(mark+": header color differs from home baseline");
+  if(!baseline&&sample.header)baseline={height:sample.header.height,background:sample.background};
+  if(viewport.width<=1040){
+   if(!sample.menuVisible||sample.desktopNavVisible)errors.push(mark+": mobile navigation breakpoint incorrect");
+   if(sample.menu&&sample.language&&sample.menu.x<sample.language.right-2)
+    errors.push(mark+": hamburger must follow language selector");
+   if(sample.brand&&sample.language&&sample.brand.right>sample.language.x+2)
+    errors.push(mark+": logo collides with language selector");
+   await page.locator(".hamburger").click();
+   if(!(await page.locator(".side-panel").evaluate(el=>el.classList.contains("side-open"))))
+    errors.push(mark+": hamburger did not open navigation");
+   await page.keyboard.press("Escape");
+   if(await page.locator(".side-panel").evaluate(el=>el.classList.contains("side-open")))
+    errors.push(mark+": Escape did not close navigation");
+   if(route!=="/"){
+    await page.screenshot({path:path.join(out,"nav-mobile-"+route.slice(1).replaceAll("/","-")+".png"),fullPage:false,animations:"disabled"});
+   }
+  }else if(!sample.desktopNavVisible||sample.menuVisible){
+   errors.push(mark+": desktop navigation breakpoint incorrect");
+  }
+  if(routeErrors.length)errors.push(mark+": browser exceptions: "+routeErrors.join(" | "));
+  checks.push({route,navViewport:viewport.name,...sample,routeErrors});
+  await page.close();
+ }
+}
+
 await browser.close();
 const report={result:errors.length?"FAIL":"PASS",errors,checks};
 fs.writeFileSync(path.join(out,"report.json"),JSON.stringify(report,null,2));
