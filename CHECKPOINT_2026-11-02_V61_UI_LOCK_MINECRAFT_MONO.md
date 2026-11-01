@@ -22,3 +22,6 @@ A release is allowed only after GitHub Actions build, UI-hash guard and real-bro
 
 ## Hero headline
 The desktop `BUILDING / DIGITAL / GAME WORLDS / THAT STICK` and equivalent mobile homepage hero text are also editorial headings and use Minecraft. Their existing line structure and absolute/flow positions remain unchanged. Font size is capped independently at each breakpoint to avoid overlapping the orange-computer parallax artwork. Screenshots are now captured with reduced motion enabled so IntersectionObserver-revealed sections are visible in full-page evidence.
+
+## QA gate for this revision
+Confirm the Minecraft webfont loads on every route, including both desktop/mobile homepage hero headlines, every section title and all paragraph copy. Screen captures must show revealed content, navbar consistency and the existing full-bleed orange-computer composition before promotion to production.
