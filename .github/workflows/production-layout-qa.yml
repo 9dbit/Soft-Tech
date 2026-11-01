@@ -1,0 +1,52 @@
+name: Soft Tech Production Layout and Minecraft Font QA
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/app/typography.css"
+      - "src/app/v4-responsive.css"
+      - "src/app/v4.css"
+      - "src/components/v4-playground.tsx"
+      - "public/fonts/**"
+      - "scripts/qa-production-layout.mjs"
+      - ".github/workflows/production-layout-qa.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  visual-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install
+        run: npm ci --no-audit --no-fund
+      - name: Build Next.js
+        run: npm run build
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Start production build locally
+        run: |
+          nohup npm run start -- -p 3000 >/tmp/soft-tech-layout-server.log 2>&1 &
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:3000/api/health >/dev/null; then exit 0; fi
+            sleep 2
+          done
+          cat /tmp/soft-tech-layout-server.log
+          exit 1
+      - name: Browser screenshot and layout audit
+        run: node scripts/qa-production-layout.mjs
+      - name: Upload screenshot evidence and metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soft-tech-production-layout-qa
+          path: qa-artifacts/production-layout/
+          retention-days: 14
+          if-no-files-found: warn
