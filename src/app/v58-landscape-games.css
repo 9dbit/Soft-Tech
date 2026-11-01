@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Press+Start+2P&display=swap');
+/* Google fonts are loaded before all rules for reliable first paint. */
 /* V5.8: three original games deserve three full-width landscape showcases. */
 .v5-home .home-collection .game-grid,
 .catalog-grid.game-grid{
@@ -348,3 +350,13 @@
  .site .top-header .hamburger{display:none!important}
  .site.v5-home .v5-stage{padding-top:0!important}
 }
+
+/* V6.4: enforce actual pixel headlines and monospace editorial copy across V5 pages. */
+
+:root{--soft-pixel:'Press Start 2P','Courier New',monospace;--soft-mono:'DM Mono','Courier New',monospace}
+html body .site p,html body .site li,html body .site blockquote,html body .site label,html body .site .corp-two p,html body .site .studio-copy p,html body .site .page-head p,html body .site .v5-home p,html body .site .v5-home .v5-stage p{font-family:var(--soft-mono)!important;font-weight:400;letter-spacing:-.015em;line-height:1.85}
+html body .site h1,html body .site h2,html body .site .v5-home h1,html body .site .v5-home h2,html body .site .v5-home .v5-stage h2,html body .site .v5-home .v5-stage h3{font-family:var(--soft-pixel)!important;font-weight:400!important;letter-spacing:-.055em!important;line-height:1.48!important;overflow-wrap:break-word}
+html body .site .v5-home h1,html body .site .v5-home h2{font-size:clamp(22px,3.3vw,53px)!important}
+html body .site .v5-home h1 span,html body .site .v5-home h2 span,html body .site .v5-home h2 em{font-family:inherit!important}
+html body .site .corp-two p,html body .site .studio-copy p{font-size:clamp(12px,1vw,15px)!important}
+@media(max-width:700px){html body .site h1,html body .site h2,html body .site .v5-home h1,html body .site .v5-home h2{font-size:clamp(17px,4.5vw,30px)!important;line-height:1.65!important;letter-spacing:-.06em!important}}
