@@ -107,3 +107,193 @@
     line-height: 1.16 !important;
   }
 }
+
+
+/* V6.1 FONT COVERAGE V2
+   Screenshot audit: section/game titles, feature labels, navbar/sidebar,
+   footer menu and promotional tile were still rendered in the old sans face.
+   Keep all 28 protected layout, parallax, header and artwork files unchanged. */
+
+/* Display typography: headings and prominent interface words. */
+.site :is(h1,h2,h3,h4),
+.site .worlds-strip strong,
+.site .v52-mobile-home .v52-featured-header strong,
+.site .side-panel .side-card > strong,
+.site .contact-art > strong,
+.site .section-header,
+.site .section-header span,
+.site .section-header button,
+.site .desktop-nav button,
+.site .side-panel .side-navigation button > span:nth-child(2),
+.site .footer-nav button,
+.site .footer-cta,
+.site .card-play,
+.site .v52-mobile-home .v52-card-info > a,
+.site .v52-mobile-home .v52-card-info > span,
+.site .v52-mobile-home .v52-ctas button,
+.site .v52-mobile-home .v52-studio-summary button,
+.site .v5-ctas button,
+.site .v5-button-primary,
+.site .v5-button-secondary,
+.site .studio-copy .btn,
+.site .contact-form button,
+.site .header-right .contact-header,
+.site .catalog-filters button,
+.site .detail-nav button,
+.site .v4-story-card-content button,
+.site .v4-explore-cta,
+.site .v4-magnetic-cta,
+.site .stage-actions .btn {
+  font-family:var(--softtech-section-display)!important;
+  font-weight:400!important;
+  font-synthesis:none;
+  letter-spacing:0!important;
+}
+/* Beat old mobile/card/desktop font shorthands and higher specificity. */
+.site .v52-mobile-home .v52-featured-header strong,
+.site .v52-games-rail .v52-card-info h2,
+.site.v5-home .home-collection .card-cover-name h3,
+.site .catalog-grid .card-cover-name h3,
+.site .v4-story-card-content h3,
+.site .side-panel .side-card > strong,
+.site .side-panel .side-navigation button > span:nth-child(2),
+.site .top-header .desktop-nav button {
+  font-family:var(--softtech-section-display)!important;
+  font-weight:400!important;
+  font-synthesis:none;
+  letter-spacing:0!important;
+}
+
+/* All descriptive content, including slogans overwritten by old font: ...!important. */
+.site :is(p,li,blockquote,figcaption,input,textarea),
+.site.v5-home .home-collection .game-card-foot p,
+.site .catalog-grid .game-card-foot p,
+.site .v52-games-rail .v52-card-info p,
+.site .footer-brand span,
+.site .footer-legal,
+.site .side-caption,
+.site .side-card-bottom,
+.site .side-card-stars span,
+.site .side-bottom,
+.site .v52-mobile-home .v52-featured-header small,
+.site .v52-mobile-home .v52-rail-arrows > span,
+.site .v52-games-rail .v52-card-cover > span {
+  font-family:var(--softtech-editorial-mono)!important;
+}
+
+/* Font-size caps only. No changes to layouts, header positions or image layers. */
+.site .side-panel .side-card > strong {
+  font-size:clamp(16px,1.45vw,20px)!important;
+  line-height:1.3!important;
+  overflow-wrap:break-word;
+}
+.site .side-panel .side-navigation button > span:nth-child(2) {
+  font-size:clamp(12px,1.15vw,15px)!important;
+  line-height:1.25!important;
+}
+.site .footer-nav button {
+  font-size:clamp(10px,.95vw,12px)!important;
+  line-height:1.45!important;
+}
+.site .top-header .desktop-nav button {
+  font-size:clamp(10px,.86vw,12px)!important;
+  line-height:1.1!important;
+}
+.site .section-header,.site .section-header span,.site .section-header button {
+  font-size:clamp(9px,.88vw,11px)!important;
+  line-height:1.35!important;
+}
+.site .worlds-strip strong{
+  font-size:clamp(11px,1.05vw,15px)!important;
+  line-height:1.3!important;
+}
+.site .contact-art > strong {
+  font-size:clamp(22px,3.05vw,43px)!important;
+  line-height:1.25!important;
+}
+.site .v4-story-card-content h3 {
+  font-size:clamp(21px,2.3vw,35px)!important;
+  line-height:1.18!important;
+}
+.site .value-box h3,.site .cap-card h3 {
+  font-size:clamp(13px,1.25vw,17px)!important;
+  line-height:1.32!important;
+  overflow-wrap:break-word;
+}
+.site.v5-home .home-collection .card-cover-name h3,
+.site .catalog-grid .card-cover-name h3 {
+  font-size:clamp(22px,2.1vw,31px)!important;
+  line-height:1.2!important;
+  overflow-wrap:break-word;
+}
+.site .stage-content h2 {
+  font-size:clamp(26px,3.1vw,43px)!important;
+  line-height:1.2!important;
+}
+.site .footer-cta,.site .card-play,.site .v4-explore-cta,
+.site .v4-magnetic-cta,.site .v4-story-card-content button,
+.site .catalog-filters button,.site .contact-form button,
+.site .detail-nav button,.site .v5-ctas button,.site .v5-button-primary,
+.site .v5-button-secondary,.site .header-right .contact-header,
+.site .studio-copy .btn {
+  font-size:clamp(9px,.8vw,11px)!important;
+  line-height:1.45!important;
+}
+
+@media(max-width:1099px) {
+  .site .v52-mobile-home .v52-featured-header strong {
+    font-size:clamp(9px,2.45vw,11px)!important;
+    line-height:1.25!important;
+  }
+  .site .v52-games-rail .v52-card-info h2 {
+    font-size:clamp(22px,6.35vw,29px)!important;
+    line-height:1.22!important;
+  }
+  .site .v52-games-rail .v52-card-info > span {
+    font-size:clamp(9px,2.4vw,11px)!important;
+    line-height:1.35!important;
+  }
+  .site .v52-mobile-home .v52-featured-header small,
+  .site .v52-mobile-home .v52-rail-arrows > span {
+    font-size:clamp(8px,2.04vw,9px)!important;
+    letter-spacing:0!important;
+  }
+  .site .worlds-strip strong {
+    font-size:clamp(11px,3.18vw,14px)!important;
+  }
+  .site .side-panel .side-card > strong {
+    font-size:clamp(16px,4.25vw,20px)!important;
+  }
+  .site .side-panel .side-navigation button > span:nth-child(2) {
+    font-size:clamp(12px,3.45vw,15px)!important;
+  }
+  .site .footer-nav button {
+    font-size:clamp(10px,2.58vw,12px)!important;
+  }
+  .site .v52-mobile-home .v52-card-info > a,
+  .site .v52-mobile-home .v52-studio-summary button,
+  .site .v52-mobile-home .v52-ctas button {
+    font-size:clamp(9px,2.55vw,11px)!important;
+    line-height:1.45!important;
+  }
+  .site .section-header,.site .section-header span,.site .section-header button {
+    font-size:clamp(9px,2.35vw,11px)!important;
+  }
+  .site .contact-art > strong {
+    font-size:clamp(21px,5.5vw,30px)!important;
+  }
+}
+@media(max-width:700px) {
+  .site .catalog-grid .card-cover-name h3 {
+    font-size:clamp(20px,5.7vw,27px)!important;
+  }
+  .site .v4-story-card-content h3 {
+    font-size:clamp(18px,5vw,25px)!important;
+  }
+  .site .value-box h3,.site .cap-card h3 {
+    font-size:clamp(13px,3.7vw,17px)!important;
+  }
+  .site .footer-cta {
+    font-size:clamp(9px,2.5vw,11px)!important;
+  }
+}
