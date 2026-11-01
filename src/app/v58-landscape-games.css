@@ -234,3 +234,72 @@
   width:46px!important;height:46px!important;flex-basis:46px!important;
  }
 }
+
+/* V6 desktop: fluid full-bleed canvas, stable unified navigation and three-up collection. */
+@media(min-width:1100px){
+ html,body{width:100%;max-width:100%;overflow-x:clip}
+ .site,.site.v5-home,.main-content{width:100%!important;max-width:none!important;min-width:0!important}
+ .site{display:block!important}
+ .site .main-content{margin:0!important;padding:0!important}
+ .v5-home .v5-hero{width:100%!important;margin:0!important;padding:0!important}
+ .v5-home .v5-stage{
+  width:100%!important;max-width:none!important;
+  margin:0!important;border-radius:0!important;
+  height:clamp(740px,61vw,1050px)!important;
+ }
+ .v5-home .v5-header{
+  position:fixed!important;top:14px!important;left:clamp(24px,3vw,58px)!important;
+  right:clamp(24px,3vw,58px)!important;height:72px!important;
+  z-index:900!important;pointer-events:none!important;
+ }
+ .v5-home .v5-header>*{pointer-events:auto!important}
+ .v5-home .v5-navigation{
+  border-radius:999px!important;background:#eee4f2ed!important;
+  box-shadow:0 8px 26px #64426b12!important;
+ }
+ .v5-home .v5-navigation button{border-radius:999px!important;color:#69656e!important}
+ .v5-home .v5-navigation button.v5-current{
+  background:#a638d4!important;color:white!important
+ }
+ .v5-home .v5-login{
+  background:#a638d4!important;border-radius:999px!important;color:white!important
+ }
+ .v5-home .v5-brand{height:72px!important}
+ .v5-home .v5-brand img{transform:none!important;height:72px!important;width:184px!important}
+ .site:not(.v5-home) .top-header{
+  position:fixed!important;top:14px!important;left:clamp(24px,3vw,58px)!important;
+  right:clamp(24px,3vw,58px)!important;width:auto!important;height:72px!important;
+  z-index:900!important;background:transparent!important;border:0!important;
+  box-shadow:none!important;backdrop-filter:none!important;
+ }
+ .site:not(.v5-home) .top-header .top-brand{
+  width:184px!important;height:72px!important;display:flex!important;align-items:center!important
+ }
+ .site:not(.v5-home) .top-header .top-brand img{
+  width:184px!important;height:72px!important;object-fit:contain!important
+ }
+ .site:not(.v5-home) .top-header .header-right{
+  margin-left:auto!important;gap:10px!important
+ }
+ .site:not(.v5-home) .top-header .header-breadcrumb,
+ .site:not(.v5-home) .top-header .header-live{display:none!important}
+ .site:not(.v5-home) .main-content{padding-top:104px!important}
+ .v5-home .home-collection{
+  width:calc(100% - clamp(48px,6vw,116px))!important;
+  max-width:none!important;margin-left:auto!important;margin-right:auto!important;
+ }
+ .v5-home .home-collection .game-grid,
+ .catalog-grid.game-grid{
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:clamp(16px,2vw,34px)!important;align-items:start!important
+ }
+ .v5-home .home-collection .game-grid>.reveal,
+ .catalog-grid.game-grid>.reveal{
+  grid-column:auto!important;width:100%!important;min-width:0!important;
+  max-width:none!important;margin:0!important
+ }
+ .v5-home .home-collection .game-card-media,
+ .catalog-grid .game-card-media{aspect-ratio:16/10!important}
+ .v5-home .home-collection .game-card-foot,
+ .catalog-grid .game-card-foot{min-width:0!important}
+}
