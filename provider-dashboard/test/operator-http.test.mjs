@@ -32,7 +32,7 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
   const {csrf}=await login.json(),cookie=login.headers.get('set-cookie').split(';')[0];
   const makeOperator=async(name)=>{
    const r=await fetch(base+'/api/operators',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:JSON.stringify({name,games:['uno-luck','mahjong-wild','skygate-5000'],currency:'VCOIN',scale:2})});
-   assert.equal(r.status,201,await r.text());return r.json();
+   assert.equal(r.status,201);return r.json();
   };
   const a=await makeOperator('Conformance Operator A'),b=await makeOperator('Conformance Operator B');
   assert.notEqual(a.credential.key_id,b.credential.key_id);
@@ -43,7 +43,7 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
   assert.equal(replay.status,409);assert.equal((await replay.json()).error,'REPLAY_DETECTED');
   const body=JSON.stringify({game_id:'uno-luck',player_ref:'test-player-1',currency:'VCOIN'});
   const launch=await fetch(base+'/v1/game-launches',signed({url:base+'/v1/game-launches',method:'POST',body,credential:a.credential,idempotencyKey:'external-conformance-launch-001'}));
-  assert.equal(launch.status,200,await launch.text());
+  assert.equal(launch.status,200);
   const launched=await launch.json();assert.match(launched.session_id,/^ss_/);
   const own=await fetch(base+'/v1/sessions/'+launched.session_id,signed({url:base+'/v1/sessions/'+launched.session_id,credential:a.credential}));
   assert.equal(own.status,200);
