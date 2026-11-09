@@ -1,0 +1,45 @@
+name: Provider production release evidence gate
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/provider-core-independent-20261109]
+    paths:
+      - 'provider-dashboard/scripts/release-evidence-gate.mjs'
+      - 'provider-dashboard/test/release-evidence-gate.test.mjs'
+      - '.github/workflows/provider-release-gate.yml'
+permissions:
+  contents: read
+jobs:
+  verify-gate-logic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.11.1'
+      - name: Validate evidence gate logic
+        working-directory: provider-dashboard
+        run: node --test test/release-evidence-gate.test.mjs
+  production-unlock:
+    if: github.event_name == 'workflow_dispatch'
+    needs: verify-gate-logic
+    runs-on: ubuntu-latest
+    environment: production-approval
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.11.1'
+      - name: Require independently supplied release evidence
+        env:
+          RELEASE_EVIDENCE_JSON: ${{ secrets.RELEASE_EVIDENCE_JSON }}
+        run: |
+          test -n "$RELEASE_EVIDENCE_JSON" || { echo "BLOCKED: no release evidence configured"; exit 1; }
+          printf '%s' "$RELEASE_EVIDENCE_JSON" > "$RUNNER_TEMP/release-evidence.json"
+          node provider-dashboard/scripts/release-evidence-gate.mjs "$RUNNER_TEMP/release-evidence.json"
+      - name: Release decision only
+        run: echo "Evidence format accepted; independent audit and runtime unlock remain separate."
