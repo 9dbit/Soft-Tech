@@ -1,0 +1,169 @@
+{
+  "observed_date_wib": "2026-11-10",
+  "scope": "Soft Tech internal sandbox provider; no external operator integration or production unlock",
+  "services": [
+    {
+      "name": "provider",
+      "repo": "9dbit/Soft-Tech",
+      "sha": "35275b061dbfc08f446dea29a11cb2b1389b05aa",
+      "deploymentId": "b977f702-66b5-4839-870f-b95a791bc76a",
+      "status": "SUCCESS"
+    },
+    {
+      "name": "uno",
+      "repo": "9dbit/uno-luck",
+      "sha": "e9a41318ae7f2f6f643a1bff36349b839e3894cd",
+      "deploymentId": "77cc457a-bcc0-41fa-8cec-bc615783e570",
+      "status": "SUCCESS"
+    },
+    {
+      "name": "mahjong",
+      "repo": "9dbit/Mahjong-legend",
+      "sha": "a32b33f85a3585349f1edc917ab75befd17de0af",
+      "deploymentId": "411c7d30-73fa-4e54-ad58-b19112bbff06",
+      "status": "SUCCESS"
+    },
+    {
+      "name": "skygate",
+      "repo": "9dbit/Skygate",
+      "sha": "9f04ab6d73ff4f6fff742b8b275fa6cdb214d33d",
+      "deploymentId": "3207f8ea-a6c2-4e06-998b-465eabda0800",
+      "status": "SUCCESS"
+    }
+  ],
+  "acceptance": {
+    "id": "provider-20261110-backup-isolation-01",
+    "status": "passed",
+    "cases": 6,
+    "scope": "Actual deployed native game rounds across two internal sandbox operators; not an external wallet certification"
+  },
+  "provider_events": [
+    {
+      "at": "2026-11-09T19:39:37.767879724Z",
+      "message": "provider.acceptance.passed provider-20261110-backup-isolation-01 6"
+    },
+    {
+      "at": "2026-11-09T19:39:57.755431170Z",
+      "message": "provider.offsite_backup {\"ok\":true,\"at\":\"2026-11-09T19:39:48.500Z\",\"key\":\"provider-core/2026-11-09T19-39-47-452Z-07ca99d9-9136-4154-a8df-58806336c9f0.stbk\",\"sha256\":\"08871a0cbc08143026510fc44a3fae27d367726b7b93210a63e70d11b1eeca5a\",\"bytes\":258098,\"remoteRestore\":\"verified\",\"source_commit\":\"35275b061dbfc08f446dea29a11cb2b1389b05aa\"}"
+    }
+  ],
+  "native_backup_events": [
+    {
+      "name": "uno",
+      "deploymentId": "77cc457a-bcc0-41fa-8cec-bc615783e570",
+      "status": "SUCCESS",
+      "entries": [
+        {
+          "time": "2026-11-09T19:36:14.372359138Z",
+          "message": "[ENGINE BACKUP] UNO importing backup module"
+        },
+        {
+          "time": "2026-11-09T19:36:14.372374788Z",
+          "event": "engine.backup.worker_started",
+          "message": "",
+          "game": "uno"
+        },
+        {
+          "time": "2026-11-09T19:36:14.372381607Z",
+          "event": "engine.backup.started",
+          "message": "",
+          "game": "uno"
+        },
+        {
+          "time": "2026-11-09T19:36:15.388896134Z",
+          "event": "engine.backup.remote_verified",
+          "message": "",
+          "game": "uno",
+          "object": "native/uno/1794252973-8bae3b7c724369f1.aesgcm",
+          "sha256": "8bae3b7c724369f1968aba3df53175c33ec7397e74d4674b3f8431a94aeaf2b2"
+        }
+      ]
+    },
+    {
+      "name": "mahjong",
+      "deploymentId": "411c7d30-73fa-4e54-ad58-b19112bbff06",
+      "status": "SUCCESS",
+      "entries": [
+        {
+          "time": "2026-11-09T19:36:54.223227672Z",
+          "message": "[ENGINE BACKUP] Mahjong importing backup module"
+        },
+        {
+          "time": "2026-11-09T19:36:54.223236492Z",
+          "event": "engine.backup.worker_started",
+          "message": "",
+          "game": "mahjong"
+        },
+        {
+          "time": "2026-11-09T19:36:54.223238592Z",
+          "event": "engine.backup.started",
+          "message": "",
+          "game": "mahjong"
+        },
+        {
+          "time": "2026-11-09T19:36:54.299480416Z",
+          "event": "engine.backup.remote_verified",
+          "message": "",
+          "game": "mahjong",
+          "object": "native/mahjong/1794253013-c47fd53911dbe200.aesgcm",
+          "sha256": "c47fd53911dbe200301ed60bf04d3661898a560e07e843875ce2b77e1d0da8b7"
+        },
+        {
+          "time": "2026-11-09T19:38:34.381715336Z",
+          "message": "INFO:     100.64.0.4:22338 - \"GET /health/backup HTTP/1.1\" 200 OK"
+        }
+      ]
+    },
+    {
+      "name": "skygate",
+      "deploymentId": "3207f8ea-a6c2-4e06-998b-465eabda0800",
+      "status": "SUCCESS",
+      "entries": [
+        {
+          "time": "2026-11-09T19:38:02.256473663Z",
+          "event": "engine.backup.remote_verified",
+          "message": "",
+          "game": "skygate",
+          "object": "native/skygate/1794253081-c9205931b7a40488.aesgcm",
+          "sha256": "c9205931b7a40488ea1665a52c15ebc706b8a6489287c051467cac7496d0d565",
+          "verified_at": "2026-11-09T19:38:02.239Z"
+        }
+      ]
+    }
+  ],
+  "ci": {
+    "provider_integration": "https://github.com/9dbit/Soft-Tech/actions/runs/42685068736",
+    "provider_backup": "https://github.com/9dbit/Soft-Tech/actions/runs/42685068336",
+    "uno": "https://github.com/9dbit/uno-luck/actions/runs/42684550424",
+    "mahjong": "https://github.com/9dbit/Mahjong-legend/actions/runs/42684624769",
+    "skygate": "https://github.com/9dbit/Skygate/actions/runs/42684766184",
+    "test_counts": {
+      "provider": 53,
+      "uno": 16,
+      "mahjong": 16,
+      "skygate": 6,
+      "monitor_fixture_tests": 9
+    }
+  },
+  "monitor": {
+    "default_branch": "main",
+    "commit": "247c0ce30033c531a4982ef84abaf62272b0236e",
+    "schedule_utc": "17 * * * *",
+    "artifact_retention_days": 14,
+    "first_run": {
+      "id": 42685664119,
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/9dbit/Soft-Tech/actions/runs/42685664119"
+    }
+  },
+  "limitations": [
+    "Physical preproduction/production separation not provisioned or certified",
+    "Admin MFA and separation of duties not implemented",
+    "External wallet certification pending",
+    "Full native lost-volume recovery and production RPO/RTO not measured",
+    "500/1000-session load, soak, chaos and independent security review pending",
+    "Legal and independent release signoff pending"
+  ],
+  "production_enabled": false
+}

@@ -1,0 +1,91 @@
+{
+  "schema": "softtech.health-monitor.v1",
+  "run_id": null,
+  "run_attempt": null,
+  "monitor_workflow_sha": null,
+  "started_at": "2026-11-09T19:39:55.128214+00:00",
+  "policy": {
+    "max_backup_age_seconds": 90000,
+    "request_timeout_seconds": 10,
+    "max_attempts": 3,
+    "retry_delay_seconds": 5,
+    "max_response_bytes": 32768
+  },
+  "services": [
+    {
+      "service": "provider",
+      "origin": "https://soft-tech-provider-panel.up.railway.app",
+      "ok": true,
+      "attempts": [
+        {
+          "ok": true,
+          "source_commit": "35275b061dbfc08f446dea29a11cb2b1389b05aa",
+          "backup_source_commit": "35275b061dbfc08f446dea29a11cb2b1389b05aa",
+          "verified_at": "2026-11-09T19:39:48.500000+00:00",
+          "backup_age_seconds": 19.948469,
+          "errors": [],
+          "attempt": 1,
+          "started_at": "2026-11-09T19:39:55.129456+00:00",
+          "checked_at": "2026-11-09T19:40:08.448469+00:00"
+        }
+      ]
+    },
+    {
+      "service": "uno",
+      "origin": "https://softtech-engine-uno-production.up.railway.app",
+      "ok": true,
+      "attempts": [
+        {
+          "ok": true,
+          "source_commit": "e9a41318ae7f2f6f643a1bff36349b839e3894cd",
+          "backup_source_commit": "e9a41318ae7f2f6f643a1bff36349b839e3894cd",
+          "verified_at": "2026-11-09T19:36:14.901088+00:00",
+          "backup_age_seconds": 230.875779,
+          "errors": [],
+          "attempt": 1,
+          "started_at": "2026-11-09T19:39:55.130487+00:00",
+          "checked_at": "2026-11-09T19:40:05.776867+00:00"
+        }
+      ]
+    },
+    {
+      "service": "mahjong",
+      "origin": "https://softtech-engine-mahjong-production.up.railway.app",
+      "ok": true,
+      "attempts": [
+        {
+          "ok": true,
+          "source_commit": "a32b33f85a3585349f1edc917ab75befd17de0af",
+          "backup_source_commit": "a32b33f85a3585349f1edc917ab75befd17de0af",
+          "verified_at": "2026-11-09T19:36:54.273153+00:00",
+          "backup_age_seconds": 191.7192,
+          "errors": [],
+          "attempt": 1,
+          "started_at": "2026-11-09T19:39:55.131158+00:00",
+          "checked_at": "2026-11-09T19:40:05.992353+00:00"
+        }
+      ]
+    },
+    {
+      "service": "skygate",
+      "origin": "https://softtech-engine-skygate-production.up.railway.app",
+      "ok": true,
+      "attempts": [
+        {
+          "ok": true,
+          "source_commit": "9f04ab6d73ff4f6fff742b8b275fa6cdb214d33d",
+          "backup_source_commit": "9f04ab6d73ff4f6fff742b8b275fa6cdb214d33d",
+          "verified_at": "2026-11-09T19:38:02.239000+00:00",
+          "backup_age_seconds": 123.506989,
+          "errors": [],
+          "attempt": 1,
+          "started_at": "2026-11-09T19:39:55.131673+00:00",
+          "checked_at": "2026-11-09T19:40:05.745989+00:00"
+        }
+      ]
+    }
+  ],
+  "finished_at": "2026-11-09T19:40:08.449338+00:00",
+  "ok": true,
+  "status": "passed"
+}

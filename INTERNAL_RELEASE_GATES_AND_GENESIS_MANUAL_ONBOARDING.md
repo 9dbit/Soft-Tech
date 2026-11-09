@@ -2,24 +2,26 @@
 Updated: 2026-11-10. Scope: Soft Tech provider only. Genesis is a future independent operator, not connected or modified by this document.
 
 ## Verified evidence
-- Latest Railway deployments of UNO, Mahjong, Skygate: SUCCESS, from environment named production; this is **not** a production-mode release.
-- GitHub Actions native backup tests: PASS for all three engines.
-- Skygate live deploy log: `[ENGINE BACKUP] verified` after encrypted upload, readback, isolated restore and integrity check.
-- UNO/Mahjong live deploy logs: backup worker launch only. **No verified remote restore event.**
+- Provider Core, UNO, Mahjong and Skygate: new deployments SUCCESS with application mode sandbox. Exact commits/deployment IDs are in [the 10 November checkpoint](CHECKPOINT_2026-11-10_BACKUP_RECOVERY_AND_MONITORING.md); Railway's environment name production is **not** a production-mode release.
+- GitHub Actions provider suite: 53 tests PASS; native backup/status suites: UNO 16, Mahjong 16, Skygate 6 PASS.
+- All three native live deploy logs now contain `engine.backup.remote_verified` after encrypted upload, readback, authenticated decryption and isolated SQLite integrity checks. Provider Core records `remoteRestore:verified`.
+- All four `/health/backup` endpoints return 200 with fresh proof bound to their current full source commit. The first hourly-monitor workflow execution [42685664119](https://github.com/9dbit/Soft-Tech/actions/runs/42685664119) passed on default branch main.
+- Fresh deployed acceptance `provider-20261110-backup-isolation-01` passed six actual native-game cases across two internal sandbox operators, including duplicate callbacks, tenant isolation and ledger reconciliation.
+- A local provider application restore rehearsal preserves identity, credentials, sessions, replay protection and journal state; pending settlement completes once. It does not establish native lost-volume recovery or production RPO/RTO.
 - Core `advanceRelease` blocks preproduction activation with `PREPRODUCTION_ISOLATION_PENDING`. Do not bypass this protection.
-- No external operator certification, production segregation, MFA or measured load/chaos evidence is presently established.
+- Immutable sandbox database identity and real-path volume containment are deployed. Physical preproduction/production segregation, external operator certification, MFA and measured load/chaos evidence are still not established.
 
 ## Internal confidence gates (all mandatory)
 | Gate | Required proof | Current |
 | --- | --- | --- |
-| G01 | Each game backup stored in S3, read back, decrypted and restored in isolated scratch SQLite, with immutable manifest and timestamp | Skygate PASS; UNO/Mahjong UNKNOWN |
-| G02 | Restore rehearsal after simulated lost volume, preserving key and RPO/RTO targets | NOT TESTED |
-| G03 | Backup age alert, retention policy, rotation, and restore drill | NOT TESTED |
-| G04 | Sandbox, preproduction, production physically separate DB/volume, wallet endpoints, API keys, secrets and session stores | NOT VERIFIED |
+| G01 | Each game backup stored in S3, read back, decrypted and restored in isolated scratch SQLite, with immutable manifest and timestamp | Remote snapshot/readback/restore PASS for all three; checksum/authenticated manifest and timestamp recorded. Storage immutability policy is not yet verified |
+| G02 | Restore rehearsal after simulated lost volume, preserving key and RPO/RTO targets | PARTIAL: provider application fixture PASS; full native volume-loss drill and production targets NOT VERIFIED |
+| G03 | Backup age alert, retention policy, rotation, and restore drill | PARTIAL: hourly current-build/freshness monitoring and failure retries active; S3 retention, key rotation and alert delivery drill pending |
+| G04 | Sandbox, preproduction, production physically separate DB/volume, wallet endpoints, API keys, secrets and session stores | PARTIAL CODE SAFEGUARD: immutable sandbox identity/path checks deployed; physical separation NOT VERIFIED |
 | G05 | Admin MFA, session revocation, rate limiting, scoped RBAC, independent approvals, audit trail | NOT VERIFIED |
 | G06 | Signed HMAC API negative tests: invalid signature, replay, stale timestamp, cross-tenant, duplicate idempotency, wrong currency, malformed payload | PARTIAL TEST COVERAGE |
-| G07 | Wallet debit, settle, refund, timeout, ambiguous result, duplicate callback, recovery and exactly-once ledger semantics with simulated operator | NOT CERTIFIED |
-| G08 | Native game deterministic result/ledger reconciliation, seed/RNG review and per-game correctness | NOT CERTIFIED |
+| G07 | Wallet debit, settle, refund, timeout, ambiguous result, duplicate callback, recovery and exactly-once ledger semantics with simulated operator | Internal fault tests and six live sandbox rounds PASS; external wallet NOT CERTIFIED |
+| G08 | Native game deterministic result/ledger reconciliation, seed/RNG review and per-game correctness | Live sandbox reconciliation PASS; full math/RNG review NOT CERTIFIED |
 | G09 | Load 500/1000 concurrent sessions, soak, crash/restart, latency, error rate and resource ceilings | NOT TESTED |
 | G10 | Independent security review, dependency/secret scan, backup access, incident response, rollback drill | NOT VERIFIED |
 | G11 | Applicable jurisdiction/operator compliance, terms and documented go-live signoff | EXTERNAL DECISION |
