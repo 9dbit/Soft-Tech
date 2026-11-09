@@ -27,7 +27,7 @@ const backupRunner=startOffsiteBackup({env:backupEnv,onStatus:status=>{const pro
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.woff2':'font/woff2','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.jpeg':'image/jpeg'};
 function send(res,status,data,type='application/json; charset=utf-8',extra={}){res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY',...extra});res.end(type.startsWith('application/json')?JSON.stringify(data):data);}
 async function readBody(req){if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'JSON_REQUIRED');let size=0,chunks=[];for await(const c of req){size+=c.length;if(size>65536)fail(413,'BODY_TOO_LARGE');chunks.push(c);}return Buffer.concat(chunks).toString('utf8');}
-function panelSession(req){const raw=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('stp_session='))?.slice(12);if(!raw||raw.length>100)return null;return staff.session(raw)||core.get('SELECT * FROM panel_sessions WHERE id_hash=? AND expires_at>?',sha(raw),Date.now());}
+function panelSession(req){const raw=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('stp_session='))?.slice(12);if(!raw||raw.length>100)return null;const named=staff.session(raw);if(named)return named;if(core.deploymentIdentity.environment!=='sandbox'&&!staff.readiness().bootstrap_available)return null;return core.get('SELECT * FROM panel_sessions WHERE id_hash=? AND expires_at>?',sha(raw),Date.now());}
 function cookie(value,maxAge){const secure=env.NODE_ENV==='production';return `stp_session=${value}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${maxAge}${secure?'; Secure':''}`;}
 function originGuard(req){if(req.headers['sec-fetch-site']==='cross-site')fail(403,'INVALID_ORIGIN');if(req.headers.origin){let origin;try{origin=new URL(req.headers.origin);}catch{fail(403,'INVALID_ORIGIN');}if(origin.host!==req.headers.host)fail(403,'INVALID_ORIGIN');}}
 const admin=session=>{if(session?.kind==='staff'){requireStaff(core,session,'operations:write',{fresh:false});return;}if(!session||session.role!=='admin')fail(403,'READ_ONLY_ROLE');if(core.deploymentIdentity.environment!=='sandbox')fail(403,'NAMED_STAFF_REQUIRED');};
@@ -66,7 +66,9 @@ const server=createServer({maxHeaderSize:16384},async(req,res)=>{
    if(path==='/api/staff/activate'&&method==='POST'){send(res,200,await staff.activate(json(await readBody(req)),authIp(req)));return;}
    if(path==='/api/staff/enroll/confirm'&&method==='POST'){sendStaffSession(res,staff.confirmEnrollment(json(await readBody(req)),authIp(req)));return;}
    if(path==='/api/login'&&method==='POST'){
-    const ip=String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'').split(',')[0].trim(),now=Date.now();
+    if(core.deploymentIdentity.environment!=='sandbox'&&!staff.readiness().bootstrap_available)fail(403,'NAMED_STAFF_REQUIRED');
+    const ip=authIp(req),now=Date.now();
+    staff.consumeLimit('shared-login',ip,30);
     const attempts=(rate.get(ip)||[]).filter(t=>t>now-600000);if(attempts.length>=10)fail(429,'RATE_LIMITED');
     const p=json(await readBody(req));const valid=p.role==='admin'&&equal(p.password,env.PANEL_ADMIN_PASSWORD)||p.role==='auditor'&&equal(p.password,env.PANEL_AUDITOR_PASSWORD);
     if(!valid){attempts.push(now);if(rate.size>10000)rate.clear();rate.set(ip,attempts);fail(401,'INVALID_CREDENTIALS');}

@@ -174,3 +174,37 @@ node qualification/evidence-gate.mjs \
 ```
 
 Any missing real external wallet evidence, independent review, legal decision, actual MFA enrollment or distinct-person approval keeps `ready:false`. No test fixture should be included as release evidence. Unit test fixtures that sign every gate exist only to verify the verifier and are labelled accordingly.
+
+## Dedicated preproduction runner
+
+A client outside the platform can add transport delays unrelated to application work. Retain that end-to-end report, including failed latency criteria. The dedicated runner provides a separate measurement from a service inside the preproduction project, using the same public HTTPS APIs, real sessions, native RNG, wallet callbacks and ledger verification. It does not change thresholds or relabel an external failure as success.
+
+Build `qualification/Dockerfile` with repository-root context. Attach a separate `/data` volume, use one replica, set `QUALIFICATION_RUNNER_ID` to the runner service ID, and supply the protected configuration as `QUALIFICATION_CONFIG_JSON`. `RUNNER_READ_TOKEN` is a distinct random secret of at least40 characters. Railway supplies the full source SHA. The runner refuses production configuration or a missing Railway volume. Its volume has immutable deployment/audience identity checks.
+
+Leave `QUALIFICATION_RUN_ID` unset on the initial deployment. `/health` will show `IDLE`; no test traffic starts. A configured run ID starts exactly one of these fixed plans:
+
+| `QUALIFICATION_PLAN` | Fixed work |
+| --- | --- |
+| `standard` (default) |500 sessions, then1,000 sessions, then60-minute soak |
+| `baseline500` |500 sessions only |
+| `wallet_conformance` |17 deployed reference-wallet conformance cases, including an actual wallet restart |
+| `network_restart` |12 native network/restart cases, with actual Core, wallet and three native process restarts |
+
+The standard soak uses500 concurrent sessions by default; set `QUALIFICATION_SOAK_SESSIONS=1000` explicitly for1,000. It always runs a full3,600seconds. A failed functional or latency gate stops the plan before its next step. A load report can remain PARTIAL only because independently attached platform resource measurements are still required.
+
+`QUALIFICATION_EXPECTED_SOURCES_JSON` may pin all five target source commits with keys `core`, `wallet`, `uno`, `mahjong` and `skygate`. The runner validates actual `/health` identities and source SHAs before starting, between steps and before resuming. Without an explicit map, it pins the first observed valid source set. Reports bind the runner SHA, target source set, configuration fingerprint, plan and run ID. Completed steps are not repeated after a runner restart. An incomplete/failed attempt or a changed source/configuration requires a new run ID; previous evidence is preserved.
+
+The service has no POST endpoint, job execution endpoint, shell endpoint or client-supplied target URL. `/health` exposes only sanitized progress. Use the read token for:
+
+```
+GET /reports
+GET /reports/<runId>-plan.json
+GET /reports/<runId>-load500.json
+GET /reports/<runId>-load1000.json
+GET /reports/<runId>-soak60m.json
+GET /reports/<runId>-wallet-conformance.json
+GET /reports/<runId>-network-restart.json
+Authorization: Bearer <RUNNER_READ_TOKEN>
+```
+
+For wallet/network plans, `/health.waiting_restart` names the exact isolated service and deployment ID to restart. The platform operator performs that Railway restart. There is no acknowledgement API that could manufacture success. The runner must observe a new process boot ID, the same database identity and the same source SHA, then verify retained receipts or native sessions. It records total operator-wait time separately from the observed unavailable-to-ready interval when one is visible. A5-minute bound prevents indefinite waiting. Independent approval, real external operator certification and production activation remain outside this runner.
