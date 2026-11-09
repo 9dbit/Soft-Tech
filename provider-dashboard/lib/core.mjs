@@ -109,7 +109,7 @@ export class Core {
  requireScope(principal,scope){if(!principal.scopes.includes(scope))fail(403,'SCOPE_DENIED');}
  ensureOperatorEnabled(op){if(op.status!=='enabled')fail(403,'OPERATOR_DISABLED');}
  safeGame(g){const age=g.checked_at===null?null:this.clock()-g.checked_at;return {...g,enabled:!!g.enabled,maintenance:!!g.maintenance,health:age!==null&&age>120000?'stale':g.health,health_json:undefined,checked_at:g.checked_at,adapter_verified:!!g.signed_seen_at,session_count:this.get('SELECT count(*) n FROM sessions WHERE game_id=?',g.id).n,round_count:this.get("SELECT count(*) n FROM rounds WHERE game_id=? AND status='settled'",g.id).n,capabilities:['sandbox','provider-session','durable-rounds','operator-isolation']};}
- games(op=null){const allowed=op?parse(op.games_json):null;return this.all('SELECT * FROM games ORDER BY id').filter(g=>!allowed||allowed.includes(g.id)).map(g=>this.safeGame(g));}
+ games(op=null){const allowed=op?parse(op.games_json):null;return this.all('SELECT * FROM games ORDER BY id').filter(g=>!allowed||allowed.includes(g.id)).map(g=>({...this.safeGame(g),...(op?{operator_mode:this.gameMode(op,g.id)}:{})}));}
  setGame(id,p,actor='admin'){
   if(typeof p.maintenance!=='boolean')fail(422,'INVALID_MAINTENANCE');if(!this.get('SELECT id FROM games WHERE id=?',id))fail(404,'GAME_NOT_FOUND');
   this.transaction(()=>{this.run('UPDATE games SET maintenance=? WHERE id=?',p.maintenance?1:0,id);this.audit(actor,'game.maintenance',id,{enabled:p.maintenance,policy:'block new launches and reserves; finish accepted rounds'});});return this.games().find(g=>g.id===id);
