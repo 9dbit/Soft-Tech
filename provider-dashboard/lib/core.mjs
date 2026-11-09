@@ -6,11 +6,12 @@ import {walletCall,WalletError} from './wallet.mjs';
 import {openDeploymentDatabase} from './deployment-identity.mjs';
 import {isolationReadiness} from './isolation-proof.mjs';
 import {releaseStaff,recordReleaseSignoff} from './staff-policy.mjs';
+import {DurableWrites} from './durable-writes.mjs';
 const scopes=['games:read','sessions:write','reports:read'];
 const parse=x=>JSON.parse(x);
 export class Core {
  constructor({env=process.env,clock=Date.now,transport=walletCall}={}){
-  this.env=env;this.clock=clock;this.transport=transport;this.locks=new Map();
+  this.env=env;this.clock=clock;this.transport=transport;this.locks=new Map();this.writeMetrics={statements:0,total_ms:0,max_ms:0};
   const master=env.PANEL_SESSION_SECRET||'';if(master.length<32)throw Error('PANEL_SESSION_SECRET is required');
   this.vault=vault(master);this.allowLocal=env.NODE_ENV==='test';
   const opened=openDeploymentDatabase({env,clock,validateExisting:db=>{
@@ -18,7 +19,7 @@ export class Core {
    const sentinel=db.prepare('SELECT value FROM meta WHERE key=?').get('vault_check');
    if(sentinel&&this.vault.open(sentinel.value)!=='softtech-core-v1')throw Error('Key mismatch: restore original master key');
   }});
-  this.db=opened.db;this.databasePath=opened.path;this.deploymentIdentity=opened.identity;
+  this.db=opened.db;this.databasePath=opened.path;this.deploymentIdentity=opened.identity;this.journal=new DurableWrites(this.db);
   this.isolation=isolationReadiness(env,this.deploymentIdentity,this.clock());
   this.db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));chmodSync(opened.path,0o600);
   const sentinel=this.get('SELECT value FROM meta WHERE key=?','vault_check');
@@ -40,8 +41,10 @@ export class Core {
    this.run(`INSERT INTO games(id,name,origin,original_origin,play_path,cover,source,source_commit) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,origin=CASE WHEN excluded.origin<>'' THEN excluded.origin ELSE games.origin END,cover=excluded.cover,source=excluded.source,source_commit=excluded.source_commit`,g.id,g.name,origin,g.original,g.play,g.cover,g.source,g.sourceCommit);
   }
  }
- close(){this.db.close();}
- run(sql,...args){return this.db.prepare(sql).run(...args);}
+ close(){this.journal.close();this.db.close();}
+ run(sql,...args){const started=performance.now();try{return this.db.prepare(sql).run(...args);}finally{const elapsed=performance.now()-started;this.writeMetrics.statements++;this.writeMetrics.total_ms+=elapsed;this.writeMetrics.max_ms=Math.max(this.writeMetrics.max_ms,elapsed);}}
+ durable(fn){return this.journal.run(fn);}
+ authenticateDurable(request,engine=false){return this.durable(()=>this.authenticate(request,engine));}
  get(sql,...args){return this.db.prepare(sql).get(...args);}
  all(sql,...args){return this.db.prepare(sql).all(...args);}
  transaction(fn){this.db.exec('BEGIN IMMEDIATE');try{const value=fn();if(value?.then)throw Error('Async transaction forbidden');this.db.exec('COMMIT');return value;}catch(e){this.db.exec('ROLLBACK');throw e;}}
@@ -234,7 +237,7 @@ export class Core {
  }
  async status(key,p){
   const s=this.session(p.session_id,p.tenant_id,key.game);const op=this.operator(s.operator_id),player=this.get('SELECT * FROM players WHERE id=?',s.player_id);
-  this.run('UPDATE sessions SET last_seen_at=? WHERE id=?',this.clock(),s.id);
+  if(this.clock()-s.last_seen_at>=30000)await this.durable(()=>this.run('UPDATE sessions SET last_seen_at=? WHERE id=? AND last_seen_at<?',this.clock(),s.id,this.clock()-30000));
   const bal=op.wallet_mode==='sandbox'?{balance_minor:player.balance_minor}:await this.transport(op,this.vault.open(op.wallet_secret),'balance',{player_ref:player.player_ref},{allowLocal:this.allowLocal});
   units(bal.balance_minor);
   return {session_id:s.id,tenant_id:op.id,player_id:s.player_id,game:s.game_id,balance:bal.balance_minor,reserved:'0',coin_scale:s.scale,currency:s.currency,expires_at:new Date(s.expires_at).toISOString(),session_expired:s.status==='revoked'||s.expires_at<=this.clock(),navigation:s.return_url?{home_url:s.return_url,label:'Soft Tech'}:null};
@@ -252,7 +255,7 @@ export class Core {
   const txid=r.id+':'+action;const player=this.get('SELECT * FROM players WHERE id=?',r.player_id);
   const payload={transaction_id:txid,player_ref:player.player_ref,session_id:r.session_id,round_id:r.id,game_id:r.game_id,amount_minor:amount,...(action==='reversal'?{original_transaction_id:r.id+':debit'}:{})};
   const encoded=JSON.stringify(payload),hash=sha(encoded),now=this.clock();
-  this.run('INSERT OR IGNORE INTO wallet_ops(id,operator_id,round_id,action,payload_json,payload_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,\'pending\',?,?)',txid,op.id,r.id,action,encoded,hash,now,now);
+  await this.durable(()=>this.run('INSERT OR IGNORE INTO wallet_ops(id,operator_id,round_id,action,payload_json,payload_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,\'pending\',?,?)',txid,op.id,r.id,action,encoded,hash,now,now));
   let row=this.get('SELECT * FROM wallet_ops WHERE id=?',txid);
   if(row.payload_hash!==hash)fail(409,'IDEMPOTENCY_CONFLICT');
   if(row.status==='ok')return parse(row.response_json);if(row.status==='rejected')fail(409,'WALLET_REJECTED');
@@ -260,14 +263,14 @@ export class Core {
   try{
    if(row.attempts){receipt=await this.transport(op,secret,'status',{transaction_id:txid,player_ref:player.player_ref},{allowLocal:this.allowLocal});if(receipt.status==='pending')throw new WalletError('WALLET_OUTCOME_UNKNOWN');}
    if(!receipt||receipt.status==='not_found'){
-    this.run('UPDATE wallet_ops SET attempts=attempts+1,updated_at=? WHERE id=?',this.clock(),txid);
+    await this.durable(()=>this.run('UPDATE wallet_ops SET attempts=attempts+1,updated_at=? WHERE id=?',this.clock(),txid));
     receipt=await this.transport(op,secret,action,payload,{allowLocal:this.allowLocal});
    }
-   if(receipt.status==='rejected'){this.run("UPDATE wallet_ops SET status='rejected',response_json=?,updated_at=? WHERE id=?",JSON.stringify(receipt),this.clock(),txid);fail(409,'WALLET_REJECTED');}
+   if(receipt.status==='rejected'){await this.durable(()=>this.run("UPDATE wallet_ops SET status='rejected',response_json=?,updated_at=? WHERE id=?",JSON.stringify(receipt),this.clock(),txid));fail(409,'WALLET_REJECTED');}
    if(receipt.status!=='applied'||receipt.transaction_id!==txid||receipt.amount_minor!==amount||receipt.currency!==op.currency||receipt.scale!==op.scale)throw new WalletError('WALLET_OUTCOME_UNKNOWN');
    units(receipt.balance_minor);
-   this.run("UPDATE wallet_ops SET status='ok',response_json=?,last_error=NULL,updated_at=? WHERE id=?",JSON.stringify(receipt),this.clock(),txid);return receipt;
-  }catch(e){if(e.code!=='WALLET_REJECTED')this.run("UPDATE wallet_ops SET status='unknown',last_error=?,updated_at=? WHERE id=?",e.code||'NETWORK_ERROR',this.clock(),txid);throw e;}
+   await this.durable(()=>this.run("UPDATE wallet_ops SET status='ok',response_json=?,last_error=NULL,updated_at=? WHERE id=?",JSON.stringify(receipt),this.clock(),txid));return receipt;
+  }catch(e){if(e.code!=='WALLET_REJECTED')await this.durable(()=>this.run("UPDATE wallet_ops SET status='unknown',last_error=?,updated_at=? WHERE id=?",e.code||'NETWORK_ERROR',this.clock(),txid));throw e;}
  }
  async reserve(key,p){
   const s=this.session(p.session_id,p.tenant_id,key.game),op=this.operator(s.operator_id);
@@ -279,13 +282,16 @@ export class Core {
    let r=this.get('SELECT * FROM rounds WHERE operator_id=? AND game_id=? AND round_ref=?',op.id,key.game,p.round_ref);
    if(r&&r.payload_hash!==fingerprint)fail(409,'IDEMPOTENCY_CONFLICT');
    if(!r){
-    this.ensureOperatorEnabled(this.operator(op.id));const current=this.session(s.id);const g=this.get('SELECT * FROM games WHERE id=?',key.game);
-    if(current.status!=='active'||current.expires_at<=this.clock())fail(401,'SESSION_EXPIRED');
-    if(!parse(op.games_json).includes(key.game))fail(403,'GAME_NOT_ALLOWED');
-    if(g.maintenance||!g.enabled)fail(409,'GAME_MAINTENANCE');
-    if(stake>BigInt(op.max_stake_minor)||maximum>BigInt(op.max_payout_minor))fail(422,'OPERATOR_LIMIT_EXCEEDED');
     const id='rd_'+random(24);
-    this.transaction(()=>{this.run('INSERT INTO rounds(id,operator_id,player_id,session_id,game_id,round_ref,payload_hash,status,currency,scale,stake_minor,max_payout_minor,created_at) VALUES(?,?,?,?,?,?,?,\'intent\',?,?,?,?,?)',id,op.id,s.player_id,s.id,key.game,p.round_ref,fingerprint,op.currency,op.scale,String(stake),String(maximum),this.clock());this.audit('engine:'+key.game,'round.intent',id,{session_id:s.id});});
+    await this.durable(()=>{
+     // Recheck controls at the commit boundary, after any queue delay.
+     const currentOp=this.operator(op.id),current=this.session(s.id),g=this.get('SELECT * FROM games WHERE id=?',key.game);this.ensureOperatorEnabled(currentOp);
+     if(current.status!=='active'||current.expires_at<=this.clock())fail(401,'SESSION_EXPIRED');
+     if(!parse(currentOp.games_json).includes(key.game))fail(403,'GAME_NOT_ALLOWED');
+     if(g.maintenance||!g.enabled)fail(409,'GAME_MAINTENANCE');
+     if(stake>BigInt(currentOp.max_stake_minor)||maximum>BigInt(currentOp.max_payout_minor))fail(422,'OPERATOR_LIMIT_EXCEEDED');
+     this.run('INSERT INTO rounds(id,operator_id,player_id,session_id,game_id,round_ref,payload_hash,status,currency,scale,stake_minor,max_payout_minor,created_at) VALUES(?,?,?,?,?,?,?,\'intent\',?,?,?,?,?)',id,op.id,s.player_id,s.id,key.game,p.round_ref,fingerprint,op.currency,op.scale,String(stake),String(maximum),this.clock());this.audit('engine:'+key.game,'round.intent',id,{session_id:s.id});
+    });
     r=this.round(id);
    }
    if(r.status==='rejected'||r.status==='voided')fail(409,'ROUND_NOT_RESERVABLE');
@@ -293,8 +299,8 @@ export class Core {
     let receipt=null;
     try{
      if(op.wallet_mode==='seamless')receipt=await this.external(op,r,'debit',r.stake_minor);
-     this.transaction(()=>{this.append(op,r.player_id,r.session_id,r.id,r.game_id,'debit',-BigInt(r.stake_minor),r.id+':debit',receipt?.balance_minor??null);this.run("UPDATE rounds SET status='reserved' WHERE id=?",r.id);});
-    }catch(e){if(['INSUFFICIENT_BALANCE','WALLET_REJECTED'].includes(e.code))this.run("UPDATE rounds SET status='rejected',finished_at=? WHERE id=?",this.clock(),r.id);throw e;}
+     await this.durable(()=>{this.append(op,r.player_id,r.session_id,r.id,r.game_id,'debit',-BigInt(r.stake_minor),r.id+':debit',receipt?.balance_minor??null);this.run("UPDATE rounds SET status='reserved' WHERE id=?",r.id);});
+    }catch(e){if(['INSUFFICIENT_BALANCE','WALLET_REJECTED'].includes(e.code))await this.durable(()=>this.run("UPDATE rounds SET status='rejected',finished_at=? WHERE id=?",this.clock(),r.id));throw e;}
    }
    return {id:r.id,round_id:r.id,round_ref:r.round_ref,status:this.round(r.id).status,currency:r.currency,stake:r.stake_minor};
   });
@@ -309,9 +315,9 @@ export class Core {
    if(r.status!=='reserved')fail(409,'ROUND_NOT_RESERVED');
    if(BigInt(payout)>BigInt(r.max_payout_minor))fail(422,'PAYOUT_EXCEEDS_RESERVED_CAP');
    // Store settlement intent before any external credit. Retry/recovery reuses this exact payload.
-   this.run('UPDATE rounds SET payout_minor=?,evidence=? WHERE id=?',payout,p.evidence,r.id);
+   await this.durable(()=>this.run('UPDATE rounds SET payout_minor=?,evidence=? WHERE id=?',payout,p.evidence,r.id));
    let receipt=null;if(op.wallet_mode==='seamless')receipt=await this.external(op,r,'credit',payout);
-   this.transaction(()=>{this.append(op,r.player_id,r.session_id,r.id,r.game_id,'credit',BigInt(payout),r.id+':credit',receipt?.balance_minor??null);this.run("UPDATE rounds SET status='settled',finished_at=? WHERE id=?",this.clock(),r.id);this.audit('engine:'+key.game,'round.settled',r.id,{operator_id:op.id,payout_minor:payout,evidence:p.evidence});});
+   await this.durable(()=>{this.append(op,r.player_id,r.session_id,r.id,r.game_id,'credit',BigInt(payout),r.id+':credit',receipt?.balance_minor??null);this.run("UPDATE rounds SET status='settled',finished_at=? WHERE id=?",this.clock(),r.id);this.audit('engine:'+key.game,'round.settled',r.id,{operator_id:op.id,payout_minor:payout,evidence:p.evidence});});
    return {id:r.id,status:'settled',payout};
   });
  }
@@ -321,9 +327,9 @@ export class Core {
    const r=this.round(first.id),op=this.operator(r.operator_id);
    if(r.status==='voided')return {id:r.id,status:'voided'};
    if(r.status!=='reserved'||r.payout_minor!==null)fail(409,'ROUND_CANNOT_BE_REVERSED');
-   this.run('UPDATE rounds SET reversal_requested=1 WHERE id=?',r.id);
+   await this.durable(()=>this.run('UPDATE rounds SET reversal_requested=1 WHERE id=?',r.id));
    let receipt=null;if(op.wallet_mode==='seamless')receipt=await this.external(op,r,'reversal',r.stake_minor);
-   this.transaction(()=>{this.append(op,r.player_id,r.session_id,r.id,r.game_id,'reversal',BigInt(r.stake_minor),r.id+':reversal',receipt?.balance_minor??null);this.run("UPDATE rounds SET status='voided',finished_at=? WHERE id=?",this.clock(),r.id);this.audit('engine:'+key.game,'round.reversed',r.id);});return {id:r.id,status:'voided'};
+   await this.durable(()=>{this.append(op,r.player_id,r.session_id,r.id,r.game_id,'reversal',BigInt(r.stake_minor),r.id+':reversal',receipt?.balance_minor??null);this.run("UPDATE rounds SET status='voided',finished_at=? WHERE id=?",this.clock(),r.id);this.audit('engine:'+key.game,'round.reversed',r.id);});return {id:r.id,status:'voided'};
   });
  }
  async engineAction(key,action,p){

@@ -6,7 +6,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdtempSync,rmSync,chmodSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {readConfig,args,persist,operatorCall,adminCall,request,must,quantiles} from './client.mjs';
+import {readConfig,args,persist,operatorCall,adminCall,request,must,quantiles,digest} from './client.mjs';
 const games=['uno-luck','mahjong-wild','skygate-5000'];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 export async function pool(items,concurrency,fn){let index=0;const results=new Array(items.length);await Promise.all(Array.from({length:Math.min(concurrency,items.length)},async()=>{for(;;){const i=index++;if(i>=items.length)return;try{results[i]={ok:true,value:await fn(items[i],i)};}catch(e){results[i]={ok:false,error:e};}}}));return results;}
@@ -21,12 +21,24 @@ export class Metrics {
 }
 export async function nativeCall(ctx,pathname,payload,{metrics,recoveryRetries=0,timeout=45000,onFailure}={}){
  const method=payload===undefined?'GET':'POST',headers={'content-type':'application/json',...(ctx.game_id==='uno-luck'?{'X-UNO-Client':'spin-ui'}:ctx.game_id==='mahjong-wild'?{'X-ML-Request':'local-demo'}:{'X-Skygate-Client':'agency-ui'}),...(ctx.cookie?{cookie:ctx.cookie}:{})};
+ if(payload!==undefined&&['/api/agency/pick','/api/spin','/api/agency/spin'].includes(pathname))ctx.last_round_request={pathname,payload:structuredClone(payload)};
  let last;
  for(let attempt=0;attempt<=recoveryRetries;attempt++){
   try{const operation=()=>request(ctx.origin+pathname,{method,headers,...(payload===undefined?{}:{body:JSON.stringify(payload)}),timeout});const r=metrics?await metrics.measure(ctx.game_id+':'+pathname,operation):await operation();const cookies=r.headers.getSetCookie?.()||[];if(cookies.length)ctx.cookie=cookies.map(c=>c.split(';')[0]).join('; ');if(r.ok)return r.data;last=new Error('NATIVE_HTTP_'+r.status);if(r.status<500&&r.status!==409)throw last;}catch(e){last=e;if(attempt===recoveryRetries)throw e;}
   if(attempt<recoveryRetries){if(onFailure)await onFailure({ctx,pathname,attempt,error:last?.message||'NATIVE_FAILURE'});await sleep(Math.min(2000,200*2**attempt));}
  }
  throw last;
+}
+// Deliberately excludes current balance, next ticket and replay flags. The saved
+// outcome and monetary result must remain byte-equivalent across an old retry.
+export function nativeOutcomeProof(gameId,result){
+ let outcome,id;
+ if(gameId==='uno-luck'){must(result?.round?.complete===true,'UNO_ROUND_INCOMPLETE');outcome=result.round;id=result.round.id;}
+ else if(gameId==='mahjong-wild'){outcome={ticket_id:result.ticket_id,round:result.round,stake:result.stake_virtual_credits,win:result.win_virtual_credits,settlement:result.settlement};id=result.ticket_id;}
+ else if(gameId==='skygate-5000'){const {state,...saved}=result;outcome=saved;id=result.id;}
+ else throw Error('UNKNOWN_GAME');
+ must(typeof id==='string'&&id.length>0,'NATIVE_OUTCOME_MISSING');
+ return {native_round_id:id,outcome_sha256:digest(JSON.stringify(outcome))};
 }
 export async function establishSession(config,index,runId,{metrics,game_id=games[index%games.length]}={}){
  const player_ref=runId+'-p'+index;
@@ -50,6 +62,7 @@ export async function playRound(ctx,{metrics,recoveryRetries=0,verifyDuplicate=t
  }else if(ctx.game_id==='skygate-5000'){
   const state=await nativeCall(ctx,'/api/agency/state',undefined,options),p={request_id:randomUUID(),bet:'2',ante:false,buy_bonus:false,release_id:state.release_id};must(p.release_id,'SKYGATE_RELEASE_MISSING');final=await nativeCall(ctx,'/api/agency/spin',p,options);if(verifyDuplicate){duplicate=await nativeCall(ctx,'/api/agency/spin',p,options);must(final.id===duplicate.id,'SKYGATE_DUPLICATE_CHANGED');}native_round_id=final.id;
  }else throw Error('UNKNOWN_GAME');
+ const proof=nativeOutcomeProof(ctx.game_id,final);if(duplicate)must(nativeOutcomeProof(ctx.game_id,duplicate).outcome_sha256===proof.outcome_sha256,'DUPLICATE_OUTCOME_CHANGED');ctx.last_completed_request={...structuredClone(ctx.last_round_request),...proof};
  const summary={native_round_id,duration_ms:performance.now()-started,duplicate_verified:!!duplicate,completed_at:new Date().toISOString()};ctx.round_count=(ctx.round_count||0)+1;ctx.duplicate_verified_count=(ctx.duplicate_verified_count||0)+(summary.duplicate_verified?1:0);sample(ctx.rounds,ctx.round_count,summary,100);metrics?.recordRound(summary.duration_ms);return summary;
 }
 async function probeHealth(config,origins){const targets={core:config.core_url,wallet:config.wallet_url,...origins},out={};await Promise.all(Object.entries(targets).filter(([,url])=>url).map(async([name,url])=>{try{const r=await request(url+'/health',{timeout:15000});out[name]={http_status:r.status,ok:r.data.ok===true,source_commit:r.data.source_commit??null,identity:r.data.deployment_identity||r.data.identity||null,memory_rss_bytes:r.data.memory_rss_bytes??null,uptime_seconds:r.data.uptime_seconds??null,process_boot_id:r.data.process_boot_id??null};}catch{out[name]={ok:false,error:'UNREACHABLE'};}}));return out;}
@@ -88,7 +101,7 @@ export async function runNativeLoad(config,{concurrency=500,roundsPerSession=1,s
   heartbeat=setInterval(()=>{report.progress.elapsed_seconds=Math.round((performance.now()-runStart)/1000);report.progress.metrics=metrics.summary();report.client_memory_rss_bytes=process.memoryUsage().rss;save();},10000);heartbeat.unref();
   const chaos=chaosHook?Promise.resolve().then(()=>chaosHook({config,contexts,runId,report,metrics})).then(evidence=>{report.chaos=evidence;}).catch(e=>{report.chaos={status:'FAIL',error:String(e.message).slice(0,100)};}):Promise.resolve();
   await Promise.all(contexts.map(async ctx=>{let iteration=0;do{try{await playRound(ctx,{metrics,recoveryRetries});report.progress.completed_rounds++;}catch(e){report.failures.push({game_id:ctx.game_id,session_id:ctx.session_id,iteration,error:String(e.message).slice(0,100)});break;}iteration++;if(durationSeconds>0&&performance.now()<deadline&&thinkTimeMs)await sleep(thinkTimeMs);}while(durationSeconds>0?performance.now()<deadline:iteration<roundsPerSession);}));
-  await chaos;report.actual_execution_seconds=Math.round((performance.now()-runStart)*1000)/1000;report.progress.phase='reconciliation';save();
+  await chaos;report.actual_execution_seconds=Math.round(performance.now()-runStart)/1000;report.progress.phase='reconciliation';save();
   report.reconciliation=await reconcileRun(config,contexts,runId,{metrics});report.health_after=await probeHealth(config,origins);
   report.round_latency=metrics.roundSummary();report.completed_rounds=contexts.reduce((n,c)=>n+(c.round_count||0),0);report.sessions_with_completed_rounds=contexts.filter(c=>c.round_count>0).length;report.duplicate_results_verified=contexts.every(c=>c.round_count>0&&c.duplicate_verified_count===c.round_count);report.metrics=metrics.summary();
   report.gates={concurrent_sessions:report.active_sessions_at_barrier===concurrency,all_sessions_played:report.sessions_with_completed_rounds===concurrency,no_round_failures:report.failures.length===0,exactly_once_reconciliation:report.reconciliation.status==='PASS',duplicate_native_results:report.duplicate_results_verified,request_error_rate:report.metrics.request_error_rate<=report.thresholds.request_error_rate,round_latency:report.round_latency.p95_ms<=report.thresholds.round_p95_ms,soak_duration:durationSeconds>0?report.actual_execution_seconds>=minSoakSeconds:null,server_resource_ceilings:null};

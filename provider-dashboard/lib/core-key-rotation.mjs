@@ -38,6 +38,16 @@ function vaultProof(db,master){
  }
  return proofs;
 }
+export function verifyCoreVaultFile({source,master,deploymentId,environment,rotationId}){
+ secretCheck(master,'Core master key');
+ const db=new DatabaseSync(source,{readOnly:true});
+ try{
+  const identity=identityCheck(db,{deploymentId,environment}),proofs=vaultProof(db,master);
+  const actualRotationId=db.prepare("SELECT value FROM meta WHERE key='master_rotation_id'").get()?.value;
+  if(rotationId!==undefined&&actualRotationId!==rotationId)throw Error('Core rotation marker mismatch');
+  return {deployment_identity:identity,rotation_id:actualRotationId??null,encrypted_values_verified:Object.keys(proofs).length,integrity_verified:true};
+ }finally{db.close();}
+}
 function applicationFingerprint(db,excludedAuditId,{rollback=false}={}){
  const digest=createHash('sha256'),encrypted=new Set(CORE_VAULT_FIELDS.map(x=>x.join('.')));
  const ignoredTables=new Set(['panel_sessions','staff_auth_challenges']);

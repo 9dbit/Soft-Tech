@@ -39,13 +39,13 @@ const server=createServer({maxHeaderSize:16384},async(req,res)=>{
  try{
   const u=new URL(req.url||'/','http://localhost'),path=u.pathname,method=req.method||'GET';
   if(path==='/health/backup'&&method==='GET'){const report=backupReadiness(backupState,{env});send(res,report.ok?200:503,report);return;}
-  if(path==='/health'&&method==='GET'){core.get('SELECT 1');const last=core.get('SELECT id,status,updated_at FROM selftests ORDER BY created_at DESC LIMIT 1');send(res,200,{ok:true,status:'ok',app:'soft-tech-provider-core',version:'1.1.0',environment:core.deploymentIdentity.environment,deployment_identity:core.deploymentIdentity,isolation_readiness:core.isolation,production_enabled:false,qualification:qualificationState,process_boot_id:processBootId,uptime_seconds:Math.floor(process.uptime()),memory_rss_bytes:process.memoryUsage().rss,cpu_usage_microseconds:process.cpuUsage(),persistent:true,replicas_supported:1,acceptance:last||null,source_commit:env.RAILWAY_GIT_COMMIT_SHA||'local'});return;}
+  if(path==='/health'&&method==='GET'){core.get('SELECT 1');const last=core.get('SELECT id,status,updated_at FROM selftests ORDER BY created_at DESC LIMIT 1');send(res,200,{ok:true,status:'ok',app:'soft-tech-provider-core',version:'1.1.0',environment:core.deploymentIdentity.environment,deployment_identity:core.deploymentIdentity,isolation_readiness:core.isolation,production_enabled:false,qualification:qualificationState,process_boot_id:processBootId,uptime_seconds:Math.floor(process.uptime()),memory_rss_bytes:process.memoryUsage().rss,cpu_usage_microseconds:process.cpuUsage(),durable_journal:core.journal.status(),sqlite_writes:core.writeMetrics,persistent:true,replicas_supported:1,acceptance:last||null,source_commit:env.RAILWAY_GIT_COMMIT_SHA||'local'});return;}
   if(path.startsWith('/api/v4/agency-game/')){
-   if(method!=='POST')fail(405,'METHOD_NOT_ALLOWED');const raw=await readBody(req);const key=core.authenticate({method,path:u.pathname+u.search,body:raw,headers:req.headers},true);
+   if(method!=='POST')fail(405,'METHOD_NOT_ALLOWED');const raw=await readBody(req);const key=await core.authenticateDurable({method,path:u.pathname+u.search,body:raw,headers:req.headers},true);
    const result=await core.engineAction(key,path.slice('/api/v4/agency-game/'.length),json(raw));send(res,200,result);return;
   }
   if(path.startsWith('/v1/')){
-   const raw=method==='POST'?await readBody(req):'';const p=core.authenticate({method,path:u.pathname+u.search,body:raw,headers:req.headers});const op=p.operator;
+   const raw=method==='POST'?await readBody(req):'';const p=await core.authenticateDurable({method,path:u.pathname+u.search,body:raw,headers:req.headers});const op=p.operator;
    const data=raw?json(raw):{};
    if(path==='/v1/games'&&method==='GET'){core.requireScope(p,'games:read');core.ensureOperatorEnabled(op);send(res,200,{games:core.games(op)});return;}
    if(path==='/v1/game-launches'&&method==='POST'){core.requireScope(p,'sessions:write');if(Object.keys(data).some(k=>!['game_id','player_ref','currency','return_url'].includes(k)))fail(422,'UNKNOWN_FIELD');send(res,200,core.createLaunch(op,data,req.headers['idempotency-key'],'operator:'+op.id));return;}

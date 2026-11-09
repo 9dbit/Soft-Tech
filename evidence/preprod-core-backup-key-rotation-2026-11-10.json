@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "classification": "observed_preproduction_remote_backup_rotation",
+  "captured_from": "Railway deployment logs",
+  "deployment_id": "4cfb30aa-2815-42f4-9fe7-dd40fb1b82de",
+  "proof": {
+    "ok": true,
+    "at": "2026-11-09T20:44:58.639Z",
+    "key": "provider-core/preproduction/18144e06-982a-4381-b8b6-18496e169b27/1794257095-74a4fdc7d8f28dee-f5a1e1ef8f584c0f.stbk",
+    "sha256": "32223ee5d6d4bba0b4ae1399af38948c1fe7c5cad32ebbb6bfff1e060ab96278",
+    "bytes": 311685,
+    "remoteRestore": "verified",
+    "key_id": "b20261110r2",
+    "deployment_identity": {
+      "deployment_id": "18144e06-982a-4381-b8b6-18496e169b27",
+      "environment": "preproduction",
+      "identity_version": 1,
+      "created_at": 1794255208544
+    },
+    "retention": {
+      "policy": "provider-7d-4w-12m-v1",
+      "enabled": true,
+      "mode": "dry-run",
+      "verified": true,
+      "conditional_delete_verified": true,
+      "inventory_count": 1,
+      "managed_count": 1,
+      "retained_count": 1,
+      "protected_unknown_count": 0,
+      "eligible_count": 0,
+      "deleted_count": 0,
+      "verified_at": "2026-11-09T20:44:55.000Z",
+      "planned_objects": [],
+      "conditional_delete_probe": {
+        "verified": true,
+        "wrong_etag_rejected": true,
+        "correct_etag_deleted": true,
+        "canary_absent_verified": true
+      }
+    },
+    "source_commit": "a0ef5287f3a2feb0c8dc6681ebca9344966968bb"
+  },
+  "limitations": [
+    "This proves a newly encrypted STBK02 snapshot was remotely restored with the new backup key.",
+    "Retention canary is a newly created disposable object; no existing backup was deleted.",
+    "This receipt does not claim a live Core master-key cutover or independent certification."
+  ]
+}

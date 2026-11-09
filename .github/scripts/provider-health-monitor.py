@@ -98,7 +98,7 @@ def validate(target, health, backup, checked):
     if target['environment'] == 'production':
         if target['kind'] in ('core', 'wallet') and health.get('production_enabled') is not False:
             errors.append('PRODUCTION_QUARANTINE_MISSING')
-        if target['kind'] not in ('core', 'wallet') and health.get('play_enabled') is not False:
+        if target['kind'] not in ('core', 'wallet') and health.get('play_enabled', identity.get('play_enabled')) is not False:
             errors.append('PRODUCTION_GAMEPLAY_QUARANTINE_MISSING')
     verified_at = None
     age = None

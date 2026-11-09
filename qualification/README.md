@@ -187,7 +187,10 @@ Leave `QUALIFICATION_RUN_ID` unset on the initial deployment. `/health` will sho
 | --- | --- |
 | `standard` (default) |500 sessions, then1,000 sessions, then60-minute soak |
 | `baseline500` |500 sessions only |
+| `capacity` |500 sessions, then1,000; stop for resource/disk review |
+| `soak_only` |A separate60-minute soak after capacity/resource review |
 | `wallet_conformance` |17 deployed reference-wallet conformance cases, including an actual wallet restart |
+| `volume_recovery` | Two same-source native restarts per game, pending outcome recovery and old result replay; remains PARTIAL until platform volume evidence is attached |
 | `network_restart` |12 native network/restart cases, with actual Core, wallet and three native process restarts |
 
 The standard soak uses500 concurrent sessions by default; set `QUALIFICATION_SOAK_SESSIONS=1000` explicitly for1,000. It always runs a full3,600seconds. A failed functional or latency gate stops the plan before its next step. A load report can remain PARTIAL only because independently attached platform resource measurements are still required.
@@ -208,3 +211,21 @@ Authorization: Bearer <RUNNER_READ_TOKEN>
 ```
 
 For wallet/network plans, `/health.waiting_restart` names the exact isolated service and deployment ID to restart. The platform operator performs that Railway restart. There is no acknowledgement API that could manufacture success. The runner must observe a new process boot ID, the same database identity and the same source SHA, then verify retained receipts or native sessions. It records total operator-wait time separately from the observed unavailable-to-ready interval when one is visible. A5-minute bound prevents indefinite waiting. Independent approval, real external operator certification and production activation remain outside this runner.
+
+### Historical timing-field correction
+
+The first `preprod-baseline500-v2-02-load500` report retained its actual measurements but accidentally labelled milliseconds as `actual_execution_seconds`. Its49,329.764 numeric value represents49.329764seconds, consistent with the barrier/finish timestamps and round-latency measurements. The original failed report is preserved unchanged. New reports divide the monotonic duration by1,000 correctly; all p50/p95/p99 `_ms` measurements were already in milliseconds. Resource proofs must use the recorded timestamps and must never treat that old field as49,329seconds.
+
+
+## Full native volume recovery
+
+The fixed cloud plan `QUALIFICATION_PLAN=volume_recovery` exercises all three native engines sequentially. It preserves one completed outcome, creates a second pending settlement under an authenticated wallet credit barrier, and keeps that barrier active through both platform actions. Public `/health.waiting_restart.stage` identifies the required action:
+
+1. `snapshot_restart`: restart the exact native service at the same source SHA. Its startup must upload and read back a fresh encrypted snapshot. The runner then waits30seconds with settlement still unavailable.
+2. `volume_restore`: after verifying the fresh snapshot logs, preserve the old volume disconnected, attach a distinct empty volume, restore that exact encrypted snapshot and change the active backup key. The runner allows10minutes for the replacement process to become healthy with the same immutable service/environment identity and source.
+
+After the second process is observed, the runner removes the credit barrier and retries the exact pending native request. It then replays the pre-existing completed request and compares the complete immutable outcome hash, verifies the original session still works, and reconciles all six completed rounds against Core and wallet receipts. Cookies and request payloads remain in process memory; the report contains hashes and opaque IDs only.
+
+This application report is **PARTIAL** even when all checks succeed. An engineering reviewer must attach platform evidence for distinct old/new volume IDs, retained original volume, encrypted snapshot object and SHA256, verified upload/readback/restore logs, previous/new key IDs and measured recovery timing. A boot ID change does not prove a volume was replaced. The plan never calls a platform mutation API itself. Run it only when the platform operator is watching the stage handshake. The reference operator must have no concurrent qualification during the barrier.
+
+For a local control-file orchestration, use `node qualification/volume-recovery.mjs --config /private/preproduction.json --run-id volume-restore-01 --control-file /private/volume-control.json --report evidence/volume-restore-01.json`; each acknowledgement must echo both `target` and `stage`, the current `request_id`, and `status: RESTART_REQUESTED`.

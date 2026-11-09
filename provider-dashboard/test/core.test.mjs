@@ -17,6 +17,13 @@ function launch(c,op,game=ids[0],key=random(20),player='player-1'){return c.crea
 function token(l){return new URLSearchParams(new URL(l.launch_url).hash.slice(1)).get('softtech_launch');}
 function redeem(c,l,game=ids[0]){return c.redeem({game},{token:token(l),request_id:'redeem-'+sha(token(l))});}
 const code=expected=>e=>e.code===expected;
+test('maintenance enabled while a reservation waits for durable commit prevents the new debit',async t=>{
+ const f=fixture(t),a=f.operator(),s=redeem(f.core,launch(f.core,a.operator));f.core.journal.delayMs=1000;
+ const result=assert.rejects(f.core.reserve({game:ids[0]},{tenant_id:a.operator.id,session_id:s.session_id,round_ref:'queued-maintenance',stake:'100',max_payout:'1000'}),code('GAME_MAINTENANCE'));
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(f.core.journal.pending.length,1);
+ f.core.setGame(ids[0],{maintenance:true});f.core.journal.flush();await result;
+ assert.equal(f.core.get('SELECT count(*) n FROM rounds').n,0);assert.equal(f.core.get("SELECT count(*) n FROM ledger WHERE kind='debit'").n,0);
+});
 function headers(secret,domain,method,path,body='',key='test-key',ts){const s=signer(secret,domain,method,path,body,ts);const prefix=domain==='agency.v1'?'x-agency-':'x-softtech-';return {[prefix+'key']:key,[prefix+'timestamp']:s.timestamp,[prefix+'nonce']:s.nonce,[prefix+'signature']:s.signature};}
 
 test('clean core has three genuine catalogue entries and zero fabricated activity',t=>{const f=fixture(t),d=f.core.bootstrap('admin');assert.equal(d.games.length,3);assert.deepEqual(d.rounds,[]);assert.equal(d.summary.rounds,0);assert.equal(d.summary.operators,0);assert.equal(d.transactions.length,0);assert.ok(d.games.every(g=>g.cover.startsWith('https://soft-tech-web-production.')&&!g.adapter_verified));});

@@ -1,0 +1,277 @@
+{
+  "schema_version": 1,
+  "classification": "railway_authoritative_resource_summary",
+  "captured_at": "2026-11-09T20:46:10.952Z",
+  "query_started_at": "2026-11-09T20:46:09.803Z",
+  "hours_back": 1,
+  "sample_rate_seconds": 30,
+  "scope": "Whole-hour conservative peaks, not exact per-run averages",
+  "run_id": "preprod-baseline500-v2-02",
+  "services": [
+    {
+      "kind": "core",
+      "service": {
+        "id": "18144e06-982a-4381-b8b6-18496e169b27",
+        "name": "softtech-preprod-core"
+      },
+      "environment": {
+        "id": "8f57318e-bf2f-4f66-8366-4341bdc29152",
+        "name": "preproduction"
+      },
+      "metrics": [
+        {
+          "measurement": "CPU_USAGE",
+          "current": 0,
+          "average": 0.0007874360881542698,
+          "min": 0,
+          "max": 0.0129359,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "CPU_LIMIT",
+          "current": 1,
+          "average": 0.5454545454545454,
+          "min": 0,
+          "max": 1,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "MEMORY_USAGE_GB",
+          "current": 0.061784064,
+          "average": 0.04409144277685952,
+          "min": 0,
+          "max": 0.08542208,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "MEMORY_LIMIT_GB",
+          "current": 0.99999744,
+          "average": 0.5454531490909096,
+          "min": 0,
+          "max": 0.99999744,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "DISK_USAGE_GB",
+          "current": 0.02301952,
+          "average": 0.013032794975206615,
+          "min": 0,
+          "max": 0.024723456,
+          "sampleCount": 121
+        }
+      ]
+    },
+    {
+      "kind": "uno",
+      "service": {
+        "id": "b7bae099-c17d-4a94-bbe6-47e48ffa5e71",
+        "name": "softtech-preprod-uno"
+      },
+      "environment": {
+        "id": "8f57318e-bf2f-4f66-8366-4341bdc29152",
+        "name": "preproduction"
+      },
+      "metrics": [
+        {
+          "measurement": "CPU_USAGE",
+          "current": 0,
+          "average": 0.001973570247933884,
+          "min": 0,
+          "max": 0.0470509,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "CPU_LIMIT",
+          "current": 1,
+          "average": 0.6446280991735537,
+          "min": 0,
+          "max": 1,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "MEMORY_USAGE_GB",
+          "current": 0.084652032,
+          "average": 0.055137542347107424,
+          "min": 0,
+          "max": 0.092725248,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "MEMORY_LIMIT_GB",
+          "current": 0.99999744,
+          "average": 0.6446264489256205,
+          "min": 0,
+          "max": 0.99999744,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "DISK_USAGE_GB",
+          "current": 0.019365888,
+          "average": 0.012226729256198346,
+          "min": 0,
+          "max": 0.019365888,
+          "sampleCount": 121
+        }
+      ]
+    },
+    {
+      "kind": "mahjong",
+      "service": {
+        "id": "f2bc1706-3b5c-4619-b17c-7cffb4ba67a5",
+        "name": "softtech-preprod-mahjong"
+      },
+      "environment": {
+        "id": "8f57318e-bf2f-4f66-8366-4341bdc29152",
+        "name": "preproduction"
+      },
+      "metrics": [
+        {
+          "measurement": "CPU_USAGE",
+          "current": 0,
+          "average": 0.0013176396694214874,
+          "min": 0,
+          "max": 0.03651626666666667,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "CPU_LIMIT",
+          "current": 1,
+          "average": 0.628099173553719,
+          "min": 0,
+          "max": 1,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "MEMORY_USAGE_GB",
+          "current": 0.082722816,
+          "average": 0.05006290300826447,
+          "min": 0,
+          "max": 0.084905984,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "MEMORY_LIMIT_GB",
+          "current": 0.99999744,
+          "average": 0.6280975656198353,
+          "min": 0,
+          "max": 0.99999744,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "DISK_USAGE_GB",
+          "current": 0.019202048,
+          "average": 0.011927552000000004,
+          "min": 0,
+          "max": 0.019202048,
+          "sampleCount": 121
+        }
+      ]
+    },
+    {
+      "kind": "skygate",
+      "service": {
+        "id": "ea04da18-ad42-402b-8b2a-bde9638ff474",
+        "name": "softtech-preprod-skygate"
+      },
+      "environment": {
+        "id": "8f57318e-bf2f-4f66-8366-4341bdc29152",
+        "name": "preproduction"
+      },
+      "metrics": [
+        {
+          "measurement": "CPU_USAGE",
+          "current": 0,
+          "average": 0.0002607055096418734,
+          "min": 0,
+          "max": 0.011020533333333332,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "CPU_LIMIT",
+          "current": 1,
+          "average": 0.6446280991735537,
+          "min": 0,
+          "max": 1,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "MEMORY_USAGE_GB",
+          "current": 0.032342016,
+          "average": 0.03500614241322317,
+          "min": 0,
+          "max": 0.077758464,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "MEMORY_LIMIT_GB",
+          "current": 0.99999744,
+          "average": 0.6446264489256205,
+          "min": 0,
+          "max": 0.99999744,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "DISK_USAGE_GB",
+          "current": 0.018055168,
+          "average": 0.011762019438016542,
+          "min": 0,
+          "max": 0.018055168,
+          "sampleCount": 121
+        }
+      ]
+    },
+    {
+      "kind": "wallet",
+      "service": {
+        "id": "e00b9e49-76f5-405f-a89e-f5f5f63f8de3",
+        "name": "softtech-preprod-wallet"
+      },
+      "environment": {
+        "id": "8f57318e-bf2f-4f66-8366-4341bdc29152",
+        "name": "preproduction"
+      },
+      "metrics": [
+        {
+          "measurement": "CPU_USAGE",
+          "current": 0,
+          "average": 0.00013689669421487597,
+          "min": 0,
+          "max": 0.006283533333333334,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "CPU_LIMIT",
+          "current": 1,
+          "average": 0.5454545454545454,
+          "min": 0,
+          "max": 1,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "MEMORY_USAGE_GB",
+          "current": 0.022851584,
+          "average": 0.039276070082644644,
+          "min": 0,
+          "max": 0.074764288,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "MEMORY_LIMIT_GB",
+          "current": 0.99999744,
+          "average": 0.5454531490909096,
+          "min": 0,
+          "max": 0.99999744,
+          "sampleCount": 121
+        },
+        {
+          "measurement": "DISK_USAGE_GB",
+          "current": 0.018685952,
+          "average": 0.010746076033057857,
+          "min": 0,
+          "max": 0.019226624,
+          "sampleCount": 121
+        }
+      ]
+    }
+  ]
+}

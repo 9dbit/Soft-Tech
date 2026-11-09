@@ -1,6 +1,6 @@
 # Provider backup keys, vault rotation and rollback preparation
 
-These commands prepare verified recovery artifacts. They never replace the current database, change a running service's environment, switch traffic or provide project go-live approval. The operator performs the cutover after stopping writes and reviewing the evidence.
+The offline commands prepare verified recovery artifacts without replacing the current database or switching traffic. The optional preproduction startup wrapper performs an explicitly configured cutover to a fresh path only after verification. Neither flow grants project go-live approval. The operator controls the maintenance window and service configuration.
 
 ## Backup key ring
 
@@ -69,6 +69,43 @@ The prepared copy removes shared panel sessions and MFA login challenges; revoke
 Player sessions, operator credentials, wallet credentials, replay nonces, rounds, ledger entries and idempotency values are preserved. This operation rotates their encryption at rest; it does not change the external signing secrets themselves. Rotate compromised external credentials separately through their existing issuance/revocation flows.
 
 Only after all verification succeeds is the fresh output database published. Review the JSON receipt, then perform an operator-controlled deployment using the fresh database path and matching new `PANEL_SESSION_SECRET`. Run the application smoke/reconciliation checks before resuming traffic. Use a single authoritative writer. The original database remains untouched by this command.
+
+## Optional preproduction startup cutover
+
+`scripts/start-provider.mjs` runs the rotation guard before importing `server.mjs`. Use it as the service start command only after reviewing and scheduling the maintenance window. This is an application startup operation on the mounted volume; a pre-deploy job without that volume cannot perform it. This wrapper is restricted to `CORE_ENVIRONMENT=preproduction`. The normal offline command remains available for separately controlled rotations elsewhere.
+
+Before enabling it, stop the qualification runner and drain accepted work. Confirm one replica, zero deployment overlap, no old service or shell process writing the source, and enough free space for the source, fresh rotated database, encrypted checkpoint and temporary verification copies. The offline acknowledgement is an operator assertion; the process cannot prove the platform has stopped every other writer. Keep the previous writer stopped throughout preparation and cutover.
+
+Configure these values together through the protected service configuration. The following paths are examples on the same existing `/data` volume:
+
+| Variable | Value / requirement |
+| --- | --- |
+| Start command | `node scripts/start-provider.mjs` |
+| `CORE_ENVIRONMENT` | `preproduction` |
+| `CORE_DEPLOYMENT_ID` | The existing immutable Core deployment ID |
+| `CORE_MASTER_ROTATION_ON_START` | `true` |
+| `CORE_MASTER_ROTATION_OFFLINE` | `true` for initial preparation, acknowledging the drained single writer |
+| `CORE_MASTER_ROTATION_SOURCE_PATH` | `/data/provider.sqlite`, the existing database under the old master |
+| `CORE_DB_PATH` | `/data/provider-master-rotated.sqlite`, a fresh path |
+| `CORE_MASTER_ROTATION_ROLLBACK_PATH` | `/data/provider-before-master-change.stbk`, a fresh checkpoint path |
+| `CORE_MASTER_ROTATION_RECEIPT_PATH` | Optional; defaults to `CORE_DB_PATH + .rotation.json` |
+| `PANEL_SESSION_SECRET` | The new runtime master, at least 32 characters |
+| `CORE_OLD_MASTER_SECRET` | The previous master, required only for first preparation |
+| `BACKUP_KEYS_JSON` / `BACKUP_ACTIVE_KEY_ID` | Retained backup ring and active checkpoint encryption key |
+
+Secret-file alternatives are supported. If `CORE_NEW_MASTER_SECRET` is also supplied, it must equal the new `PANEL_SESSION_SECRET`. The guard removes old/new maintenance-secret variables from the environment before importing the server; the server retains only its new runtime master and its normal backup ring. Removing a variable from the process environment is not a secure erasure guarantee. Remove the old maintenance secret from the service configuration after a verified restart, while keeping its approved recovery copy outside the running service.
+
+All five paths (source, output, checkpoint, receipt and receipt's `.preparing` marker) must be distinct, in the same physical directory, and on the attached Railway volume when that mount is configured. Existing files must be private regular files without symlink or hard-link aliases. First startup refuses any unmarked output/checkpoint or leftover output SQLite sidecars.
+
+The guard validates the old database and key, fingerprints the frozen source database and WAL, and atomically creates an authenticated `.preparing` marker. It invokes the offline rotation, verifies the fresh result and encrypted rollback checkpoint, and atomically publishes the completed receipt. Both marker and receipt are authenticated with an HMAC under the new master. A crash or failure before completed receipt publication leaves a visible incomplete preparation and refuses subsequent automatic startup. Preserve the files and investigate; never delete the markers merely to make a failed deployment start.
+
+On a completed restart, the guard requires both records, their matching preparation ID and configured paths, the exact deployment identity, unchanged frozen source bytes and WAL, an unchanged rollback checkpoint, and a current database whose sentinel and every registered encrypted field open with the new master. Its `master_rotation_id` must match the receipt. It does not require the old master or the backup decrypt key just to start an already verified current database, and it never reruns rotation. Keep the checkpoint's decrypt key in the backup ring so recovery remains possible.
+
+The live database's initial SHA256 is historical cutover evidence. Legitimate post-cutover transactions change its bytes, so restarts verify its current integrity, identity and vault instead of comparing it to the initial byte hash. The retired source is different: any detected byte/WAL change after cutover refuses startup because it could indicate a second writer or an attempted stale cutover. A benign manual checkpoint of that retired source also changes the fingerprint; preserve it without opening it for writes. This check runs during startup, not as a continuous cross-process lock.
+
+The structured `provider.master_rotation_startup` log records the rotation ID, verified database identity, current path, receipt/checkpoint paths, verification counts and whether this startup prepared or resumed the rotation. It never logs secrets. Before restarting qualification, confirm the health identity, preserved operator/session/round state, pending-work reconciliation and a new remotely restored backup under the active backup key. Repeat a process restart without the old maintenance secret and verify the same rotation ID. Bind the subsequent load/soak evidence to the post-cutover source commit and runtime identity.
+
+Do not disable the guard after cutover merely to skip a refusal. Keep the startup wrapper and its completed verification configuration for subsequent restarts. A planned second master rotation requires a separately reviewed path/receipt generation and another drained maintenance window. There is no automatic rollback: later transactions must be preserved and reconciled before any recovery cutover.
 
 ## Rollback rehearsal and preparation
 
