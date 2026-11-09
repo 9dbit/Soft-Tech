@@ -55,6 +55,7 @@ async function run(){
   await desktop.getByText("Updated demo operator OP-EU-001").waitFor();
   await desktop.locator('.nav-link[data-page="reconcile"]').click();
   await desktop.locator("#run-reconcile").click();
+  await desktop.locator(".reconcile-card .tag.good").waitFor({state:"visible",timeout:15000});
   assert.match(await desktop.locator(".reconcile-card").innerText(),/SIMULATED MATCH/);
   assert.deepEqual(errors,[],"desktop browser errors");
   const mobile=await browser.newPage({viewport:{width:390,height:844},acceptDownloads:true});
