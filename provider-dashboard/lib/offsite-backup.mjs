@@ -34,6 +34,12 @@ export async function putEncryptedObject({endpoint,bucket,region,accessKeyId,sec
  if(!response.ok)throw Error('S3 upload failed HTTP '+response.status);
  return {key,bytes:payload.length,sha256:signed.checksum};
 }
+export async function readEncryptedObject({endpoint,bucket,region,accessKeyId,secretAccessKey,urlStyle='path',key,fetcher=fetch}){
+ const signed=signS3({method:'GET',endpoint,bucket,region,accessKeyId,secretAccessKey,urlStyle,key,payload:Buffer.alloc(0)});
+ const response=await fetcher(signed.url,{method:'GET',headers:signed.headers,redirect:'manual',signal:AbortSignal.timeout(90000)});
+ if(!response.ok)throw Error('S3 restore read failed HTTP '+response.status);
+ return Buffer.from(await response.arrayBuffer());
+}
 export async function runOffsiteBackup({env=process.env,fetcher=fetch,now=new Date()}={}){
  const source=env.CORE_DB_PATH,passphrase=env.BACKUP_PASSPHRASE;
  const bucket=env.BACKUP_S3_BUCKET,endpoint=env.BACKUP_S3_ENDPOINT,region=env.BACKUP_S3_REGION;
@@ -46,8 +52,18 @@ export async function runOffsiteBackup({env=process.env,fetcher=fetch,now=new Da
   await restoreEncryptedBackup({source:encrypted,destination:restored,password:passphrase});
   const payload=await readFile(encrypted);
   const key='provider-core/'+now.toISOString().replace(/[:.]/g,'-')+'-'+randomUUID()+'.stbk';
-  const upload=await putEncryptedObject({endpoint,bucket,region,accessKeyId,secretAccessKey,urlStyle:env.BACKUP_S3_URL_STYLE||'path',key,payload,fetcher});
-  return {...upload,localIntegrity:'verified',encrypted:true,snapshotSha256:result.sha256};
+  const opts={endpoint,bucket,region,accessKeyId,secretAccessKey,urlStyle:env.BACKUP_S3_URL_STYLE||'path',key,fetcher};
+  const upload=await putEncryptedObject({...opts,payload});
+  let remoteRestore='not_requested';
+  if(env.BACKUP_VERIFY_REMOTE==='true'){
+   const remote=await readEncryptedObject(opts);
+   if(hash(remote)!==upload.sha256)throw Error('Remote backup checksum mismatch');
+   const remoteFile=join(tmp,'remote.stbk'),remoteRestored=join(tmp,'remote-restored.sqlite');
+   await (await import('node:fs/promises')).writeFile(remoteFile,remote,{flag:'wx',mode:0o600});
+   await restoreEncryptedBackup({source:remoteFile,destination:remoteRestored,password:passphrase});
+   remoteRestore='verified';
+  }
+  return {...upload,localIntegrity:'verified',remoteRestore,encrypted:true,snapshotSha256:result.sha256};
  }finally{await rm(tmp,{recursive:true,force:true});}
 }
 export function startOffsiteBackup({env=process.env,onStatus=()=>{},fetcher=fetch}={}){
