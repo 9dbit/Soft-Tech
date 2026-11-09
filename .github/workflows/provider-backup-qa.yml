@@ -5,6 +5,9 @@ on:
     paths:
       - 'provider-dashboard/scripts/sqlite-backup.mjs'
       - 'provider-dashboard/test/backup.test.mjs'
+      - 'provider-dashboard/lib/offsite-backup.mjs'
+      - 'provider-dashboard/test/offsite-backup.test.mjs'
+      - 'provider-dashboard/server.mjs'
       - '.github/workflows/provider-backup-qa.yml'
   workflow_dispatch:
 permissions:
@@ -19,7 +22,7 @@ jobs:
         with:
           node-version: '24'
       - name: Backup, tamper and isolated restore tests
-        run: node --test provider-dashboard/test/backup.test.mjs
+        run: node --test provider-dashboard/test/backup.test.mjs provider-dashboard/test/offsite-backup.test.mjs
       - name: Core regression tests
         working-directory: provider-dashboard
         run: npm test
