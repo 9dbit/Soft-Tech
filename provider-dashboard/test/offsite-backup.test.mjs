@@ -20,18 +20,23 @@ test('offsite snapshot encrypts committed data, locally restores and uploads wit
   const dbPath=join(dir,'core.sqlite'),db=new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode=WAL; CREATE TABLE events(id INTEGER PRIMARY KEY, message TEXT);');
   db.prepare('INSERT INTO events(message) VALUES(?)').run('sensitive-provider-ledger-record');
-  const env={CORE_DB_PATH:dbPath,BACKUP_PASSPHRASE:'test-only-long-passphrase-123456789',BACKUP_S3_BUCKET:'softtech-backups',BACKUP_S3_ENDPOINT:'https://storage.example.test',BACKUP_S3_REGION:'iad',BACKUP_S3_ACCESS_KEY_ID:'test-key',BACKUP_S3_SECRET_ACCESS_KEY:'test-secret'};
-  let calls=0;
+  const env={CORE_DB_PATH:dbPath,BACKUP_PASSPHRASE:'test-only-long-passphrase-123456789',BACKUP_S3_BUCKET:'softtech-backups',BACKUP_S3_ENDPOINT:'https://storage.example.test',BACKUP_S3_REGION:'iad',BACKUP_S3_ACCESS_KEY_ID:'test-key',BACKUP_S3_SECRET_ACCESS_KEY:'test-secret',BACKUP_VERIFY_REMOTE:'true'};
+  let calls=0,stored;
   const result=await runOffsiteBackup({env,now:new Date('2026-11-09T12:00:00.000Z'),fetcher:async(url,opts)=>{
    calls++;
-   assert.equal(opts.method,'PUT');
    assert.equal(new URL(url).host,'storage.example.test');
-   assert.equal(Buffer.from(opts.body).includes(Buffer.from('sensitive-provider-ledger-record')),false);
-   assert.ok(Buffer.from(opts.body).subarray(0,6).equals(Buffer.from('STBK01')));
-   return {ok:true,status:200};
+   if(opts.method==='PUT'){
+    stored=Buffer.from(opts.body);
+    assert.equal(stored.includes(Buffer.from('sensitive-provider-ledger-record')),false);
+    assert.ok(stored.subarray(0,6).equals(Buffer.from('STBK01')));
+    return {ok:true,status:200};
+   }
+   assert.equal(opts.method,'GET');
+   return {ok:true,status:200,arrayBuffer:async()=>stored};
   }});
-  assert.equal(calls,1);
+  assert.equal(calls,2);
   assert.equal(result.localIntegrity,'verified');
+  assert.equal(result.remoteRestore,'verified');
   assert.equal(result.encrypted,true);
   assert.match(result.key,/^provider-core\/2026-11-09T12-00-00-000Z-[a-f0-9-]+\.stbk$/);
   db.close();
