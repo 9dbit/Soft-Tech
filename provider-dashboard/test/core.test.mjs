@@ -34,3 +34,28 @@ test('SSRF guard rejects nonpublic callbacks and mismatched receipts',async t=>{
 test('HTTPS wallet protocol receipt uses exact signed body and verifies amount/currency',async t=>{const secret=random(40);const srv=createServer(async(req,res)=>{let body='';for await(const c of req)body+=c;const p=JSON.parse(body),ts=req.headers['x-softtech-timestamp'],nonce=req.headers['x-softtech-nonce'];assert.equal(req.headers['x-softtech-signature'],signer(secret,'softtech.wallet.v1','POST',req.url,body,ts,nonce).signature);res.setHeader('Content-Type','application/json');res.end(JSON.stringify({transaction_id:p.transaction_id,status:'applied',amount_minor:p.amount_minor,balance_minor:'10',currency:p.currency,scale:p.scale}));});await new Promise(r=>srv.listen(0,'127.0.0.1',r));t.after(()=>srv.close());const op={id:'op-x',wallet_url:'http://127.0.0.1:'+srv.address().port+'/wallet',currency:'VCOIN',scale:2};const r=await walletCall(op,secret,'debit',{transaction_id:'tx1',amount_minor:'50'},{allowLocal:true});assert.equal(r.status,'applied');});
 test('OpenAPI describes deployed operator paths rather than a design-only contract',()=>{const d=spec();assert.equal(d.openapi,'3.1.0');for(const p of ['/v1/games','/v1/game-launches','/v1/transactions','/v1/reconciliation'])assert.ok(d.paths[p]);assert.ok(!JSON.stringify(d).includes('NOT_IMPLEMENTED'));});
 test('HTTP login, CSRF, durable logout, private routes, admin/auditor permissions',async t=>{const dir=mkdtempSync(join(tmpdir(),'st-http-')),port=19220+Math.floor(Math.random()*100),base='http://127.0.0.1:'+port;const env={...process.env,NODE_ENV:'test',PORT:String(port),CORE_DB_PATH:join(dir,'core.sqlite'),PANEL_ADMIN_PASSWORD:random(24),PANEL_AUDITOR_PASSWORD:random(24),PANEL_SESSION_SECRET:random(40)};const child=spawn(process.execPath,['server.mjs'],{env,stdio:['ignore','pipe','pipe']});let logs='';child.stderr.on('data',x=>logs+=x);t.after(async()=>{child.kill();await new Promise(r=>child.once('exit',r));rmSync(dir,{recursive:true,force:true});});for(let i=0;i<80;i++){try{if((await fetch(base+'/health')).ok)break;}catch{}await new Promise(r=>setTimeout(r,50));}assert.equal((await fetch(base+'/api/bootstrap')).status,401);const login=async(role)=>{const r=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role,password:env[role==='admin'?'PANEL_ADMIN_PASSWORD':'PANEL_AUDITOR_PASSWORD']})});assert.equal(r.status,200,logs);return {cookie:r.headers.get('set-cookie').split(';')[0],data:await r.json()};};const a=await login('admin'),headers={'Content-Type':'application/json',Cookie:a.cookie};let r=await fetch(base+'/api/operators',{method:'POST',headers,body:'{}'});assert.equal(r.status,403);headers['X-CSRF-Token']=a.data.csrf;r=await fetch(base+'/api/operators',{method:'POST',headers,body:JSON.stringify({name:'HTTP Operator',games:ids})});assert.equal(r.status,201);const audit=await login('auditor'),ah={'Content-Type':'application/json',Cookie:audit.cookie,'X-CSRF-Token':audit.data.csrf};r=await fetch(base+'/api/operators',{method:'POST',headers:ah,body:'{}'});assert.equal(r.status,403);r=await fetch(base+'/api/download/openapi.json',{headers:ah});assert.equal(r.status,200);assert.match(r.headers.get('content-disposition'),/attachment/);await fetch(base+'/api/logout',{method:'POST',headers,body:'{}'});assert.equal((await fetch(base+'/api/bootstrap',{headers})).status,401);});
+
+test('operator-game release workflow is audited, sequential and production locked',t=>{
+ const f=fixture(t),a=f.operator('Release A'),b=f.operator('Release B');
+ assert.equal(f.core.gameMode(f.core.operator(a.operator.id),ids[0]),'sandbox');
+ assert.throws(()=>f.core.setOperatorGameMode(a.operator.id,ids[0],'production'),code('RELEASE_APPROVAL_REQUIRED'));
+ assert.throws(()=>f.core.setOperatorGameMode(a.operator.id,ids[0],'preproduction'),code('RELEASE_APPROVAL_REQUIRED'));
+ const request=f.core.requestRelease(a.operator.id,ids[0],'preproduction');
+ assert.equal(request.status,'requested');
+ assert.throws(()=>f.core.advanceRelease(request.id,'activate'),code('INVALID_RELEASE_TRANSITION'));
+ assert.throws(()=>f.core.advanceRelease(request.id,'validate'),code('GLOBAL_PREPRODUCTION_REQUIRED'));
+ assert.throws(()=>f.core.requestRelease(b.operator.id,ids[0],'production'),code('PRODUCTION_LOCKED'));
+ f.core.run("INSERT INTO meta(key,value) VALUES('release_mode','preproduction')");
+ assert.equal(f.core.advanceRelease(request.id,'validate').status,'validated');
+ assert.equal(f.core.advanceRelease(request.id,'approve').status,'approved');
+ assert.equal(f.core.advanceRelease(request.id,'activate').status,'activated');
+ assert.equal(f.core.gameMode(f.core.operator(a.operator.id),ids[0]),'preproduction');
+ assert.equal(f.core.gameMode(f.core.operator(b.operator.id),ids[0]),'sandbox');
+ assert.equal(launch(f.core,a.operator).environment,'preproduction');
+ f.core.setOperatorGameMode(a.operator.id,ids[0],'disabled');
+ assert.throws(()=>launch(f.core,a.operator,ids[0],random(20),'blocked'),code('GAME_DISABLED_FOR_OPERATOR'));
+ assert.equal(launch(f.core,b.operator).environment,'sandbox');
+ assert.ok(f.core.all("SELECT * FROM audit WHERE event LIKE 'release.%'").length>=4);
+ f.restart();
+ assert.equal(f.core.gameMode(f.core.operator(a.operator.id),ids[0]),'disabled');
+});
