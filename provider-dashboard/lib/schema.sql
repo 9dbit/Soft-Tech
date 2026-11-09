@@ -32,3 +32,18 @@ CREATE TABLE IF NOT EXISTS operator_game_modes(
  updated_at INTEGER NOT NULL,
  PRIMARY KEY(operator_id,game_id)
 );
+
+CREATE TABLE IF NOT EXISTS release_requests(
+ id TEXT PRIMARY KEY,
+ operator_id TEXT NOT NULL REFERENCES operators(id),
+ game_id TEXT NOT NULL REFERENCES games(id),
+ requested_mode TEXT NOT NULL CHECK(requested_mode IN('sandbox','preproduction')),
+ status TEXT NOT NULL CHECK(status IN('requested','validated','approved','activated','rejected','cancelled')),
+ requested_by TEXT NOT NULL,
+ validated_by TEXT,
+ approved_by TEXT,
+ created_at INTEGER NOT NULL,
+ updated_at INTEGER NOT NULL,
+ notes TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS release_requests_scope ON release_requests(operator_id,game_id,status,created_at);
