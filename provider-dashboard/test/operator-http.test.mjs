@@ -30,6 +30,15 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
   let healthy=false;
   for(let i=0;i<60;i++){if(spawnError||child.exitCode!==null)break;try{const r=await fetch(base+'/health');if(r.ok){healthy=true;break;}}catch{}await pause(200);}
   assert.equal(healthy,true,'core did not become healthy: '+(spawnError?.message||logs));
+  const health=await (await fetch(base+'/health')).json();
+  assert.equal(health.deployment_identity.environment,'sandbox');
+  assert.equal(health.deployment_identity.identity_bound,true);
+  assert.equal(health.deployment_identity.physical_isolation_verified,false);
+  const backupHealth=await fetch(base+'/health/backup');
+  assert.equal(backupHealth.status,503,'A reachable database must not imply verified offsite backup');
+  const backupProof=await backupHealth.json();
+  assert.equal(backupProof.backup_verified,false);assert.equal(backupProof.reason,'BACKUP_DISABLED');
+  assert.equal('key' in backupProof,false);assert.equal('error' in backupProof,false);
   const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'admin',password:env.PANEL_ADMIN_PASSWORD})});
   assert.equal(login.status,200);
   const {csrf}=await login.json(),cookie=login.headers.get('set-cookie').split(';')[0];
@@ -38,7 +47,9 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
    assert.equal(r.status,201);return r.json();
   };
   const release=await fetch(base+'/api/release-control',{headers:{Cookie:cookie}});
-  assert.equal(release.status,200);assert.equal((await release.json()).production_enabled,false);
+  assert.equal(release.status,200);const releaseState=await release.json();assert.equal(releaseState.production_enabled,false);
+  assert.equal(releaseState.checks.backup_verified,false);assert.equal(releaseState.checks.environment_isolation,false);
+  assert.equal(releaseState.deployment_identity.deployment_id,health.deployment_identity.deployment_id);
   const production=await fetch(base+'/api/release-control',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:JSON.stringify({mode:'production',confirmation:'CONFIRM PRODUCTION'})});
   assert.equal(production.status,409,'Production must remain locked');
   const preprod=await fetch(base+'/api/release-control',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:JSON.stringify({mode:'preproduction',confirmation:'CONFIRM PREPRODUCTION'})});

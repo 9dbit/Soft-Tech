@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
 import {Core} from './lib/core.mjs';
 import {startOffsiteBackup} from './lib/offsite-backup.mjs';
+import {backupReadiness} from './lib/backup-readiness.mjs';
 import {Fault,fail,random,sha,equal,json} from './lib/security.mjs';
 import {spec,developerHTML,signingExample} from './lib/docs.mjs';
 const env=process.env,port=Number(env.PORT||8080),root=resolve(import.meta.dirname,'public');
@@ -10,7 +11,8 @@ if((env.PANEL_ADMIN_PASSWORD||'').length<16||(env.PANEL_AUDITOR_PASSWORD||'').le
 export const core=new Core({env});
 const rate=new Map();
 let backupState={enabled:env.OFFSITE_BACKUP_ENABLED==='true',last:null};
-const backupRunner=startOffsiteBackup({env,onStatus:status=>{backupState={enabled:true,last:status};console.log('provider.offsite_backup',JSON.stringify(status));}});
+const backupEnv={...env,CORE_DB_PATH:core.databasePath};
+const backupRunner=startOffsiteBackup({env:backupEnv,onStatus:status=>{const proof={...status,source_commit:env.RAILWAY_GIT_COMMIT_SHA||'local'};backupState={enabled:true,last:proof};console.log('provider.offsite_backup',JSON.stringify(proof));}});
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.woff2':'font/woff2','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.jpeg':'image/jpeg'};
 function send(res,status,data,type='application/json; charset=utf-8',extra={}){res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY',...extra});res.end(type.startsWith('application/json')?JSON.stringify(data):data);}
 async function readBody(req){if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'JSON_REQUIRED');let size=0,chunks=[];for await(const c of req){size+=c.length;if(size>65536)fail(413,'BODY_TOO_LARGE');chunks.push(c);}return Buffer.concat(chunks).toString('utf8');}
@@ -21,7 +23,8 @@ const admin=session=>{if(!session||session.role!=='admin')fail(403,'READ_ONLY_RO
 const server=createServer({maxHeaderSize:16384},async(req,res)=>{
  try{
   const u=new URL(req.url||'/','http://localhost'),path=u.pathname,method=req.method||'GET';
-  if(path==='/health'&&method==='GET'){core.get('SELECT 1');const last=core.get('SELECT id,status,updated_at FROM selftests ORDER BY created_at DESC LIMIT 1');send(res,200,{ok:true,status:'ok',app:'soft-tech-provider-core',version:'1.0.0',environment:'sandbox',persistent:true,replicas_supported:1,acceptance:last||null,source_commit:env.RAILWAY_GIT_COMMIT_SHA||'local'});return;}
+  if(path==='/health/backup'&&method==='GET'){const report=backupReadiness(backupState,{env});send(res,report.ok?200:503,report);return;}
+  if(path==='/health'&&method==='GET'){core.get('SELECT 1');const last=core.get('SELECT id,status,updated_at FROM selftests ORDER BY created_at DESC LIMIT 1');send(res,200,{ok:true,status:'ok',app:'soft-tech-provider-core',version:'1.0.0',environment:core.deploymentIdentity.environment,deployment_identity:core.deploymentIdentity,persistent:true,replicas_supported:1,acceptance:last||null,source_commit:env.RAILWAY_GIT_COMMIT_SHA||'local'});return;}
   if(path.startsWith('/api/v4/agency-game/')){
    if(method!=='POST')fail(405,'METHOD_NOT_ALLOWED');const raw=await readBody(req);const key=core.authenticate({method,path:u.pathname+u.search,body:raw,headers:req.headers},true);
    const result=await core.engineAction(key,path.slice('/api/v4/agency-game/'.length),json(raw));send(res,200,result);return;
@@ -42,7 +45,7 @@ const server=createServer({maxHeaderSize:16384},async(req,res)=>{
   if(path.startsWith('/api/')){
    if(method==='POST')originGuard(req);
    const session=panelSession(req);
-   if(path==='/api/session'&&method==='GET'){send(res,200,{authenticated:!!session,role:session?.role||null,csrf:session?.csrf||null,version:'1.0.0',environment:'sandbox'});return;}
+   if(path==='/api/session'&&method==='GET'){send(res,200,{authenticated:!!session,role:session?.role||null,csrf:session?.csrf||null,version:'1.0.0',environment:core.deploymentIdentity.environment,deployment_identity:core.deploymentIdentity});return;}
    if(path==='/api/login'&&method==='POST'){
     const ip=String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'').split(',')[0].trim(),now=Date.now();
     const attempts=(rate.get(ip)||[]).filter(t=>t>now-600000);if(attempts.length>=10)fail(429,'RATE_LIMITED');
@@ -56,14 +59,14 @@ const server=createServer({maxHeaderSize:16384},async(req,res)=>{
    if(path==='/api/backup-status'&&method==='GET'){admin(session);send(res,200,backupState);return;}
    if(path==='/api/release-control'&&method==='GET'){
     const mode=core.get('SELECT value FROM meta WHERE key=?','release_mode')?.value||'sandbox';
-    send(res,200,{mode,production_enabled:false,credits:'virtual_nonredeemable',backup:backupState,checks:{backup_verified:backupState.last?.ok===true&&backupState.last?.remoteRestore==='verified',external_wallet_certified:false,engine_volume_recovery:false,mfa_enabled:false,legal_approval:false},message:'Production activation is locked until all independent release gates pass.'});return;
+    send(res,200,{mode,production_enabled:false,deployment_identity:core.deploymentIdentity,credits:'virtual_nonredeemable',backup:backupState,backup_readiness:backupReadiness(backupState,{env}),checks:{backup_verified:backupReadiness(backupState,{env}).ok,environment_isolation:false,external_wallet_certified:false,engine_volume_recovery:false,mfa_enabled:false,legal_approval:false},message:'Production activation is locked until all independent release gates pass.'});return;
    }
    if(path==='/api/release-control'&&method==='POST'){
     admin(session);const data=json(await readBody(req));
     if(!['sandbox','preproduction'].includes(data.mode))fail(409,'PRODUCTION_LOCKED');
     if(data.confirmation!=='CONFIRM '+data.mode.toUpperCase())fail(422,'CONFIRMATION_REQUIRED');
     const old=core.get('SELECT value FROM meta WHERE key=?','release_mode')?.value||'sandbox';
-    if(data.mode==='preproduction'&&!(backupState.last?.ok===true&&backupState.last?.remoteRestore==='verified'))fail(409,'BACKUP_NOT_VERIFIED');
+    if(data.mode==='preproduction'&&!backupReadiness(backupState,{env}).ok)fail(409,'BACKUP_NOT_VERIFIED');
     core.transaction(()=>{core.run('INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value','release_mode',data.mode);core.audit('panel:admin','release.mode_changed','provider',{from:old,to:data.mode,credits:'virtual_nonredeemable'});});
     send(res,200,{mode:data.mode,production_enabled:false});return;
    }

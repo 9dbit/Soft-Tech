@@ -48,3 +48,17 @@ test('offsite scheduling is opt-in',()=>{
  assert.equal(x.enabled,false);x.stop();
  assert.throws(()=>startOffsiteBackup({env:{OFFSITE_BACKUP_ENABLED:'true',OFFSITE_BACKUP_INTERVAL_HOURS:'0'}}),/interval/);
 });
+
+test('failed offsite backup retries in five minutes, success resumes daily cadence, stop prevents further work',async()=>{
+ const jobs=[],cancelled=[],statuses=[];let attempts=0;
+ const runner=startOffsiteBackup({env:{OFFSITE_BACKUP_ENABLED:'true'},onStatus:status=>statuses.push(status),
+  schedule:(run,delay)=>{const job={run,delay,unref(){}};jobs.push(job);return job;},cancel:job=>cancelled.push(job),
+  runBackup:async()=>{attempts++;if(attempts===1)throw Error('temporary transport outage');return {key:'verified.stbk',sha256:'a'.repeat(64),bytes:4096,remoteRestore:'verified'};}
+ });
+ assert.equal(jobs[0].delay,30000);
+ await jobs[0].run();assert.equal(statuses[0].ok,false);assert.equal(jobs[1].delay,300000);
+ await jobs[1].run();assert.equal(statuses[1].ok,true);assert.equal(jobs[2].delay,86400000);
+ runner.stop();assert.equal(cancelled[0],jobs[2]);
+ await jobs[2].run();assert.equal(attempts,2);assert.equal(jobs.length,3);
+ assert.throws(()=>startOffsiteBackup({env:{OFFSITE_BACKUP_ENABLED:'true',OFFSITE_BACKUP_RETRY_SECONDS:'0'}}),/retry/);
+});

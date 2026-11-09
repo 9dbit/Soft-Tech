@@ -15,6 +15,7 @@ A real, operator-neutral sandbox control plane for UNO LUCK, MAHJONG WILD and SK
 - PANEL_ADMIN_PASSWORD, PANEL_AUDITOR_PASSWORD: existing server-side access passwords, 16+ characters.
 - PANEL_SESSION_SECRET: persistent encryption root (32+ characters). Keep a recoverable copy in a secret manager. Changing it without key migration makes stored operator secrets unreadable.
 - CORE_DB_PATH=/data/provider.sqlite, with an attached Railway /data volume. Production refuses unmounted storage.
+- CORE_ENVIRONMENT=sandbox and CORE_DEPLOYMENT_ID: a stable, nonsecret deployment identifier. The live provider uses its Railway service ID. The database permanently retains this identity; an explicit mismatch or a request to relabel it as preproduction/production fails before business writes. Resolved database paths must remain inside the mounted volume, including symlinks. This does not certify physical environment isolation or change the sandbox v1 signing protocol.
 - CORE_PUBLIC_ORIGIN: panel's HTTPS origin.
 - UNO_PROVIDER_ORIGIN, MAHJONG_PROVIDER_ORIGIN, SKYGATE_PROVIDER_ORIGIN: dedicated native engine HTTPS origins.
 - CORE_ENGINE_KEYS_JSON: array of three objects with id, canonical game ID and independently generated secret. Never expose in browser or repository.
@@ -41,7 +42,10 @@ Existing native adapters use the server-only /api/v4/agency-game/{redeem,status,
 - Ledger and audit rows are immutable; no reset/erase endpoint.
 - Maintenance and operator disable block new admission while allowing already accepted rounds to settle.
 - Health endpoints alone do not prove integration. The panel distinguishes health timestamps from verified signed engine calls. Acceptance additionally proves real settled rounds and journal matches.
-- Back up volume/database and encryption root before migration. Automated offsite backups and disaster-recovery rehearsal are NOT included yet.
+- Encrypted offsite snapshots include upload, remote readback, authenticated decryption and isolated SQLite integrity verification. Configure OFFSITE_BACKUP_ENABLED, BACKUP_PASSPHRASE, BACKUP_S3_ENDPOINT/BUCKET/REGION/ACCESS_KEY_ID/SECRET_ACCESS_KEY/URL_STYLE and BACKUP_VERIFY_REMOTE=true. Keep encryption roots independently recoverable.
+- The default backup cadence is 24 hours, with the initial attempt 30 seconds after startup. Failed attempts retry after five minutes without overlapping runs; OFFSITE_BACKUP_RETRY_SECONDS accepts 60–3600 seconds.
+- GET /health verifies the running database. GET /health/backup separately returns 200 only for fresh remote-restore proof from the current source commit, otherwise 503. Its response contains no bucket credentials, object keys or raw error details. Release Control uses the same check. A cached proof is not a fresh S3 probe, and a verified database snapshot is not a full service or lost-volume recovery rehearsal.
+- Restore into a new path, retain the original deployment identity and master secret, and verify journal reconciliation before a recovery cutover. Never delete or edit identity to repurpose a sandbox database.
 - Browser test viewport emulation is not a physical iPhone Safari test.
 
 ## Tests

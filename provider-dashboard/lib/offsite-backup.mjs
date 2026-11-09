@@ -66,20 +66,22 @@ export async function runOffsiteBackup({env=process.env,fetcher=fetch,now=new Da
   return {...upload,localIntegrity:'verified',remoteRestore,encrypted:true,snapshotSha256:result.sha256};
  }finally{await rm(tmp,{recursive:true,force:true});}
 }
-export function startOffsiteBackup({env=process.env,onStatus=()=>{},fetcher=fetch}={}){
+export function startOffsiteBackup({env=process.env,onStatus=()=>{},fetcher=fetch,runBackup=runOffsiteBackup,schedule=setTimeout,cancel=clearTimeout}={}){
  if(env.OFFSITE_BACKUP_ENABLED!=='true')return {enabled:false,stop(){}};
  const interval=Number(env.OFFSITE_BACKUP_INTERVAL_HOURS||24);
  if(!Number.isFinite(interval)||interval<6||interval>168)throw Error('Backup interval must be between 6 and 168 hours');
- let running=false,stopped=false;
+ const retry=Number(env.OFFSITE_BACKUP_RETRY_SECONDS||300);
+ if(!Number.isFinite(retry)||retry<60||retry>3600)throw Error('Backup retry must be between 60 and 3600 seconds');
+ let running=false,stopped=false,timer;
+ const queue=delay=>{if(!stopped){timer=schedule(run,delay);timer.unref?.();}};
  const run=async()=>{
   if(running||stopped)return;
-  running=true;
-  try{const result=await runOffsiteBackup({env,fetcher});onStatus({ok:true,at:new Date().toISOString(),key:result.key,sha256:result.sha256,bytes:result.bytes,remoteRestore:result.remoteRestore});}
+  running=true;let delay=retry*1000;
+  try{const result=await runBackup({env,fetcher});onStatus({ok:true,at:new Date().toISOString(),key:result.key,sha256:result.sha256,bytes:result.bytes,remoteRestore:result.remoteRestore});delay=interval*3600000;}
   catch(e){onStatus({ok:false,at:new Date().toISOString(),error:e.message});}
-  finally{running=false;}
+  finally{running=false;queue(delay);}
  };
- const timer=setInterval(run,interval*3600000);timer.unref();
  // Start after startup to avoid delaying health and deployment readiness.
- const initial=setTimeout(run,30000);initial.unref();
- return {enabled:true,stop(){stopped=true;clearTimeout(initial);clearInterval(timer);}};
+ queue(30000);
+ return {enabled:true,stop(){stopped=true;cancel(timer);}};
 }

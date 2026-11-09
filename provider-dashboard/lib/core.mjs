@@ -1,10 +1,9 @@
-import {DatabaseSync} from 'node:sqlite';
-import {readFileSync,mkdirSync,chmodSync} from 'node:fs';
-import {dirname,isAbsolute,resolve} from 'node:path';
+import {readFileSync,chmodSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {catalog} from './catalog.mjs';
 import {Fault,fail,sha,random,equal,canonical,mac,vault,text,units,originURL} from './security.mjs';
 import {walletCall,WalletError} from './wallet.mjs';
+import {openDeploymentDatabase} from './deployment-identity.mjs';
 const scopes=['games:read','sessions:write','reports:read'];
 const parse=x=>JSON.parse(x);
 export class Core {
@@ -12,11 +11,13 @@ export class Core {
   this.env=env;this.clock=clock;this.transport=transport;this.locks=new Map();
   const master=env.PANEL_SESSION_SECRET||'';if(master.length<32)throw Error('PANEL_SESSION_SECRET is required');
   this.vault=vault(master);this.allowLocal=env.NODE_ENV==='test';
-  const path=env.CORE_DB_PATH||resolve('.local-data/provider.sqlite');
-  if(!isAbsolute(path))throw Error('Absolute CORE_DB_PATH required');
-  if(env.NODE_ENV==='production'&&(!env.RAILWAY_VOLUME_MOUNT_PATH||!path.startsWith(env.RAILWAY_VOLUME_MOUNT_PATH.replace(/\/$/,'')+'/')))throw Error('A mounted persistent volume is required in production');
-  mkdirSync(dirname(path),{recursive:true,mode:0o700});
-  this.db=new DatabaseSync(path);this.db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));chmodSync(path,0o600);
+  const opened=openDeploymentDatabase({env,clock,validateExisting:db=>{
+   if(!db.prepare("SELECT 1 FROM sqlite_schema WHERE type='table' AND name='meta'").get())return;
+   const sentinel=db.prepare('SELECT value FROM meta WHERE key=?').get('vault_check');
+   if(sentinel&&this.vault.open(sentinel.value)!=='softtech-core-v1')throw Error('Key mismatch: restore original master key');
+  }});
+  this.db=opened.db;this.databasePath=opened.path;this.deploymentIdentity=opened.identity;
+  this.db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));chmodSync(opened.path,0o600);
   const sentinel=this.get('SELECT value FROM meta WHERE key=?','vault_check');
   if(sentinel){if(this.vault.open(sentinel.value)!=='softtech-core-v1')throw Error('Key mismatch: restore original master key');}
   else this.run('INSERT INTO meta VALUES(?,?)','vault_check',this.vault.seal('softtech-core-v1'));
