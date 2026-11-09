@@ -34,6 +34,14 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
    const r=await fetch(base+'/api/operators',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:JSON.stringify({name,games:['uno-luck','mahjong-wild','skygate-5000'],currency:'VCOIN',scale:2})});
    assert.equal(r.status,201);return r.json();
   };
+  const release=await fetch(base+'/api/release-control',{headers:{Cookie:cookie}});
+  assert.equal(release.status,200);assert.equal((await release.json()).production_enabled,false);
+  const production=await fetch(base+'/api/release-control',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:JSON.stringify({mode:'production',confirmation:'CONFIRM PRODUCTION'})});
+  assert.equal(production.status,409,'Production must remain locked');
+  const preprod=await fetch(base+'/api/release-control',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:JSON.stringify({mode:'preproduction',confirmation:'CONFIRM PREPRODUCTION'})});
+  assert.equal(preprod.status,409,'Preproduction requires verified remote backup');
+  const sandbox=await fetch(base+'/api/release-control',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:JSON.stringify({mode:'sandbox',confirmation:'CONFIRM SANDBOX'})});
+  assert.equal(sandbox.status,200);
   const a=await makeOperator('Conformance Operator A'),b=await makeOperator('Conformance Operator B');
   assert.notEqual(a.credential.key_id,b.credential.key_id);
   const gameReq=signed({url:base+'/v1/games',credential:a.credential});
