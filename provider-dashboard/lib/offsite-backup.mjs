@@ -1,15 +1,14 @@
-import {createHash,randomUUID} from 'node:crypto';
-import {readFile,mkdtemp,rm} from 'node:fs/promises';
+import {randomUUID} from 'node:crypto';
+import {mkdtemp,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createEncryptedBackup,restoreEncryptedBackup} from '../scripts/sqlite-backup.mjs';
 import {backupKeysFromEnv} from './backup-keys.mjs';
 import {providerBackupPrefix} from './backup-scope.mjs';
 
-import {putEncryptedObject,readEncryptedObject} from './backup-s3.mjs';
-export {signS3,putEncryptedObject,readEncryptedObject} from './backup-s3.mjs';
+import {putEncryptedObjectFile,readEncryptedObjectFile} from './backup-s3.mjs';
+export {signS3,putEncryptedObject,readEncryptedObject,putEncryptedObjectFile,readEncryptedObjectFile} from './backup-s3.mjs';
 import {runProviderRetention} from './provider-retention-s3.mjs';
-const hash=x=>createHash('sha256').update(x).digest('hex');
 export async function runOffsiteBackup({env=process.env,fetcher=fetch,now=new Date()}={}){
  const source=env.CORE_DB_PATH;
  const bucket=env.BACKUP_S3_BUCKET,endpoint=env.BACKUP_S3_ENDPOINT,region=env.BACKUP_S3_REGION;
@@ -21,20 +20,21 @@ export async function runOffsiteBackup({env=process.env,fetcher=fetch,now=new Da
   const encrypted=join(tmp,'snapshot.stbk'),restored=join(tmp,'verified.sqlite');
   const result=await createEncryptedBackup({source,destination:encrypted,...ring,createdAt:now.getTime()});
   await restoreEncryptedBackup({source:encrypted,destination:restored,...ring});
+  await rm(restored);
   const identity=result.manifest.deployment_identity;
   if(env.CORE_DEPLOYMENT_ID&&identity?.deployment_id!==env.CORE_DEPLOYMENT_ID||env.CORE_ENVIRONMENT&&identity?.environment!==env.CORE_ENVIRONMENT)throw Error('Offsite backup source identity differs from configured deployment');
-  const payload=await readFile(encrypted);
   const key=identity?providerBackupPrefix(identity)+Math.floor(now.getTime()/1000)+'-'+result.manifest.sha256.slice(0,16)+'-'+randomUUID().replaceAll('-','').slice(0,16)+'.stbk':'provider-core/'+now.toISOString().replace(/[:.]/g,'-')+'-'+randomUUID()+'.stbk';
   const opts={endpoint,bucket,region,accessKeyId,secretAccessKey,urlStyle:env.BACKUP_S3_URL_STYLE||'path',key,fetcher};
-  const upload=await putEncryptedObject({...opts,payload});
+  const upload=await putEncryptedObjectFile({...opts,source:encrypted});
+  if(upload.sha256!==result.sha256||upload.bytes!==result.bytes)throw Error('Local backup changed before upload');
   let remoteRestore='not_requested';
   if(env.BACKUP_VERIFY_REMOTE==='true'){
-   const remote=await readEncryptedObject(opts);
-   if(hash(remote)!==upload.sha256)throw Error('Remote backup checksum mismatch');
    const remoteFile=join(tmp,'remote.stbk'),remoteRestored=join(tmp,'remote-restored.sqlite');
-   await (await import('node:fs/promises')).writeFile(remoteFile,remote,{flag:'wx',mode:0o600});
+   const remote=await readEncryptedObjectFile({...opts,destination:remoteFile});
+   if(remote.sha256!==upload.sha256||remote.bytes!==upload.bytes)throw Error('Remote backup checksum mismatch');
    await restoreEncryptedBackup({source:remoteFile,destination:remoteRestored,...ring});
    remoteRestore='verified';
+   await rm(remoteFile);await rm(remoteRestored);
   }
   const report={...upload,localIntegrity:'verified',remoteRestore,encrypted:true,snapshotSha256:result.manifest.sha256,key_id:result.key_id,deployment_identity:identity,manifest:result.manifest};
   if(env.BACKUP_RETENTION_ENABLED==='true')report.retention=await runProviderRetention({env,result:report,ring,fetcher,now});

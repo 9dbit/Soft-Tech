@@ -4,6 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {buffer as consumeBuffer} from 'node:stream/consumers';
 import {signS3,runOffsiteBackup,startOffsiteBackup} from '../lib/offsite-backup.mjs';
 
 test('SigV4 signs only the intended HTTPS bucket and refuses untrusted paths',()=>{
@@ -26,13 +27,13 @@ test('offsite snapshot encrypts committed data, locally restores and uploads wit
    calls++;
    assert.equal(new URL(url).host,'storage.example.test');
    if(opts.method==='PUT'){
-    stored=Buffer.from(opts.body);
+    stored=await consumeBuffer(opts.body);
     assert.equal(stored.includes(Buffer.from('sensitive-provider-ledger-record')),false);
     assert.ok(stored.subarray(0,6).equals(Buffer.from('STBK02')));
     return {ok:true,status:200};
    }
    assert.equal(opts.method,'GET');
-   return {ok:true,status:200,arrayBuffer:async()=>stored};
+   return new Response(stored,{status:200});
   }});
   assert.equal(calls,2);
   assert.equal(result.localIntegrity,'verified');

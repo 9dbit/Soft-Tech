@@ -4,6 +4,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdtemp,mkdir,readFile,realpath,rm,symlink,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
+import {buffer as consumeBuffer} from 'node:stream/consumers';
 import {Core} from '../lib/core.mjs';
 import {runOffsiteBackup} from '../lib/offsite-backup.mjs';
 import {random,sha} from '../lib/security.mjs';
@@ -45,12 +46,12 @@ test('offsite backup uses the active Core database when a symlink plus parent tr
    assert.equal(new URL(url).host,'storage.backup-fixture.example');
    methods.push(request.method);
    if(request.method==='PUT'){
-    objectUrl=url;stored=Buffer.from(request.body);
+    objectUrl=url;stored=await consumeBuffer(request.body);
     assert.equal(stored.includes(Buffer.from('backup-source-player')),false);
     return {ok:true,status:200};
    }
    assert.equal(request.method,'GET');assert.equal(url,objectUrl);
-   return {ok:true,status:200,arrayBuffer:async()=>stored};
+   return new Response(stored,{status:200});
   }});
   assert.deepEqual(methods,['PUT','GET']);
   assert.equal(result.remoteRestore,'verified');assert.equal(result.localIntegrity,'verified');

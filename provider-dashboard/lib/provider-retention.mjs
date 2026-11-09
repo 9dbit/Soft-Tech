@@ -2,6 +2,7 @@
 import {createHash} from 'node:crypto';
 import {canonicalBackupIdentity,providerBackupPrefix} from './backup-scope.mjs';
 import {strongETag} from './backup-s3.mjs';
+import {hashBackupFile} from './backup-file.mjs';
 export const RETENTION_POLICY='provider-7d-4w-12m-v1';
 const DAY=86400,sha=value=>createHash('sha256').update(value).digest('hex');
 function weekStart(seconds){const date=new Date(seconds*1000);date.setUTCHours(0,0,0,0);date.setUTCDate(date.getUTCDate()-((date.getUTCDay()+6)%7));return date.getTime()/1000;}
@@ -24,7 +25,7 @@ export function providerRetentionPlan(keys,{identity,now=Math.floor(Date.now()/1
  const candidates=records.filter(record=>!keep.has(record.key)&&now-record.created_at>=7*DAY).reverse().slice(0,maxDeletes),verifyKeys=new Set([...records.slice(0,2).map(r=>r.key),...representatives,...candidates.map(r=>r.key)]);
  return {prefix,records,keep:[...keep],ignored,candidates,verifyKeys:[...verifyKeys]};
 }
-export async function enforceProviderRetention({identity,currentObject,currentCiphertextSha256,list,download,remove,verify,checkConditionalDelete,probeRequested=false,now=Math.floor(Date.now()/1000),restoringObject=null,mode='dry-run',maxObjects=4096,maxDeletes=5,logger=()=>{}}){
+export async function enforceProviderRetention({identity,currentObject,currentCiphertextSha256,list,download,remove,verify,verifyFile,checkConditionalDelete,probeRequested=false,now=Math.floor(Date.now()/1000),restoringObject=null,mode='dry-run',maxObjects=4096,maxDeletes=5,logger=()=>{}}){
  const report={policy:RETENTION_POLICY,enabled:true,mode,verified:false,conditional_delete_verified:false,inventory_count:0,managed_count:0,retained_count:0,protected_unknown_count:0,eligible_count:0,deleted_count:0,verified_at:new Date(now*1000).toISOString()};
  try{
   const expected=canonicalBackupIdentity(identity);
@@ -37,9 +38,15 @@ export async function enforceProviderRetention({identity,currentObject,currentCi
   const records=new Map(plan.records.map(record=>[record.key,record])),proofs=new Map();
   for(const key of required){
    const record=records.get(key);if(!record)throw Error('RETENTION_OBJECT_SCOPE_INVALID');
-   const response=await download(key);if(!response||!Buffer.isBuffer(response.bytes))throw Error('RETENTION_DOWNLOAD_INVALID');
-   const digest=sha(response.bytes);if(key===currentObject&&digest!==currentCiphertextSha256)throw Error('RETENTION_CURRENT_CIPHERTEXT_CHANGED');
-   const manifest=await verify(response.bytes);
+   const response=await download(key);let digest,verifyDownloaded;
+   if(response&&Buffer.isBuffer(response.bytes)&&typeof verify==='function'){digest=sha(response.bytes);verifyDownloaded=()=>verify(response.bytes);}
+   else if(response&&typeof response.path==='string'&&typeof verifyFile==='function'){
+    const proof=await hashBackupFile(response.path);
+    if(proof.bytes!==response.bytes||proof.sha256!==response.sha256)throw Error('RETENTION_DOWNLOADED_FILE_CHANGED');
+    digest=proof.sha256;verifyDownloaded=()=>verifyFile(response.path);
+   }else throw Error('RETENTION_DOWNLOAD_INVALID');
+   if(key===currentObject&&digest!==currentCiphertextSha256)throw Error('RETENTION_CURRENT_CIPHERTEXT_CHANGED');
+   const manifest=await verifyDownloaded();
    if(!manifest||manifest.format!=='softtech-sqlite-backup-v2'||Math.floor(manifest.created_at/1000)!==record.created_at||!String(manifest.sha256).startsWith(record.hash_prefix)||JSON.stringify(canonicalBackupIdentity(manifest.deployment_identity))!==JSON.stringify(expected))throw Error('RETENTION_FOREIGN_OR_MALFORMED_MANIFEST');
    if(key===currentObject&&(now-Math.floor(manifest.created_at/1000)<0||now-Math.floor(manifest.created_at/1000)>25*3600))throw Error('RETENTION_CURRENT_BACKUP_STALE');
    proofs.set(key,{digest,etag:response.etag});

@@ -1,9 +1,10 @@
 import {DatabaseSync,backup} from 'node:sqlite';
 import {randomUUID,createHash} from 'node:crypto';
-import {mkdir,mkdtemp,rm,readFile,chmod,realpath,open} from 'node:fs/promises';
+import {mkdir,mkdtemp,rm,chmod,realpath,open} from 'node:fs/promises';
 import {dirname,join,resolve} from 'node:path';
 import {vault,equal} from './security.mjs';
 import {requireFreshPath,publishFreshFile} from './recovery-io.mjs';
+import {hashBackupFile} from './backup-file.mjs';
 import {createEncryptedBackup,restoreEncryptedBackup,verifyDatabase} from '../scripts/sqlite-backup.mjs';
 
 export const CORE_VAULT_FIELDS=Object.freeze([
@@ -57,7 +58,7 @@ function applicationFingerprint(db,excludedAuditId,{rollback=false}={}){
   if(ignoredTables.has(name))continue;
   const selected=columns(db,name).map(c=>c.name).filter(c=>!encrypted.has(name+'.'+c)&&!mutable.has(name+'.'+c));
   digest.update(name+'\n');
-  for(const row of db.prepare('SELECT '+selected.map(quote).join(',')+' FROM '+quote(name)+' ORDER BY rowid').all()){
+  for(const row of db.prepare('SELECT '+selected.map(quote).join(',')+' FROM '+quote(name)+' ORDER BY rowid').iterate()){
    if(name==='meta'&&['vault_check','master_rotation_id','master_rotated_at'].includes(row.key))continue;
    if(name==='audit'&&row.id===excludedAuditId)continue;
    digest.update(JSON.stringify(row)+'\n');
@@ -125,7 +126,7 @@ export async function rotateCoreMasterKey({source,destination,rollbackDestinatio
   if(reader.prepare('PRAGMA data_version').get().data_version!==sourceVersion)throw Error('Source changed during offline preparation; repeat after quiescing writes');
   await finishDatabase(db,snapshot);db=null;
   if(reader.prepare('PRAGMA data_version').get().data_version!==sourceVersion)throw Error('Source changed during offline preparation; repeat after quiescing writes');
-  const outputHash=sha(await readFile(snapshot));await publishFreshFile(snapshot,target);
+  const outputHash=(await hashBackupFile(snapshot)).sha256;await publishFreshFile(snapshot,target);
   return {rotation_id:rotationId,destination:target,output_sha256:outputHash,rollback_destination:rollback,rollback_sha256:checkpoint.sha256,backup_key_id:checkpoint.key_id,deployment_identity:identity,rewrapped,revoked,integrity_verified:true,vault_plaintexts_preserved:true,old_master_rejected:true,source_written:false,requires_operator_cutover:true};
  }finally{db?.close();reader?.close();await rm(tmp,{recursive:true,force:true});}
 }
@@ -139,7 +140,7 @@ export async function prepareCoreRollback({source,destination,master,password,ke
   db.exec('BEGIN IMMEDIATE');
   try{revoked=revokePanelAuthority(db,now,{rollback:true});db.prepare('INSERT INTO audit(id,actor,event,scope,detail_json,created_at) VALUES(?,?,?,?,?,?)').run(id,'maintenance:offline-rollback','vault.rollback_prepared',deploymentId,JSON.stringify({revoked}),now);if(applicationFingerprint(db,id,{rollback:true})!==before||JSON.stringify(vaultProof(db,master))!==JSON.stringify(proofs))throw Error('Rollback application verification failed');db.exec('COMMIT');}
   catch(error){db.exec('ROLLBACK');throw error;}
-  await finishDatabase(db,path);db=null;const digest=sha(await readFile(path));await publishFreshFile(path,target);
+  await finishDatabase(db,path);db=null;const digest=(await hashBackupFile(path)).sha256;await publishFreshFile(path,target);
   return {destination:target,sha256:digest,deployment_identity:identity,revoked,integrity_verified:true,requires_operator_cutover:true,source_written:false};
  }finally{db?.close();await rm(tmp,{recursive:true,force:true});}
 }

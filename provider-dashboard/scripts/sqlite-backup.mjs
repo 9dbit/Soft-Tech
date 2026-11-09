@@ -1,11 +1,12 @@
 import {DatabaseSync,backup} from 'node:sqlite';
 import {randomBytes,createCipheriv,createDecipheriv,scryptSync,createHash} from 'node:crypto';
-import {readFile,mkdtemp,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,rm,writeFile,chmod} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {backupKeys,backupKeysFromEnv} from '../lib/backup-keys.mjs';
-import {requireFreshPath,writeFreshFile} from '../lib/recovery-io.mjs';
+import {requireFreshPath} from '../lib/recovery-io.mjs';
+import {openBackupFile,assertBackupFileUnchanged,backupFileChunks,hashBackupFile,writeBackupChunk,publishBackupFile} from '../lib/backup-file.mjs';
 
 const LEGACY=Buffer.from('STBK01'),MAGIC=Buffer.from('STBK02');
 const SCRYPT={N:16384,r:8,p:1,maxmem:64*1024*1024};
@@ -49,15 +50,28 @@ export async function createEncryptedBackup({source,destination,password,keys,ac
  const ring=backupKeys({password,keys,activeKeyId});if(!source||!destination||!Number.isSafeInteger(createdAt)||createdAt<0)throw Error('source, destination and valid creation time required');
  await requireFreshPath(destination);const tmp=await mkdtemp(join(tmpdir(),'softtech-backup-'));let db;
  try{
-  const snapshot=join(tmp,'snapshot.sqlite');db=new DatabaseSync(source,{readOnly:true});await backup(db,snapshot);db.close();db=null;
+  const snapshot=join(tmp,'snapshot.sqlite');db=new DatabaseSync(source,{readOnly:true});await backup(db,snapshot);db.close();db=null;await chmod(snapshot,0o600);
   const verified=new DatabaseSync(snapshot,{readOnly:true});let identity;
   try{identity=verifyDatabase(verified);}finally{verified.close();}
-  const bytes=await readFile(snapshot),manifest={format:'softtech-sqlite-backup-v2',key_id:ring.activeKeyId,created_at:createdAt,sha256:hash(bytes),size:bytes.length,deployment_identity:identity};
+  const digest=await hashBackupFile(snapshot),manifest={format:'softtech-sqlite-backup-v2',key_id:ring.activeKeyId,created_at:createdAt,sha256:digest.sha256,size:digest.bytes,deployment_identity:identity};
   const header=Buffer.from(JSON.stringify(manifest)),length=Buffer.alloc(4);length.writeUInt32BE(header.length);
   const aad=Buffer.concat([MAGIC,length,header]),salt=randomBytes(16),iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key(ring.keys[ring.activeKeyId],salt),iv);cipher.setAAD(aad);
-  const encrypted=Buffer.concat([cipher.update(bytes),cipher.final()]),data=Buffer.concat([aad,salt,iv,cipher.getAuthTag(),encrypted]);
-  await writeFreshFile(destination,data);
-  return {bytes:data.length,sha256:hash(data),format:'STBK02',key_id:ring.activeKeyId,manifest};
+  const encrypted=await publishBackupFile(destination,async(output,path)=>{
+   // STBK02 stores its GCM tag before ciphertext. Keep that exact format by
+   // patching the tag in a private file before its atomic publication.
+   await writeBackupChunk(output,Buffer.concat([aad,salt,iv,Buffer.alloc(16)]));
+   const opened=await openBackupFile(snapshot),actual=createHash('sha256');let size=0;
+   try{
+    for await(const chunk of backupFileChunks(opened.file,{end:opened.before.size})){
+     actual.update(chunk);size+=chunk.length;await writeBackupChunk(output,cipher.update(chunk));
+    }
+    await assertBackupFileUnchanged(opened.file,opened.before);
+   }finally{await opened.file.close();}
+   if(size!==manifest.size||actual.digest('hex')!==manifest.sha256)throw Error('Snapshot changed during encryption');
+   await writeBackupChunk(output,cipher.final());await writeBackupChunk(output,cipher.getAuthTag(),aad.length+28);
+   return hashBackupFile(path);
+  });
+  return {bytes:encrypted.bytes,sha256:encrypted.sha256,format:'STBK02',key_id:ring.activeKeyId,manifest};
  }finally{db?.close();await rm(tmp,{recursive:true,force:true});}
 }
 export async function inspectEncryptedBackup(bytes,options={}){
@@ -70,10 +84,55 @@ export async function inspectEncryptedBackup(bytes,options={}){
   return {...result,deployment_identity:identity};
  }finally{await rm(tmp,{recursive:true,force:true});}
 }
+async function readHeaderBytes(file,start,length){
+ const bytes=Buffer.alloc(length);let offset=0;
+ while(offset<length){const part=await file.read(bytes,offset,length-offset,start+offset);if(!part.bytesRead)throw Error('Invalid backup header');offset+=part.bytesRead;}
+ return bytes;
+}
+async function decryptBackupToFile(source,output,options){
+ const ring=backupKeys({...options,requireActive:false}),{file,before}=await openBackupFile(source);
+ try{
+  if(before.size<50)throw Error('Invalid backup format');
+  const prefix=await readHeaderBytes(file,0,10);let offset,format,manifest=null,keyId,aad,salt,iv,tag;
+  if(prefix.subarray(0,6).equals(LEGACY)){
+   if(!ring.keys.legacy)throw Error('Legacy backup decrypt key unavailable');
+   const header=await readHeaderBytes(file,6,44);salt=header.subarray(0,16);iv=header.subarray(16,28);tag=header.subarray(28,44);offset=50;format='STBK01';keyId='legacy';
+  }else{
+   if(!prefix.subarray(0,6).equals(MAGIC)||before.size<54)throw Error('Invalid backup format');
+   const length=prefix.readUInt32BE(6);
+   if(length<2||length>4096||before.size<10+length+44)throw Error('Invalid backup header');
+   const header=await readHeaderBytes(file,10,length+44);aad=Buffer.concat([prefix,header.subarray(0,length)]);
+   try{manifest=JSON.parse(header.subarray(0,length).toString('utf8'));}catch{throw Error('Invalid backup header');}
+   if(!manifest||manifest.format!=='softtech-sqlite-backup-v2'||typeof manifest.key_id!=='string'||!Object.hasOwn(ring.keys,manifest.key_id))throw Error('Backup decrypt key unavailable');
+   keyId=manifest.key_id;salt=header.subarray(length,length+16);iv=header.subarray(length+16,length+28);tag=header.subarray(length+28,length+44);offset=10+length+44;format='STBK02';
+  }
+  const decipher=createDecipheriv('aes-256-gcm',key(ring.keys[keyId],salt),iv);if(aad)decipher.setAAD(aad);decipher.setAuthTag(tag);
+  const digest=createHash('sha256');let size=0;
+  for await(const chunk of backupFileChunks(file,{start:offset,end:before.size})){
+   const plaintext=decipher.update(chunk);digest.update(plaintext);size+=plaintext.length;await writeBackupChunk(output,plaintext);
+  }
+  // No destination is visible until final() authenticates the complete stream.
+  const final=decipher.final();digest.update(final);size+=final.length;await writeBackupChunk(output,final);
+  await assertBackupFileUnchanged(file,before);
+  const plaintextHash=digest.digest('hex');
+  if(manifest&&(!Number.isSafeInteger(manifest.created_at)||manifest.created_at<0||manifest.size!==size||manifest.sha256!==plaintextHash))throw Error('Backup plaintext manifest mismatch');
+  return {format,key_id:keyId,manifest};
+ }finally{await file.close();}
+}
 export async function restoreEncryptedBackup({source,destination,...options}){
- await requireFreshPath(destination);const result=await inspectEncryptedBackup(await readFile(source),options);
- await writeFreshFile(destination,result.plaintext);
- return {format:result.format,key_id:result.key_id,manifest:result.manifest,deployment_identity:result.deployment_identity};
+ const restored=await publishBackupFile(destination,async(output,path)=>{
+  const result=await decryptBackupToFile(source,output,options);await output.sync();
+  const db=new DatabaseSync(path,{readOnly:true});let identity;
+  try{identity=verifyDatabase(db);}finally{db.close();}
+  if(result.manifest&&JSON.stringify(identity)!==JSON.stringify(result.manifest.deployment_identity))throw Error('Restored deployment identity differs from authenticated manifest');
+  return {...result,deployment_identity:identity};
+ });
+ const {path,...result}=restored;return result;
+}
+export async function inspectEncryptedBackupFile(source,options={}){
+ const tmp=await mkdtemp(join(tmpdir(),'softtech-verify-'));
+ try{return await restoreEncryptedBackup({source,destination:join(tmp,'restored.sqlite'),...options});}
+ finally{await rm(tmp,{recursive:true,force:true});}
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const [mode,source,destination]=process.argv.slice(2);

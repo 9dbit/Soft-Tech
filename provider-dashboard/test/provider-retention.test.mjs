@@ -5,6 +5,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {mkdtemp,rm,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {buffer as consumeBuffer} from 'node:stream/consumers';
 import {providerBackupPrefix} from '../lib/backup-scope.mjs';
 import {providerRetentionPlan,enforceProviderRetention} from '../lib/provider-retention.mjs';
 import {probeConditionalDeletion} from '../lib/provider-retention-s3.mjs';
@@ -27,7 +28,7 @@ function mockStorage(initial=new Map(),{conditional=true,changeOnDelete=false}={
    const xml='<ListBucketResult><IsTruncated>'+more+'</IsTruncated>'+page.map(k=>'<Contents><Key>'+k+'</Key></Contents>').join('')+(more?'<NextContinuationToken>'+(offset+3)+'</NextContinuationToken>':'')+'</ListBucketResult>';
    return new Response(xml,{status:200});
   }
-  if(opts.method==='PUT'){objects.set(name,Buffer.from(opts.body));return new Response(null,{status:200,headers:{ETag:etag(objects.get(name))}});}
+  if(opts.method==='PUT'){objects.set(name,Buffer.isBuffer(opts.body)?Buffer.from(opts.body):await consumeBuffer(opts.body));return new Response(null,{status:200,headers:{ETag:etag(objects.get(name))}});}
   if(!objects.has(name))return new Response(null,{status:404});
   if(opts.method==='GET')return new Response(objects.get(name),{status:200,headers:{ETag:etag(objects.get(name))}});
   if(opts.method==='HEAD')return new Response(null,{status:200,headers:{ETag:etag(objects.get(name))}});

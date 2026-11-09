@@ -1,7 +1,10 @@
 import {randomUUID,createHash} from 'node:crypto';
+import {mkdtemp,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {providerBackupPrefix,canonicalBackupIdentity} from './backup-scope.mjs';
-import {putEncryptedObject,readEncryptedObjectReceipt,headEncryptedObject,deleteEncryptedObject,listEncryptedObjects,strongETag} from './backup-s3.mjs';
-import {inspectEncryptedBackup} from '../scripts/sqlite-backup.mjs';
+import {putEncryptedObject,readEncryptedObjectReceipt,readEncryptedObjectFile,headEncryptedObject,deleteEncryptedObject,listEncryptedObjects,strongETag} from './backup-s3.mjs';
+import {inspectEncryptedBackupFile} from '../scripts/sqlite-backup.mjs';
 import {enforceProviderRetention,RETENTION_POLICY} from './provider-retention.mjs';
 const sha=value=>createHash('sha256').update(value).digest('hex');
 
@@ -26,12 +29,14 @@ export async function runProviderRetention({env,result,ring,fetcher=fetch,now=ne
  const identity=result.deployment_identity;
  if(!identity)return {policy:RETENTION_POLICY,enabled:true,mode,verified:false,conditional_delete_verified:false,deleted_count:0,error_code:'RETENTION_IDENTITY_REQUIRED'};
  const options={endpoint:env.BACKUP_S3_ENDPOINT,bucket:env.BACKUP_S3_BUCKET,region:env.BACKUP_S3_REGION,accessKeyId:env.BACKUP_S3_ACCESS_KEY_ID,secretAccessKey:env.BACKUP_S3_SECRET_ACCESS_KEY,urlStyle:env.BACKUP_S3_URL_STYLE||'path',fetcher};
- const prefix=providerBackupPrefix(identity);
- return enforceProviderRetention({identity,currentObject:result.key,currentCiphertextSha256:result.sha256,now:Math.floor(now.getTime()/1000),mode,probeRequested:env.BACKUP_RETENTION_PROBE==='true',maxDeletes:Number(env.BACKUP_RETENTION_MAX_DELETES||5),restoringObject:env.BACKUP_RESTORE_IN_PROGRESS_OBJECT||null,
+ const prefix=providerBackupPrefix(identity),temporary=await mkdtemp(join(tmpdir(),'softtech-retention-')),downloaded=join(temporary,'object.stbk');
+ try{return await enforceProviderRetention({identity,currentObject:result.key,currentCiphertextSha256:result.sha256,now:Math.floor(now.getTime()/1000),mode,probeRequested:env.BACKUP_RETENTION_PROBE==='true',maxDeletes:Number(env.BACKUP_RETENTION_MAX_DELETES||5),restoringObject:env.BACKUP_RESTORE_IN_PROGRESS_OBJECT||null,
   list:continuationToken=>listEncryptedObjects({...options,prefix,continuationToken}),
-  download:key=>readEncryptedObjectReceipt({...options,key}),
+  // Required objects are verified sequentially. Reuse only this private scratch
+  // path, so retention never retains an archive-sized buffer or many disk copies.
+  download:async key=>{await rm(downloaded,{force:true});return readEncryptedObjectFile({...options,key,destination:downloaded});},
   remove:(key,etag)=>{if(!key.startsWith(prefix))throw Error('RETENTION_OBJECT_SCOPE_INVALID');return deleteEncryptedObject({...options,key,ifMatch:etag});},
-  verify:async bytes=>{const verified=await inspectEncryptedBackup(bytes,ring);if(verified.format!=='STBK02'||!verified.manifest)throw Error('RETENTION_UNAUTHENTICATED_LEGACY_MANIFEST');return verified.manifest;},
+  verifyFile:async path=>{const verified=await inspectEncryptedBackupFile(path,ring);if(verified.format!=='STBK02'||!verified.manifest)throw Error('RETENTION_UNAUTHENTICATED_LEGACY_MANIFEST');return verified.manifest;},
   checkConditionalDelete:()=>probeConditionalDeletion({identity,...options})
- });
+ });}finally{await rm(temporary,{recursive:true,force:true});}
 }
