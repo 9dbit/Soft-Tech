@@ -16,7 +16,7 @@ function fixture({changeOldOutcome=false}={}){
   operatorCall:async()=>({ok:true}),
   reconcileRun:async()=>({status:'PASS',provider_rounds:6,provider_ledger_entries:12,wallet:{run_transactions:12}})
  };
- const restart=async(_c,target,_origin,o)=>{assert.equal(armed,true);calls.push(o.stage);assert.equal(o.timeoutMs,o.stage==='volume_restore'?600000:300000);return {classification:'unit_test_fixture_not_platform_evidence',target,stage:o.stage,process_boot_id_before:'old',process_boot_id_after:'new',status:'PASS'};};
+ const restart=async(_c,target,_origin,o)=>{assert.equal(armed,true);calls.push(o.stage);assert.equal(o.timeoutMs,o.stage==='volume_restore'?600000:300000);return {classification:'unit_test_fixture_not_platform_evidence',target,stage:o.stage,process_boot_id_before:o.stage==='snapshot_restart'?'old':'snapshot',process_boot_id_after:o.stage==='snapshot_restart'?'snapshot':'restored',source_commit:'a'.repeat(40),status:'PASS'};};
  return {adapters,restart,calls};
 }
 test('volume drill keeps pending credit blocked across both stages and replays prior outcomes without claiming platform restore',async()=>{

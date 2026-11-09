@@ -85,6 +85,8 @@ node qualification/wallet-conformance.mjs \
 
 The CLI deliberately reports PARTIAL when no actual deployment restart hook is supplied. The exported `runWalletConformance` accepts a restart callback for a real platform restart or a disposable local fixture. Its17 scenarios cover seed authorization/idempotency, balances, debit/credit/refund, insufficient funds, conflicting retry, double close, signature/replay/timestamp/audience/environment, cross-operator/currency, ambiguous disconnect/timeout, pending status, partition, durable rejection, restart and authoritative ledger reconciliation.
 
+Disconnect cases accept either an actual connection/timeout exception or proxy502/504 after the exact authenticated fault has been consumed. They first prove the transaction did not exist, then verify its authoritative applied/not-found state, the exact balance delta, recovery receipt and duplicate retry balance. A successful HTTP response, unrelated503, unconsumed fault, wrong commit state or extra debit fails the case. The report records the observed transport form; a502 alone never proves successful fault recovery. A real HTTP reverse-proxy regression covers the platform's socket-close-to502 behavior.
+
 Run a small preparatory smoke test only by explicitly setting `allow_small_test: true` in the protected configuration. A small smoke test is never500/1,000-session evidence. The required load runs are:
 
 ```bash
@@ -229,3 +231,20 @@ After the second process is observed, the runner removes the credit barrier and 
 This application report is **PARTIAL** even when all checks succeed. An engineering reviewer must attach platform evidence for distinct old/new volume IDs, retained original volume, encrypted snapshot object and SHA256, verified upload/readback/restore logs, previous/new key IDs and measured recovery timing. A boot ID change does not prove a volume was replaced. The plan never calls a platform mutation API itself. Run it only when the platform operator is watching the stage handshake. The reference operator must have no concurrent qualification during the barrier.
 
 For a local control-file orchestration, use `node qualification/volume-recovery.mjs --config /private/preproduction.json --run-id volume-restore-01 --control-file /private/volume-control.json --report evidence/volume-restore-01.json`; each acknowledgement must echo both `target` and `stage`, the current `request_id`, and `status: RESTART_REQUESTED`.
+
+
+## Attach platform resource evidence
+
+`resource-proof.mjs` reads the original load report, a saved `railway_authoritative_resource_summary` and verified effective limits plus a budget declared before the run. It writes a separate attachment and refuses to overwrite an input. Missing CPU, memory, disk, volume IDs, any of the six services (including the load runner), sample counts, effective limits or prior budget fails the attachment. Start from `resource-limits.example.json`; its null placeholders deliberately cannot pass.
+
+```bash
+node qualification/resource-proof.mjs \
+  --load evidence/load-500-01.json \
+  --metrics evidence/platform-resource-after.json \
+  --limits evidence/verified-resource-limits.json \
+  --report evidence/load-500-01-resources.json
+```
+
+Capture Core, wallet, UNO, Mahjong, Skygate and runner summaries with `CPU_USAGE`, `CPU_LIMIT`, `MEMORY_USAGE_GB`, `MEMORY_LIMIT_GB` and `DISK_USAGE_GB`. Preserve the actual query start, response completion, `hours_back` and sample interval. A summary collected before the run finishes is insufficient. The helper requires the entire run, including setup and reconciliation, to fit inside the guaranteed query window. A one-hour soak usually requires a two-hour summary because setup and reconciliation extend beyond60minutes.
+
+Whole-hour maximum samples provide conservative bounds for the smaller run window; they may include earlier activity. Whole-hour averages remain labelled `enclosing_window_average`; `exact_run_window_average` remains null. Platform sample peaks are not instantaneous peaks. Do not copy a whole-hour average into a per-run average. Use a separately exported timestamped series if an exact test-window mean is required. Resource evidence can complete a functional PARTIAL report; it can never erase a failed session, latency threshold or ledger reconciliation.

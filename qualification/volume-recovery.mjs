@@ -26,6 +26,8 @@ export async function runVolumeRecovery(config,{reportFile,controlFile,runId='vo
    // until both restarts are observed, so the new snapshot retains pending work.
    await api.sleep(30000);const remainingBeforeRestore=await inspectBarrier();
    const restore=await restart(config,ctx.game_id,ctx.origin,{runId,controlFile,stage:'volume_restore',timeoutMs:600000});
+   must(snapshot.status==='PASS'&&restore.status==='PASS'&&/^[a-f0-9]{40}$/.test(snapshot.source_commit||'')&&snapshot.source_commit===restore.source_commit,'SAME_SOURCE_RESTORE_REQUIRED');
+   must(snapshot.process_boot_id_after===restore.process_boot_id_before&&restore.process_boot_id_before!==restore.process_boot_id_after,'RESTORE_PROCESS_CHAIN_MISMATCH');
    const remainingAfterRestore=await inspectBarrier();must((await api.adminCall(config,'/admin/faults/clear',{operator_id:config.operator.id})).ok,'CREDIT_BARRIER_CLEAR_FAILED');
    const recovered=await api.nativeCall(ctx,pending.pathname,pending.payload,{metrics,recoveryRetries:16}),recoveredProof=nativeOutcomeProof(ctx.game_id,recovered);
    const recoveredDuplicate=await api.nativeCall(ctx,pending.pathname,pending.payload,{metrics,recoveryRetries:4});must(nativeOutcomeProof(ctx.game_id,recoveredDuplicate).outcome_sha256===recoveredProof.outcome_sha256,'PENDING_OUTCOME_CHANGED_AFTER_RETRY');

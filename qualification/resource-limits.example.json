@@ -1,0 +1,93 @@
+{
+  "classification": "railway_authoritative_resource_limits",
+  "environment_id": "REPLACE_WITH_ACTUAL_PLATFORM_ENVIRONMENT_ID",
+  "valid_from": "REPLACE_WITH_VERIFIED_EFFECTIVE_TIME",
+  "valid_until": "REPLACE_WITH_VERIFIED_END_TIME",
+  "budget_declared_at": "REPLACE_WITH_ACTUAL_PRE_RUN_BUDGET_TIME",
+  "services": [
+    {
+      "kind": "core",
+      "service_id": null,
+      "volume_id": null,
+      "replicas": null,
+      "cpu_limit_vcpu": null,
+      "memory_limit_gb": null,
+      "disk_capacity_gb": null,
+      "budget": {
+        "cpu_peak_fraction": null,
+        "memory_peak_fraction": null,
+        "disk_peak_fraction": null
+      }
+    },
+    {
+      "kind": "wallet",
+      "service_id": null,
+      "volume_id": null,
+      "replicas": null,
+      "cpu_limit_vcpu": null,
+      "memory_limit_gb": null,
+      "disk_capacity_gb": null,
+      "budget": {
+        "cpu_peak_fraction": null,
+        "memory_peak_fraction": null,
+        "disk_peak_fraction": null
+      }
+    },
+    {
+      "kind": "uno",
+      "service_id": null,
+      "volume_id": null,
+      "replicas": null,
+      "cpu_limit_vcpu": null,
+      "memory_limit_gb": null,
+      "disk_capacity_gb": null,
+      "budget": {
+        "cpu_peak_fraction": null,
+        "memory_peak_fraction": null,
+        "disk_peak_fraction": null
+      }
+    },
+    {
+      "kind": "mahjong",
+      "service_id": null,
+      "volume_id": null,
+      "replicas": null,
+      "cpu_limit_vcpu": null,
+      "memory_limit_gb": null,
+      "disk_capacity_gb": null,
+      "budget": {
+        "cpu_peak_fraction": null,
+        "memory_peak_fraction": null,
+        "disk_peak_fraction": null
+      }
+    },
+    {
+      "kind": "skygate",
+      "service_id": null,
+      "volume_id": null,
+      "replicas": null,
+      "cpu_limit_vcpu": null,
+      "memory_limit_gb": null,
+      "disk_capacity_gb": null,
+      "budget": {
+        "cpu_peak_fraction": null,
+        "memory_peak_fraction": null,
+        "disk_peak_fraction": null
+      }
+    },
+    {
+      "kind": "runner",
+      "service_id": null,
+      "volume_id": null,
+      "replicas": null,
+      "cpu_limit_vcpu": null,
+      "memory_limit_gb": null,
+      "disk_capacity_gb": null,
+      "budget": {
+        "cpu_peak_fraction": null,
+        "memory_peak_fraction": null,
+        "disk_peak_fraction": null
+      }
+    }
+  ]
+}

@@ -2,6 +2,8 @@ import {DatabaseSync} from 'node:sqlite';
 import {createHash,createHmac,randomBytes,timingSafeEqual,createCipheriv,createDecipheriv} from 'node:crypto';
 import {mkdirSync,chmodSync,existsSync,realpathSync} from 'node:fs';
 import path from 'node:path';
+import {types} from 'node:util';
+import {DurableWrites} from './durable-writes.mjs';
 export class WalletFault extends Error { constructor(status,code){super(code);this.status=status;this.code=code;} }
 export const fail=(status,code)=>{throw new WalletFault(status,code);};
 const hash=s=>createHash('sha256').update(s).digest('hex');
@@ -12,10 +14,11 @@ export function canonical(version,environment,audience,method,pathname,timestamp
 export function walletHeaders({secret,operatorId,version=2,environment,audience,method='POST',pathname,body,timestamp=String(Math.floor(Date.now()/1000)),nonce=randomBytes(18).toString('hex')}){return {'content-type':'application/json','x-softtech-key':'wallet-'+operatorId,'x-softtech-timestamp':timestamp,'x-softtech-nonce':nonce,'x-softtech-signature':createHmac('sha256',secret).update(canonical(version,environment,audience,method,pathname,timestamp,nonce,body)).digest('hex'),...(version===2?{'x-wallet-version':'2','x-wallet-environment':environment,'x-wallet-audience':audience}:{})};}
 export class ReferenceWallet {
  constructor({env=process.env,clock=Date.now}={}){
-  this.env=env;this.clock=clock;this.authCount=0;
+  this.env=env;this.clock=clock;this.authCount=0;this.transactionDepth=0;this.transactionSequence=0;this.writeMetrics={statements:0,total_ms:0,max_ms:0};
   const environment=env.WALLET_ENVIRONMENT||'sandbox',deploymentId=env.WALLET_DEPLOYMENT_ID,audience=env.WALLET_CORE_AUDIENCE;
   if(!['sandbox','preproduction','production'].includes(environment)||!/^[-\w.]{8,100}$/.test(deploymentId||'')||!/^[-\w.]{8,100}$/.test(audience||''))throw Error('Explicit wallet environment, deployment ID and Core audience are required');
   if(typeof env.WALLET_MASTER_KEY!=='string'||env.WALLET_MASTER_KEY.length<32||typeof env.WALLET_ADMIN_TOKEN!=='string'||env.WALLET_ADMIN_TOKEN.length<40)throw Error('Wallet master and admin secrets are required');
+  if(env.RAILWAY_SERVICE_ID&&!env.RAILWAY_VOLUME_MOUNT_PATH)throw Error('A dedicated wallet volume mount is required on Railway');
   if(environment==='production'&&env.WALLET_TEST_CONTROL_ENABLED==='true')throw Error('Production test control is forbidden');
   this.testControl=environment!=='production'&&env.WALLET_TEST_CONTROL_ENABLED==='true';
   this.key=createHash('sha256').update('softtech-reference-wallet-v1:'+env.WALLET_MASTER_KEY).digest();
@@ -50,9 +53,19 @@ export class ReferenceWallet {
    CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT,'immutable audit');END;`);
   if(!this.get('SELECT 1 FROM identity'))this.run('INSERT INTO identity VALUES(1,?,?,?,?,?)',environment,deploymentId,audience,this.seal('wallet-key-check'),clock());
   this.identity={environment,deployment_id:deploymentId,core_audience:audience};
+  this.journal=new DurableWrites(this.db,{fault:code=>new WalletFault(503,code)});
  }
- close(){this.db.close();} get(sql,...p){return this.db.prepare(sql).get(...p);} all(sql,...p){return this.db.prepare(sql).all(...p);} run(sql,...p){return this.db.prepare(sql).run(...p);}
- transaction(fn){this.db.exec('BEGIN IMMEDIATE');try{const r=fn();this.db.exec('COMMIT');return r;}catch(e){this.db.exec('ROLLBACK');throw e;}}
+ close(){this.journal.close();this.db.close();} get(sql,...p){return this.db.prepare(sql).get(...p);} all(sql,...p){return this.db.prepare(sql).all(...p);}
+ run(sql,...p){const start=performance.now();try{return this.db.prepare(sql).run(...p);}finally{const elapsed=performance.now()-start;this.writeMetrics.statements++;this.writeMetrics.total_ms+=elapsed;this.writeMetrics.max_ms=Math.max(this.writeMetrics.max_ms,elapsed);}}
+ durable(fn){return this.journal.run(fn);}
+ transaction(fn){
+  if(typeof fn!=='function'||types.isAsyncFunction(fn)||types.isGeneratorFunction(fn))throw Error('Synchronous wallet transaction required');
+  const nested=this.journal?.inOperation||this.transactionDepth>0,savepoint='wallet_transaction_'+(++this.transactionSequence);
+  this.db.exec(nested?'SAVEPOINT '+savepoint:'BEGIN IMMEDIATE');this.transactionDepth++;
+  try{const result=fn();if(result?.then)throw Error('Asynchronous wallet transaction forbidden');this.db.exec(nested?'RELEASE '+savepoint:'COMMIT');return result;}
+  catch(error){if(nested){this.db.exec('ROLLBACK TO '+savepoint);this.db.exec('RELEASE '+savepoint);}else this.db.exec('ROLLBACK');throw error;}
+  finally{this.transactionDepth--;}
+ }
  seal(s){const iv=randomBytes(12),c=createCipheriv('aes-256-gcm',this.key,iv),body=Buffer.concat([c.update(s,'utf8'),c.final()]);return [iv,c.getAuthTag(),body].map(x=>x.toString('base64url')).join('.');}
  open(s){const [iv,tag,body]=s.split('.').map(x=>Buffer.from(x,'base64url')),c=createDecipheriv('aes-256-gcm',this.key,iv);c.setAuthTag(tag);return Buffer.concat([c.update(body),c.final()]).toString();}
  audit(event,operator,detail={}){this.run('INSERT INTO audit(event,operator_id,detail_json,created_at) VALUES(?,?,?,?)',event,operator,JSON.stringify(detail),this.clock());}
@@ -79,6 +92,7 @@ export class ReferenceWallet {
   if(Math.abs(this.clock()/1000-Number(ts))>300)fail(401,'SIGNATURE_EXPIRED');
   const op=this.operator(key.slice(7)),version=h['x-wallet-version']==='2'?2:1;
   if(version!==op.protocol_version||version===1&&this.identity.environment!=='sandbox')fail(401,'PROTOCOL_MISMATCH');
+  if(version===1&&(h['x-wallet-environment']!==undefined||h['x-wallet-audience']!==undefined))fail(401,'PROTOCOL_MISMATCH');
   if(version===2&&(h['x-wallet-environment']!==this.identity.environment||h['x-wallet-audience']!==this.identity.core_audience))fail(401,'WALLET_AUDIENCE_MISMATCH');
   const expected=createHmac('sha256',this.open(op.secret_box)).update(canonical(version,this.identity.environment,this.identity.core_audience,method,pathname,ts,nonce,raw)).digest('hex');
   if(!equal(expected,sig))fail(401,'INVALID_SIGNATURE');
