@@ -72,6 +72,8 @@ const server=createServer({maxHeaderSize:16384},async(req,res)=>{
    if(path==='/api/download/developer.html'&&method==='GET'){send(res,200,developerHTML(),'text/html; charset=utf-8',{'Content-Disposition':'attachment; filename="soft-tech-provider-api-v1.html"'});return;}
    if(path==='/api/download/client.mjs'&&method==='GET'){send(res,200,signingExample,'text/javascript; charset=utf-8',{'Content-Disposition':'attachment; filename="soft-tech-client-example.mjs"'});return;}
    if(path==='/api/operators'&&method==='POST'){admin(session);send(res,201,core.createOperator(json(await readBody(req)),'panel:admin'));return;}
+   let policyMatch=path.match(/^\/api\/operators\/([\w-]+)\/games\/([\w-]+)\/mode$/);
+   if(policyMatch&&method==='POST'){admin(session);const p=json(await readBody(req));if(Object.keys(p).some(k=>k!=='mode'))fail(422,'UNKNOWN_FIELD');send(res,200,core.setOperatorGameMode(policyMatch[1],policyMatch[2],p.mode));return;}
    let m=path.match(/^\/api\/operators\/([\w-]+)(\/keys)?$/);
    if(m&&method==='POST'){admin(session);send(res,200,m[2]?core.rotateKey(m[1],'panel:admin'):core.updateOperator(m[1],json(await readBody(req)),'panel:admin'));return;}
    if(path==='/api/game-launches'&&method==='POST'){admin(session);const p=json(await readBody(req));send(res,200,core.createLaunch(core.internalOperator(),{game_id:p.game_id,player_ref:p.player_ref||'owner-qa',return_url:env.CORE_PUBLIC_ORIGIN||'https://soft-tech-provider-panel.up.railway.app'},p.idempotency_key||random(24),'panel:admin'));return;}
