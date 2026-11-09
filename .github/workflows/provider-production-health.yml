@@ -1,0 +1,25 @@
+name: Provider production health monitor
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  provider-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify production provider health
+        env:
+          CORE_URL: https://soft-tech-provider-panel.up.railway.app
+        run: |
+          set -eu
+          for attempt in 1 2 3; do
+            if curl --fail --silent --show-error --max-time 15 "$CORE_URL/health" -o /tmp/provider-health.json; then
+              node -e "const fs=require('fs');const x=JSON.parse(fs.readFileSync('/tmp/provider-health.json'));if(x.ok!==true)process.exit(1);console.log('provider healthy')" && exit 0
+            fi
+            sleep 5
+          done
+          echo 'Production provider health check failed' >&2
+          exit 1
