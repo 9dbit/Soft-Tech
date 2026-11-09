@@ -2,12 +2,15 @@ import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
 import {Core} from './lib/core.mjs';
+import {startOffsiteBackup} from './lib/offsite-backup.mjs';
 import {Fault,fail,random,sha,equal,json} from './lib/security.mjs';
 import {spec,developerHTML,signingExample} from './lib/docs.mjs';
 const env=process.env,port=Number(env.PORT||8080),root=resolve(import.meta.dirname,'public');
 if((env.PANEL_ADMIN_PASSWORD||'').length<16||(env.PANEL_AUDITOR_PASSWORD||'').length<16)throw Error('Admin and auditor passwords must be configured');
 export const core=new Core({env});
 const rate=new Map();
+let backupState={enabled:env.OFFSITE_BACKUP_ENABLED==='true',last:null};
+const backupRunner=startOffsiteBackup({env,onStatus:status=>{backupState={enabled:true,last:status};console.log('provider.offsite_backup',JSON.stringify(status));}});
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.woff2':'font/woff2','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.jpeg':'image/jpeg'};
 function send(res,status,data,type='application/json; charset=utf-8',extra={}){res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY',...extra});res.end(type.startsWith('application/json')?JSON.stringify(data):data);}
 async function readBody(req){if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'JSON_REQUIRED');let size=0,chunks=[];for await(const c of req){size+=c.length;if(size>65536)fail(413,'BODY_TOO_LARGE');chunks.push(c);}return Buffer.concat(chunks).toString('utf8');}
@@ -50,6 +53,7 @@ const server=createServer({maxHeaderSize:16384},async(req,res)=>{
    if(!session)fail(401,'UNAUTHENTICATED');
    if(method==='POST'&&!equal(req.headers['x-csrf-token']||'',session.csrf))fail(403,'CSRF_REQUIRED');
    if(path==='/api/logout'&&method==='POST'){core.run('DELETE FROM panel_sessions WHERE id_hash=?',session.id_hash);send(res,200,{success:true},undefined,{'Set-Cookie':cookie('',0)});return;}
+   if(path==='/api/backup-status'&&method==='GET'){admin(session);send(res,200,backupState);return;}
    if(path==='/api/bootstrap'&&method==='GET'){send(res,200,core.bootstrap(session.role));return;}
    if(path==='/api/download/openapi.json'&&method==='GET'){send(res,200,spec(),undefined,{'Content-Disposition':'attachment; filename="soft-tech-provider-openapi-v1.json"'});return;}
    if(path==='/api/download/developer.html'&&method==='GET'){send(res,200,developerHTML(),'text/html; charset=utf-8',{'Content-Disposition':'attachment; filename="soft-tech-provider-api-v1.html"'});return;}
@@ -80,5 +84,5 @@ server.listen(port,'0.0.0.0',()=>{
 });
 const healthTimer=setInterval(()=>void core.refreshHealth().catch(()=>{}),60000);healthTimer.unref();
 const recoveryTimer=setInterval(()=>void core.recover().catch(()=>{}),30000);recoveryTimer.unref();
-function shutdown(){clearInterval(healthTimer);clearInterval(recoveryTimer);server.close(()=>{core.close();process.exit(0);});setTimeout(()=>process.exit(1),15000).unref();}
+function shutdown(){backupRunner.stop();clearInterval(healthTimer);clearInterval(recoveryTimer);server.close(()=>{core.close();process.exit(0);});setTimeout(()=>process.exit(1),15000).unref();}
 process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
