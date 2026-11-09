@@ -52,6 +52,9 @@ test('operator-game release workflow is audited, sequential and production locke
  assert.equal(f.core.gameMode(f.core.operator(a.operator.id),ids[0]),'sandbox');
  assert.equal(f.core.gameMode(f.core.operator(b.operator.id),ids[0]),'sandbox');
  assert.equal(f.core.get('SELECT status FROM release_requests WHERE id=?',request.id).status,'approved');
+ f.core.run('INSERT INTO operator_game_modes(operator_id,game_id,mode,updated_at) VALUES(?,?,?,?)',a.operator.id,ids[0],'preproduction',f.now());
+ assert.throws(()=>launch(f.core,a.operator,ids[0],random(20),'legacy-preprod'),code('PREPRODUCTION_ISOLATION_PENDING'));
+ f.core.run('DELETE FROM operator_game_modes WHERE operator_id=? AND game_id=?',a.operator.id,ids[0]);
  f.core.setOperatorGameMode(a.operator.id,ids[0],'disabled');
  assert.throws(()=>launch(f.core,a.operator,ids[0],random(20),'blocked'),code('GAME_DISABLED_FOR_OPERATOR'));
  assert.equal(launch(f.core,b.operator).environment,'sandbox');
