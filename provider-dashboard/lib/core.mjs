@@ -60,6 +60,42 @@ export class Core {
   });
   return {operator_id:id,game_id:gameId,mode,changed:true};
  }
+ releaseRequests(){return this.all('SELECT * FROM release_requests ORDER BY created_at DESC LIMIT 100');}
+ requestRelease(operatorId,gameId,mode,actor='panel:admin'){
+  const op=this.operator(operatorId);
+  if(op.internal||!parse(op.games_json).includes(gameId))fail(403,'GAME_NOT_ALLOWED');
+  if(!['sandbox','preproduction'].includes(mode))fail(409,'PRODUCTION_LOCKED');
+  const existing=this.get("SELECT id FROM release_requests WHERE operator_id=? AND game_id=? AND status IN ('requested','validated','approved') LIMIT 1",operatorId,gameId);
+  if(existing)fail(409,'RELEASE_REQUEST_PENDING');
+  const id='rel_'+random(18),now=this.clock();
+  this.transaction(()=>{
+   this.run('INSERT INTO release_requests(id,operator_id,game_id,requested_mode,status,requested_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',id,operatorId,gameId,mode,'requested',actor,now,now);
+   this.audit(actor,'release.requested',operatorId,{request_id:id,game_id:gameId,mode});
+  });
+  return this.get('SELECT * FROM release_requests WHERE id=?',id);
+ }
+ advanceRelease(id,action,actor='panel:admin'){
+  const request=this.get('SELECT * FROM release_requests WHERE id=?',id);
+  if(!request)fail(404,'RELEASE_REQUEST_NOT_FOUND');
+  const transitions={requested:{validate:'validated',reject:'rejected',cancel:'cancelled'},validated:{approve:'approved',reject:'rejected',cancel:'cancelled'},approved:{activate:'activated',reject:'rejected',cancel:'cancelled'}};
+  const next=transitions[request.status]?.[action];
+  if(!next)fail(409,'INVALID_RELEASE_TRANSITION');
+  const op=this.operator(request.operator_id);
+  if(op.status!=='enabled'||!parse(op.games_json).includes(request.game_id))fail(409,'OPERATOR_NOT_READY');
+  if(action==='validate'){
+   const g=this.get('SELECT * FROM games WHERE id=?',request.game_id);
+   if(!g?.enabled||g.maintenance||!g.origin)fail(409,'GAME_NOT_READY');
+   if(request.requested_mode==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
+  }
+  if(action==='activate'&&request.requested_mode==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
+  const now=this.clock();
+  this.transaction(()=>{
+   if(action==='activate')this.run('INSERT INTO operator_game_modes(operator_id,game_id,mode,updated_at) VALUES(?,?,?,?) ON CONFLICT(operator_id,game_id) DO UPDATE SET mode=excluded.mode,updated_at=excluded.updated_at',request.operator_id,request.game_id,request.requested_mode,now);
+   this.run('UPDATE release_requests SET status=?,validated_by=CASE WHEN ?=? THEN ? ELSE validated_by END,approved_by=CASE WHEN ?=? THEN ? ELSE approved_by END,updated_at=? WHERE id=?',next,action,'validate',actor,action,'approve',actor,now,id);
+   this.audit(actor,'release.'+action,request.operator_id,{request_id:id,game_id:request.game_id,mode:request.requested_mode,from:request.status,to:next});
+  });
+  return this.get('SELECT * FROM release_requests WHERE id=?',id);
+ }
  operatorView(op){return {id:op.id,name:op.name,status:op.status,environment:op.environment,games:parse(op.games_json),game_modes:this.operatorGameModes(op.id),currency:op.currency,scale:op.scale,wallet_mode:op.wallet_mode,wallet_url:op.wallet_url,return_origins:parse(op.return_origins_json),initial_minor:op.initial_minor,max_stake_minor:op.max_stake_minor,max_payout_minor:op.max_payout_minor,internal:!!op.internal,created_at:op.created_at};}
  createOperator(input,actor='admin',{internal=false,id=null}={}){
   if(!input||typeof input!=='object'||Array.isArray(input))fail(422,'OBJECT_REQUIRED');
