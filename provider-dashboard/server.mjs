@@ -2,6 +2,7 @@ import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
 import {Core} from './lib/core.mjs';
+import {walletTransportStatus} from './lib/wallet.mjs';
 import {startOffsiteBackup} from './lib/offsite-backup.mjs';
 import {backupReadiness} from './lib/backup-readiness.mjs';
 import {Fault,fail,random,sha,equal,json} from './lib/security.mjs';
@@ -39,7 +40,7 @@ const server=createServer({maxHeaderSize:16384},async(req,res)=>{
  try{
   const u=new URL(req.url||'/','http://localhost'),path=u.pathname,method=req.method||'GET';
   if(path==='/health/backup'&&method==='GET'){const report=backupReadiness(backupState,{env});send(res,report.ok?200:503,report);return;}
-  if(path==='/health'&&method==='GET'){core.get('SELECT 1');const last=core.get('SELECT id,status,updated_at FROM selftests ORDER BY created_at DESC LIMIT 1');send(res,200,{ok:true,status:'ok',app:'soft-tech-provider-core',version:'1.1.0',environment:core.deploymentIdentity.environment,deployment_identity:core.deploymentIdentity,isolation_readiness:core.isolation,production_enabled:false,qualification:qualificationState,process_boot_id:processBootId,uptime_seconds:Math.floor(process.uptime()),memory_rss_bytes:process.memoryUsage().rss,cpu_usage_microseconds:process.cpuUsage(),durable_journal:core.journal.status(),sqlite_writes:core.writeMetrics,persistent:true,replicas_supported:1,acceptance:last||null,source_commit:env.RAILWAY_GIT_COMMIT_SHA||'local'});return;}
+  if(path==='/health'&&method==='GET'){core.get('SELECT 1');const last=core.get('SELECT id,status,updated_at FROM selftests ORDER BY created_at DESC LIMIT 1');send(res,200,{ok:true,status:'ok',app:'soft-tech-provider-core',version:'1.1.0',environment:core.deploymentIdentity.environment,deployment_identity:core.deploymentIdentity,isolation_readiness:core.isolation,production_enabled:false,qualification:qualificationState,process_boot_id:processBootId,uptime_seconds:Math.floor(process.uptime()),memory_rss_bytes:process.memoryUsage().rss,cpu_usage_microseconds:process.cpuUsage(),durable_journal:core.journal.status(),sqlite_writes:core.writeMetrics,wallet_transport:walletTransportStatus(),persistent:true,replicas_supported:1,acceptance:last||null,source_commit:env.RAILWAY_GIT_COMMIT_SHA||'local'});return;}
   if(path.startsWith('/api/v4/agency-game/')){
    if(method!=='POST')fail(405,'METHOD_NOT_ALLOWED');const raw=await readBody(req);const key=await core.authenticateDurable({method,path:u.pathname+u.search,body:raw,headers:req.headers},true);
    const result=await core.engineAction(key,path.slice('/api/v4/agency-game/'.length),json(raw));send(res,200,result);return;
