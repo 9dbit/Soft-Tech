@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "verified_at": "2026-11-09T20:02:31.108Z",
+  "observation": "Resources provisioned from Railway API; deployment/health verified separately",
+  "environments": [
+    {
+      "environment": "sandbox",
+      "project_id": "0e6f5bdf-8437-41e1-a709-b42476cd143e",
+      "railway_environment_id": "9d39a708-0653-4d6c-9f88-d1e730833492",
+      "services": {
+        "core": "c19f2aa0-8508-430f-a21c-0d3ac1be87bc",
+        "uno": "f79366ac-acd4-4b3f-8adb-bd54d29c6c55",
+        "mahjong": "8aea4f06-7f65-43ff-a9f6-08d6e08c8009",
+        "skygate": "edd381a3-11db-4d19-a0f8-23dbccb8e3a6",
+        "wallet": "b6c89468-6c56-4aa5-8e5d-eb8207f1973c"
+      },
+      "volumes": {
+        "core": "2b498b6d-e2ac-49fc-aac0-915a179d3597",
+        "uno": "d8d4081b-4216-42a3-be69-4394f350ed02",
+        "mahjong": "6c809bf6-40a3-46b9-98ed-f924b5c50609",
+        "skygate": "e4d003fa-78fd-4748-a2b9-2a93e8200d15",
+        "wallet": "97b28e7f-f541-426a-908f-8bae365f237d"
+      },
+      "bucket_ids": [
+        "ce728e5e-b960-491f-a204-d8b771f3dc0f",
+        "cfad1c5c-de1b-42a8-aaf2-a8a147e9aa65"
+      ],
+      "origins": {
+        "core": "https://soft-tech-provider-panel.up.railway.app",
+        "uno": "https://softtech-engine-uno-production.up.railway.app",
+        "mahjong": "https://softtech-engine-mahjong-production.up.railway.app",
+        "skygate": "https://softtech-engine-skygate-production.up.railway.app",
+        "wallet": "https://softtech-sandbox-wallet-production.up.railway.app"
+      }
+    },
+    {
+      "environment": "preproduction",
+      "project_id": "7a863b9d-5d93-41f8-b766-5c99189e256d",
+      "railway_environment_id": "8f57318e-bf2f-4f66-8366-4341bdc29152",
+      "services": {
+        "core": "18144e06-982a-4381-b8b6-18496e169b27",
+        "uno": "b7bae099-c17d-4a94-bbe6-47e48ffa5e71",
+        "mahjong": "f2bc1706-3b5c-4619-b17c-7cffb4ba67a5",
+        "skygate": "ea04da18-ad42-402b-8b2a-bde9638ff474",
+        "wallet": "e00b9e49-76f5-405f-a89e-f5f5f63f8de3"
+      },
+      "volumes": {
+        "core": "5b38a110-040e-472e-b337-edf9acd5556f",
+        "uno": "e77953b4-664e-4ff0-b19b-2caba88e5f97",
+        "mahjong": "ec6c5ce7-26c7-4362-8adf-f47edbb231c4",
+        "skygate": "4a4d299a-9537-4260-8c19-123a34b82a3c",
+        "wallet": "0209314c-065b-4790-99ef-79ed19defb3a"
+      },
+      "bucket_ids": [
+        "dfaa50ab-251c-4356-80e1-3f7574a90d11",
+        "3d40afc5-e7e7-4ce9-aee5-f22ace045c6b"
+      ],
+      "origins": {
+        "core": "https://softtech-preprod-core-preproduction.up.railway.app",
+        "uno": "https://softtech-preprod-uno-preproduction.up.railway.app",
+        "mahjong": "https://softtech-preprod-mahjong-preproduction.up.railway.app",
+        "skygate": "https://softtech-preprod-skygate-preproduction.up.railway.app",
+        "wallet": "https://softtech-preprod-wallet-preproduction.up.railway.app"
+      }
+    },
+    {
+      "environment": "production",
+      "project_id": "eefad689-2da4-4cab-b5eb-c8b8a569ae8d",
+      "railway_environment_id": "a7a4ba3e-aafd-48eb-96d4-5c68ba0a3389",
+      "services": {
+        "core": "ad4422a7-4d0c-4501-aa52-c727cde07a96",
+        "uno": "8d9451b5-17e2-4498-bcc3-bc6588959a43",
+        "mahjong": "46d42d61-947d-4ed5-b43f-4770795fec8a",
+        "skygate": "6d3a9970-55f5-446a-8f49-8b9485684331",
+        "wallet": "35f52251-61e6-48f0-8d54-3e17e5ab77d6"
+      },
+      "volumes": {
+        "core": "4b7e0954-b3ea-4c10-890c-f886af6e210c",
+        "uno": "c3fb90aa-d549-4bc8-849a-101285ff9424",
+        "mahjong": "cc741397-f125-4d4a-8de7-bb08705e1328",
+        "skygate": "e3da8da3-6cd9-425c-96a7-49d6ae29595c",
+        "wallet": "fb155391-26f4-4940-a8a2-1d609daf1dd8"
+      },
+      "bucket_ids": [
+        "447006fa-2cb1-48bc-a6b9-1d8336fbba3e",
+        "6553ba6a-af72-4333-939e-0c8d8051d4a7"
+      ],
+      "origins": {
+        "core": "https://softtech-prod-core-production.up.railway.app",
+        "uno": "https://softtech-prod-uno-production.up.railway.app",
+        "mahjong": "https://softtech-prod-mahjong-production.up.railway.app",
+        "skygate": "https://softtech-prod-skygate-production.up.railway.app",
+        "wallet": "https://softtech-prod-wallet-production.up.railway.app"
+      }
+    }
+  ]
+}

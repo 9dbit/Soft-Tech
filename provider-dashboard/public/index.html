@@ -5,7 +5,7 @@
 <meta name="description" content="Soft Tech Provider Dashboard, independent provider engine integration.">
 <title>Soft Tech | Provider Control</title>
 <link rel="icon" href="/logo.png" type="image/png"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/core.css">
-<script src="/app.js" defer></script>
+<script src="/app.js" defer></script><script src="/staff.js" defer></script>
 </head><body>
 <div class="auth-layout" id="auth-layout">
   <div class="aurora aurora-a"></div><div class="aurora aurora-b"></div>
@@ -17,12 +17,14 @@
     <p class="intro">A unified command center for game releases, operators, persistent game sessions, reconciliation and API documentation.</p>
     <form id="login-form" autocomplete="on">
       <label for="role">Access permission</label>
-      <select id="role" name="role" required><option value="admin">Provider Administrator</option><option value="auditor">Read-only Auditor</option></select>
+      <select id="role" name="role" required><option value="staff">Individual Staff + MFA</option><option value="admin">Shared Sandbox Administrator</option><option value="auditor">Shared Sandbox Auditor</option></select>
+      <div id="staff-username-field"><label for="staff-username">Staff username</label><input id="staff-username" name="username" autocomplete="username" maxlength="120" placeholder="Your individual account" required></div>
       <label for="password">Access password</label>
       <input id="password" type="password" minlength="16" autocomplete="current-password" required placeholder="Enter your access password">
       <p class="error-message" id="login-error" role="alert" aria-live="polite"></p>
       <button class="btn-primary full-width" type="submit" id="login-button">ENTER DASHBOARD <span aria-hidden="true">↗</span></button>
     </form>
+    <button class="staff-activate-link" type="button" data-staff-activation>ACTIVATE STAFF INVITATION</button>
     <div class="auth-note"><span class="dot"></span> REAL GAME ENGINES / VIRTUAL SANDBOX CREDITS ONLY</div>
   </main>
   <footer class="auth-footer">SOFT TECH © 2026 <span>INDEPENDENT GAME TECHNOLOGY</span></footer>
@@ -41,6 +43,7 @@
       <button type="button" class="nav-link" data-page="reconcile"><span class="nav-icon">⇄</span><span>Reconciliation</span><small>05</small></button>
       <button type="button" class="nav-link" data-page="developer"><span class="nav-icon">⌁</span><span>API Developer</span><small>06</small></button>
       <button type="button" class="nav-link" data-page="release"><span class="nav-icon">◉</span><span>Release Control</span><small>07</small></button>
+      <button type="button" class="nav-link" data-page="staff"><span class="nav-icon">◇</span><span>Staff & MFA</span><small>08</small></button>
     </nav>
     <div class="sidebar-bottom"><div class="sidebar-status"><span class="dot"></span> SANDBOX ENVIRONMENT</div><p>Three Soft Tech originals. One independent provider core.</p><div class="build-version">CORE v1.0 / 2026</div></div>
   </aside>

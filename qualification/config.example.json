@@ -1,0 +1,26 @@
+{
+  "environment": "preproduction",
+  "core_audience": "REPLACE_WITH_PREPRODUCTION_CORE_SERVICE_ID",
+  "core_url": "https://REPLACE_WITH_PREPRODUCTION_CORE_HOST",
+  "wallet_url": "https://REPLACE_WITH_PREPRODUCTION_WALLET_HOST",
+  "wallet_admin_token": "REPLACE_WITH_DISTINCT_SECRET_FROM_PROTECTED_STORE",
+  "currency": "VCOIN",
+  "scale": 2,
+  "return_url": "https://REPLACE_WITH_PREPRODUCTION_CORE_HOST",
+  "operator": {
+    "id": "op_qualification_REPLACE_WITH_UNIQUE_SUFFIX",
+    "key_id": "st_REPLACE_WITH_UNIQUE_KEY_ID",
+    "secret": "REPLACE_WITH_DISTINCT_API_SECRET_FROM_PROTECTED_STORE",
+    "wallet_secret": "REPLACE_WITH_DISTINCT_WALLET_SECRET_FROM_PROTECTED_STORE",
+    "protocol_version": 2
+  },
+  "engine_origins": {
+    "uno-luck": "https://REPLACE_WITH_PREPRODUCTION_UNO_HOST",
+    "mahjong-wild": "https://REPLACE_WITH_PREPRODUCTION_MAHJONG_HOST",
+    "skygate-5000": "https://REPLACE_WITH_PREPRODUCTION_SKYGATE_HOST"
+  },
+  "thresholds": {
+    "request_error_rate": 0.01,
+    "round_p95_ms": 10000
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "classification": "local_test_fixture_validation",
+  "external_operator_certified": false,
+  "live_load_executed": false,
+  "executed_at": "2026-11-09T20:10:18.386059+00:00",
+  "status": "PASS",
+  "tests": 24,
+  "passed": 24,
+  "failed": 0,
+  "core_source": "merged working-tree integration snapshot before final deployment commit",
+  "core_source_hashes": {
+    "core.mjs": "a7c56c30dc426b2cbc4c7960eeadd654b3b74862782dfc26b28436b8c699497f",
+    "security.mjs": "d417de400b41e89fbe7b9d514b603b5b854e817333a26a4f2b351873f45eb04d",
+    "wallet.mjs": "20a1fadec85d99a1070997201e2734f017bac3bec8edd98e77f7ddfdc61821b9",
+    "deployment-identity.mjs": "394bb33adfaeefa35719de534e5c58ea9a4826bfc2f0e3bcaf2168896641c942",
+    "schema.sql": "281c86af3fd0cd5b00359af6fd391596e1575a331337563eb90fb3c1ccbd8065"
+  },
+  "test_log_sha256": "69221a9e5fe2c53dac9163b36cf0241b1c07a1545de8a7de80789a6886e3c2bb"
+}

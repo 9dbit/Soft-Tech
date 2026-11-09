@@ -6,6 +6,8 @@ export const random=(n=32)=>randomBytes(n).toString('base64url');
 export function equal(a,b){return timingSafeEqual(createHash('sha256').update(String(a)).digest(),createHash('sha256').update(String(b)).digest());}
 export const mac=(secret,message)=>createHmac('sha256',secret).update(message).digest('hex');
 export const canonical=(domain,method,path,timestamp,nonce,body)=>[domain,method.toUpperCase(),path,timestamp,nonce,sha(body)].join('\n');
+export const canonicalV2=(domain,environment,audience,method,path,timestamp,nonce,body)=>[domain,environment,audience,method.toUpperCase(),path,timestamp,nonce,sha(body)].join('\n');
+export function signerV2(secret,domain,environment,audience,method,path,body,timestamp=String(Math.floor(Date.now()/1000)),nonce=randomBytes(16).toString('hex')){return {timestamp,nonce,signature:mac(secret,canonicalV2(domain,environment,audience,method,path,timestamp,nonce,body))};}
 export function signer(secret,domain,method,path,body,timestamp=String(Math.floor(Date.now()/1000)),nonce=randomBytes(16).toString('hex')){return {timestamp,nonce,signature:mac(secret,canonical(domain,method,path,timestamp,nonce,body))};}
 export function vault(master){
  const key=createHash('sha256').update('softtech-v1:'+master).digest();

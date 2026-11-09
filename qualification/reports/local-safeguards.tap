@@ -1,0 +1,154 @@
+TAP version 13
+# Subtest: generic internal operator cannot bypass preproduction release with sandbox wallet
+ok 1 - generic internal operator cannot bypass preproduction release with sandbox wallet
+  ---
+  duration_ms: 40.378782
+  type: 'test'
+  ...
+# Subtest: sandbox v2 API key rotation never downgrades protocol
+ok 2 - sandbox v2 API key rotation never downgrades protocol
+  ---
+  duration_ms: 28.239722
+  type: 'test'
+  ...
+# Subtest: qualification bootstrap, wallet v2 transport and durable duplicate settlement integrate
+ok 3 - qualification bootstrap, wallet v2 transport and durable duplicate settlement integrate
+  ---
+  duration_ms: 133.997572
+  type: 'test'
+  ...
+# Subtest: fresh isolated environments bind explicit identity while production remains quarantined
+ok 4 - fresh isolated environments bind explicit identity while production remains quarantined
+  ---
+  duration_ms: 59.985251
+  type: 'test'
+  ...
+# Subtest: existing sandbox and legacy database promotion fail before database bytes change
+ok 5 - existing sandbox and legacy database promotion fail before database bytes change
+  ---
+  duration_ms: 25.919145
+  type: 'test'
+  ...
+# Subtest: operator and engine v2 reject cross environment and audience even with deliberately reused fixture secrets
+ok 6 - operator and engine v2 reject cross environment and audience even with deliberately reused fixture secrets
+  ---
+  duration_ms: 58.256257
+  type: 'test'
+  ...
+# Subtest: legacy v1 signature cannot carry v2 audience headers to imply binding
+ok 7 - legacy v1 signature cannot carry v2 audience headers to imply binding
+  ---
+  duration_ms: 28.978737
+  type: 'test'
+  ...
+# Subtest: Core wallet transport v2 refuses correctly signed requests for another wallet audience
+ok 8 - Core wallet transport v2 refuses correctly signed requests for another wallet audience
+  ---
+  duration_ms: 42.231896
+  type: 'test'
+  ...
+# Subtest: complete fixture verifies signatures, digests and distinct verified reviewers
+ok 9 - complete fixture verifies signatures, digests and distinct verified reviewers
+  ---
+  duration_ms: 14.861012
+  type: 'test'
+  ...
+# Subtest: missing human trust registry and missing external certification fail closed
+ok 10 - missing human trust registry and missing external certification fail closed
+  ---
+  duration_ms: 7.961663
+  type: 'test'
+  ...
+# Subtest: tampering with payload or artifact is rejected
+ok 11 - tampering with payload or artifact is rejected
+  ---
+  duration_ms: 14.849137
+  type: 'test'
+  ...
+# Subtest: one person cannot request and approve with different keys
+ok 12 - one person cannot request and approve with different keys
+  ---
+  duration_ms: 7.811061
+  type: 'test'
+  ...
+# Subtest: automation or implementer cannot impersonate independent security review
+ok 13 - automation or implementer cannot impersonate independent security review
+  ---
+  duration_ms: 11.881249
+  type: 'test'
+  ...
+# Subtest: other deployment, revoked identity and expired material review are rejected
+ok 14 - other deployment, revoked identity and expired material review are rejected
+  ---
+  duration_ms: 9.392245
+  type: 'test'
+  ...
+# Subtest: reference-wallet claim cannot satisfy external operator gate
+ok 15 - reference-wallet claim cannot satisfy external operator gate
+  ---
+  duration_ms: 6.850045
+  type: 'test'
+  ...
+# Subtest: material traversal and symlink escape are rejected even if signed
+ok 16 - material traversal and symlink escape are rejected even if signed
+  ---
+  duration_ms: 11.798597
+  type: 'test'
+  ...
+# Subtest: proof detects applied external credit missing from Core journal and passes only after real recovery
+ok 17 - proof detects applied external credit missing from Core journal and passes only after real recovery
+  ---
+  duration_ms: 277.969812
+  type: 'test'
+  ...
+# Subtest: real HTTP wallet conformance and restart preserves durable receipts
+ok 18 - real HTTP wallet conformance and restart preserves durable receipts
+  ---
+  duration_ms: 599.730252
+  type: 'test'
+  ...
+# Subtest: database environment, audience, deployment and master key cannot be relabelled
+ok 19 - database environment, audience, deployment and master key cannot be relabelled
+  ---
+  duration_ms: 19.409534
+  type: 'test'
+  ...
+# Subtest: production refuses test control and remains financially locked
+ok 20 - production refuses test control and remains financially locked
+  ---
+  duration_ms: 15.213351
+  type: 'test'
+  ...
+# Subtest: stored wallet secrets are encrypted; immutable journal rejects edits
+ok 21 - stored wallet secrets are encrypted; immutable journal rejects edits
+  ---
+  duration_ms: 14.603103
+  type: 'test'
+  ...
+# Subtest: one wallet transaction ID cannot credit another player and replay survives restart
+ok 22 - one wallet transaction ID cannot credit another player and replay survives restart
+  ---
+  duration_ms: 65.10873
+  type: 'test'
+  ...
+# Subtest: 64 concurrent duplicate debits commit once and return the durable receipt
+ok 23 - 64 concurrent duplicate debits commit once and return the durable receipt
+  ---
+  duration_ms: 205.352737
+  type: 'test'
+  ...
+# Subtest: admin token, malformed payloads, oversized requests and protocol downgrade are rejected
+ok 24 - admin token, malformed payloads, oversized requests and protocol downgrade are rejected
+  ---
+  duration_ms: 38.790233
+  type: 'test'
+  ...
+1..24
+# tests 24
+# suites 0
+# pass 24
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2597.147811

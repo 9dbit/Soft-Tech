@@ -1,9 +1,11 @@
 import {readFileSync,chmodSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {catalog} from './catalog.mjs';
-import {Fault,fail,sha,random,equal,canonical,mac,vault,text,units,originURL} from './security.mjs';
+import {Fault,fail,sha,random,equal,canonical,canonicalV2,mac,vault,text,units,originURL} from './security.mjs';
 import {walletCall,WalletError} from './wallet.mjs';
 import {openDeploymentDatabase} from './deployment-identity.mjs';
+import {isolationReadiness} from './isolation-proof.mjs';
+import {releaseStaff,recordReleaseSignoff} from './staff-policy.mjs';
 const scopes=['games:read','sessions:write','reports:read'];
 const parse=x=>JSON.parse(x);
 export class Core {
@@ -17,15 +19,21 @@ export class Core {
    if(sentinel&&this.vault.open(sentinel.value)!=='softtech-core-v1')throw Error('Key mismatch: restore original master key');
   }});
   this.db=opened.db;this.databasePath=opened.path;this.deploymentIdentity=opened.identity;
+  this.isolation=isolationReadiness(env,this.deploymentIdentity,this.clock());
   this.db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));chmodSync(opened.path,0o600);
   const sentinel=this.get('SELECT value FROM meta WHERE key=?','vault_check');
   if(sentinel){if(this.vault.open(sentinel.value)!=='softtech-core-v1')throw Error('Key mismatch: restore original master key');}
   else this.run('INSERT INTO meta VALUES(?,?)','vault_check',this.vault.seal('softtech-core-v1'));
   this.run("INSERT OR IGNORE INTO meta VALUES('schema_version','1')");
   this.engineKeys=new Map();
+  const engineDeployments=parse(env.CORE_ENGINE_DEPLOYMENTS_JSON||'{}');
   for(const k of parse(env.CORE_ENGINE_KEYS_JSON||'[]')){
    text(k.id,'engine_key',{max:80});if(!catalog.some(g=>g.id===k.game)||typeof k.secret!=='string'||k.secret.length<32)throw Error('Invalid game transport credentials');
-   this.engineKeys.set(k.id,k);
+   const binding=k.deployment_id||engineDeployments[k.game];
+   if(binding!==undefined&&(typeof binding!=='string'||!/^[A-Za-z0-9][A-Za-z0-9_-]{7,99}$/.test(binding)))throw Error('Invalid engine deployment binding');
+   if(k.protocol_version!==undefined&&![1,2].includes(k.protocol_version))throw Error('Invalid engine protocol version');
+   if(this.engineKeys.has(k.id))throw Error('Duplicate engine key ID');
+   this.engineKeys.set(k.id,{...k,...(binding?{deployment_id:binding}:{})});
   }
   for(const g of catalog){
    let origin=env[g.env]||'';if(origin)origin=originURL(origin,{allowLocal:this.allowLocal}).origin;
@@ -39,19 +47,32 @@ export class Core {
  transaction(fn){this.db.exec('BEGIN IMMEDIATE');try{const value=fn();if(value?.then)throw Error('Async transaction forbidden');this.db.exec('COMMIT');return value;}catch(e){this.db.exec('ROLLBACK');throw e;}}
  async serial(key,fn){const before=this.locks.get(key)||Promise.resolve();const next=before.catch(()=>{}).then(fn);this.locks.set(key,next);try{return await next;}finally{if(this.locks.get(key)===next)this.locks.delete(key);}}
  audit(actor,event,scope,detail={}){this.run('INSERT INTO audit VALUES(?,?,?,?,?,?)',randomUUID(),actor,event,scope,JSON.stringify(detail),this.clock());}
- operator(id){const op=this.get('SELECT * FROM operators WHERE id=?',id);if(!op)fail(404,'OPERATOR_NOT_FOUND');return op;}
- releaseMode(){return this.get('SELECT value FROM meta WHERE key=?','release_mode')?.value||'sandbox';}
+ operator(id){const op=this.get('SELECT * FROM operators WHERE id=?',id);if(!op)fail(404,'OPERATOR_NOT_FOUND');if(op.environment!==this.deploymentIdentity.environment)fail(403,'OPERATOR_ENVIRONMENT_MISMATCH');return {...op,wallet_protocol_version:this.get('SELECT version FROM operator_wallet_protocol WHERE operator_id=?',id)?.version??1,deployment_id:this.deploymentIdentity.deployment_id};}
+ releaseMode(){return this.get('SELECT value FROM meta WHERE key=?','release_mode')?.value||this.deploymentIdentity.environment;}
+ defaultGameMode(op){return this.deploymentIdentity.environment==='sandbox'?'sandbox':this.qualificationAllowed(op)?'preproduction':'disabled';}
+ qualificationAllowed(op){return this.deploymentIdentity.environment==='preproduction'&&this.env.CORE_QUALIFICATION_ENABLED==='true'&&op.internal===1&&op.id.startsWith('op_qualification_')&&op.currency==='VCOIN'&&op.wallet_mode==='seamless'&&(op.wallet_protocol_version??this.get('SELECT version FROM operator_wallet_protocol WHERE operator_id=?',op.id)?.version)===2;}
+ ensurePlayEnvironment(op,gameId){
+  const environment=this.deploymentIdentity.environment;
+  if(environment==='production')fail(423,'PRODUCTION_GATES_PENDING');
+  if(environment==='preproduction'){
+   const g=this.get('SELECT * FROM games WHERE id=?',gameId);let identity;try{identity=JSON.parse(g?.health_json||'{}').deployment_identity;}catch{}
+   const expected=Array.from(this.engineKeys.values()).find(k=>k.game===gameId)?.deployment_id;
+   if(!expected||g?.health!=='ok'||g.checked_at===null||this.clock()-g.checked_at>120000||!identity?.identity_bound||identity.environment!==environment||identity.core_deployment_id!==this.deploymentIdentity.deployment_id||identity.deployment_id!==expected||identity.game_id!==gameId)fail(503,'ENGINE_ENVIRONMENT_NOT_VERIFIED');
+   if(!this.qualificationAllowed(op)&&this.gameMode(op,gameId)!=='preproduction')fail(403,'RELEASE_APPROVAL_REQUIRED');
+  }
+ }
  operatorGameModes(id){
   const op=this.operator(id),allowed=parse(op.games_json);
   const rows=this.all('SELECT game_id,mode,updated_at FROM operator_game_modes WHERE operator_id=?',id);
-  return allowed.map(game_id=>{const found=rows.find(r=>r.game_id===game_id);return {game_id,mode:found?.mode||'sandbox',updated_at:found?.updated_at||null};});
+  return allowed.map(game_id=>{const found=rows.find(r=>r.game_id===game_id);return {game_id,mode:found?.mode||this.defaultGameMode(op),updated_at:found?.updated_at||null};});
  }
- gameMode(op,gameId){return this.get('SELECT mode FROM operator_game_modes WHERE operator_id=? AND game_id=?',op.id,gameId)?.mode||'sandbox';}
+ gameMode(op,gameId){return this.get('SELECT mode FROM operator_game_modes WHERE operator_id=? AND game_id=?',op.id,gameId)?.mode||this.defaultGameMode(op);}
  setOperatorGameMode(id,gameId,mode,actor='panel:admin'){
   const op=this.operator(id);
   if(op.internal)fail(409,'INTERNAL_OPERATOR_PROTECTED');
   if(!parse(op.games_json).includes(gameId))fail(403,'GAME_NOT_ALLOWED');
   if(!['sandbox','disabled'].includes(mode))fail(409,'RELEASE_APPROVAL_REQUIRED');
+  if(mode==='sandbox'&&this.deploymentIdentity.environment!=='sandbox')fail(409,'ENVIRONMENT_MODE_MISMATCH');
   const old=this.gameMode(op,gameId),now=this.clock();
   if(old===mode)return {operator_id:id,game_id:gameId,mode,changed:false};
   this.transaction(()=>{
@@ -65,11 +86,13 @@ export class Core {
   const op=this.operator(operatorId);
   if(op.internal||!parse(op.games_json).includes(gameId))fail(403,'GAME_NOT_ALLOWED');
   if(!['sandbox','preproduction'].includes(mode))fail(409,'PRODUCTION_LOCKED');
+  const staff=releaseStaff(this,actor,'request');actor='staff:'+staff.staff_id;
   const existing=this.get("SELECT id FROM release_requests WHERE operator_id=? AND game_id=? AND status IN ('requested','validated','approved') LIMIT 1",operatorId,gameId);
   if(existing)fail(409,'RELEASE_REQUEST_PENDING');
   const id='rel_'+random(18),now=this.clock();
   this.transaction(()=>{
    this.run('INSERT INTO release_requests(id,operator_id,game_id,requested_mode,status,requested_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',id,operatorId,gameId,mode,'requested',actor,now,now);
+   recordReleaseSignoff(this,id,'request',staff);
    this.audit(actor,'release.requested',operatorId,{request_id:id,game_id:gameId,mode});
   });
   return this.get('SELECT * FROM release_requests WHERE id=?',id);
@@ -80,6 +103,7 @@ export class Core {
   const transitions={requested:{validate:'validated',reject:'rejected',cancel:'cancelled'},validated:{approve:'approved',reject:'rejected',cancel:'cancelled'},approved:{activate:'activated',reject:'rejected',cancel:'cancelled'}};
   const next=transitions[request.status]?.[action];
   if(!next)fail(409,'INVALID_RELEASE_TRANSITION');
+  const staff=releaseStaff(this,actor,action,request);actor='staff:'+staff.staff_id;
   const op=this.operator(request.operator_id);
   if(op.status!=='enabled'||!parse(op.games_json).includes(request.game_id))fail(409,'OPERATOR_NOT_READY');
   if(action==='validate'){
@@ -88,34 +112,43 @@ export class Core {
    if(request.requested_mode==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
   }
   if(action==='activate'&&request.requested_mode==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
-  if(action==='activate'&&request.requested_mode==='preproduction')fail(409,'PREPRODUCTION_ISOLATION_PENDING');
+  if(action==='activate'&&request.requested_mode==='preproduction'&&(this.deploymentIdentity.environment!=='preproduction'||!this.isolation.ok))fail(409,'PREPRODUCTION_ISOLATION_PENDING');
   const now=this.clock();
   this.transaction(()=>{
    if(action==='activate')this.run('INSERT INTO operator_game_modes(operator_id,game_id,mode,updated_at) VALUES(?,?,?,?) ON CONFLICT(operator_id,game_id) DO UPDATE SET mode=excluded.mode,updated_at=excluded.updated_at',request.operator_id,request.game_id,request.requested_mode,now);
    this.run('UPDATE release_requests SET status=?,validated_by=CASE WHEN ?=? THEN ? ELSE validated_by END,approved_by=CASE WHEN ?=? THEN ? ELSE approved_by END,updated_at=? WHERE id=?',next,action,'validate',actor,action,'approve',actor,now,id);
+   recordReleaseSignoff(this,id,action,staff);
    this.audit(actor,'release.'+action,request.operator_id,{request_id:id,game_id:request.game_id,mode:request.requested_mode,from:request.status,to:next});
   });
   return this.get('SELECT * FROM release_requests WHERE id=?',id);
  }
- operatorView(op){return {id:op.id,name:op.name,status:op.status,environment:op.environment,games:parse(op.games_json),game_modes:this.operatorGameModes(op.id),currency:op.currency,scale:op.scale,wallet_mode:op.wallet_mode,wallet_url:op.wallet_url,return_origins:parse(op.return_origins_json),initial_minor:op.initial_minor,max_stake_minor:op.max_stake_minor,max_payout_minor:op.max_payout_minor,internal:!!op.internal,created_at:op.created_at};}
+ operatorView(op){return {id:op.id,name:op.name,status:op.status,environment:op.environment,games:parse(op.games_json),game_modes:this.operatorGameModes(op.id),currency:op.currency,scale:op.scale,wallet_mode:op.wallet_mode,wallet_protocol_version:this.get('SELECT version FROM operator_wallet_protocol WHERE operator_id=?',op.id)?.version??1,wallet_url:op.wallet_url,return_origins:parse(op.return_origins_json),initial_minor:op.initial_minor,max_stake_minor:op.max_stake_minor,max_payout_minor:op.max_payout_minor,internal:!!op.internal,created_at:op.created_at};}
  createOperator(input,actor='admin',{internal=false,id=null}={}){
   if(!input||typeof input!=='object'||Array.isArray(input))fail(422,'OBJECT_REQUIRED');
+  if(this.deploymentIdentity.environment==='production')fail(423,'PRODUCTION_GATES_PENDING');
+  const protocolVersion=input.protocol_version??(this.deploymentIdentity.environment==='sandbox'?1:2);
+  if(![1,2].includes(protocolVersion)||this.deploymentIdentity.environment!=='sandbox'&&protocolVersion!==2)fail(422,'INVALID_PROTOCOL_VERSION');
   const name=text(input.name,'name',{max:80});const gameIds=input.games;
   if(!Array.isArray(gameIds)||!gameIds.length||gameIds.some(g=>!catalog.some(x=>x.id===g))||new Set(gameIds).size!==gameIds.length)fail(422,'INVALID_GAMES');
   const currency=text(input.currency||'VCOIN','currency',{max:12,pattern:/^[A-Z][A-Z0-9]{2,11}$/});const scale=input.scale??2;
   if(!Number.isInteger(scale)||scale<0||scale>8)fail(422,'INVALID_SCALE');
   const mode=input.wallet_mode||'sandbox';if(!['sandbox','seamless'].includes(mode))fail(422,'INVALID_WALLET_MODE');
   const url=mode==='seamless'?originURL(input.wallet_url,{allowLocal:this.allowLocal,pathAllowed:true}).href:'';
+  const walletOrigins=(this.env.CORE_ALLOWED_WALLET_ORIGINS||'').split(',').filter(Boolean);
+  if(mode==='seamless'&&this.deploymentIdentity.environment!=='sandbox'&&!walletOrigins.length)fail(403,'WALLET_ENVIRONMENT_NOT_ALLOWED');
+  if(mode==='seamless'&&walletOrigins.length&&!walletOrigins.includes(new URL(url).origin))fail(403,'WALLET_ENVIRONMENT_NOT_ALLOWED');
   const origins=input.return_origins||[];if(!Array.isArray(origins)||origins.length>20)fail(422,'INVALID_RETURN_ORIGINS');
   const allowed=origins.map(u=>originURL(u,{allowLocal:this.allowLocal}).origin);
   const initial=String(units(input.initial_minor??'10000000'));const maxStake=String(units(input.max_stake_minor??'10000000',{zero:false}));const maxPayout=String(units(input.max_payout_minor??'1000000000000',{zero:false}));
   const opId=id||'op_'+random(15),keyId='st_'+random(18),secret=random(40),walletSecret=random(40),now=this.clock();
   this.transaction(()=>{
-   this.run('INSERT INTO operators VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',opId,name,'enabled','sandbox',JSON.stringify(gameIds),currency,scale,mode,url,mode==='seamless'?this.vault.seal(walletSecret):null,JSON.stringify(allowed),initial,maxStake,maxPayout,internal?1:0,now,now);
+   this.run('INSERT INTO operators VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',opId,name,'enabled',this.deploymentIdentity.environment,JSON.stringify(gameIds),currency,scale,mode,url,mode==='seamless'?this.vault.seal(walletSecret):null,JSON.stringify(allowed),initial,maxStake,maxPayout,internal?1:0,now,now);
    this.run('INSERT INTO api_keys VALUES(?,?,?,?,?,?)',keyId,opId,this.vault.seal(secret),JSON.stringify(scopes),null,now);
+   this.run('INSERT INTO api_key_protocol VALUES(?,?)',keyId,protocolVersion);
+   this.run('INSERT INTO operator_wallet_protocol VALUES(?,?)',opId,protocolVersion);
    this.audit(actor,'operator.created',opId,{wallet_mode:mode,currency,scale,internal});
   });
-  return {operator:this.operatorView(this.operator(opId)),credential:{key_id:keyId,secret,scopes},...(mode==='seamless'?{wallet_signing_secret:walletSecret}:{}),note:'Secrets are shown only now. Store server-side.'};
+  return {operator:this.operatorView(this.operator(opId)),credential:{key_id:keyId,secret,scopes,protocol_version:protocolVersion,environment:this.deploymentIdentity.environment,audience:this.deploymentIdentity.deployment_id},...(mode==='seamless'?{wallet_signing_secret:walletSecret}:{}),note:'Secrets are shown only now. Store server-side.'};
  }
  internalOperator(){let op=this.get("SELECT * FROM operators WHERE id='st-internal'");if(!op){this.createOperator({name:'Soft Tech Internal QA',games:catalog.map(g=>g.id),currency:'VCOIN',scale:2,return_origins:[this.env.CORE_PUBLIC_ORIGIN||'https://soft-tech-provider-panel.up.railway.app']},'system',{internal:true,id:'st-internal'});op=this.operator('st-internal');}return op;}
  updateOperator(id,input,actor='admin'){
@@ -126,18 +159,23 @@ export class Core {
   return this.operatorView(this.operator(id));
  }
  rotateKey(id,actor='admin'){
-  this.operator(id);const keyId='st_'+random(18),secret=random(40),now=this.clock();
-  this.transaction(()=>{this.run('UPDATE api_keys SET revoked_at=? WHERE operator_id=? AND revoked_at IS NULL',now,id);this.run('INSERT INTO api_keys VALUES(?,?,?,?,?,?)',keyId,id,this.vault.seal(secret),JSON.stringify(scopes),null,now);this.audit(actor,'operator.keys_rotated',id);});
-  return {key_id:keyId,secret,scopes};
+  this.operator(id);const keyId='st_'+random(18),secret=random(40),now=this.clock(),version=this.deploymentIdentity.environment==='sandbox'?(this.get('SELECT MAX(p.version) AS version FROM api_key_protocol p JOIN api_keys k ON k.id=p.key_id WHERE k.operator_id=? AND k.revoked_at IS NULL',id)?.version??1):2;
+  this.transaction(()=>{this.run('UPDATE api_keys SET revoked_at=? WHERE operator_id=? AND revoked_at IS NULL',now,id);this.run('INSERT INTO api_keys VALUES(?,?,?,?,?,?)',keyId,id,this.vault.seal(secret),JSON.stringify(scopes),null,now);this.run('INSERT INTO api_key_protocol VALUES(?,?)',keyId,version);this.audit(actor,'operator.keys_rotated',id);});
+  return {key_id:keyId,secret,scopes,protocol_version:version,environment:this.deploymentIdentity.environment,audience:this.deploymentIdentity.deployment_id};
  }
  authenticate({method,path,body='',headers},engine=false){
   const prefix=engine?'x-agency-':'x-softtech-',id=headers[prefix+'key'],ts=headers[prefix+'timestamp'],nonce=headers[prefix+'nonce'],sig=headers[prefix+'signature'];
   if(typeof id!=='string'||typeof ts!=='string'||!/^\d{10,11}$/.test(ts)||typeof nonce!=='string'||!/^[A-Za-z0-9_-]{16,80}$/.test(nonce)||typeof sig!=='string'||!/^[a-f0-9]{64}$/.test(sig))fail(401,'INVALID_SIGNATURE');
   if(Math.abs(this.clock()/1000-Number(ts))>300)fail(401,'SIGNATURE_EXPIRED');
-  let secret,principal;
-  if(engine){principal=this.engineKeys.get(id);if(!principal)fail(401,'INVALID_SIGNATURE');secret=principal.secret;}
-  else{const k=this.get('SELECT * FROM api_keys WHERE id=? AND revoked_at IS NULL',id);if(!k)fail(401,'INVALID_SIGNATURE');secret=this.vault.open(k.secret_box);principal={operator:this.operator(k.operator_id),scopes:parse(k.scopes_json),key_id:id};}
-  if(!equal(sig,mac(secret,canonical(engine?'agency.v1':'softtech.v1',method,path,ts,nonce,body))))fail(401,'INVALID_SIGNATURE');
+  let secret,principal,requiredVersion;
+  if(engine){principal=this.engineKeys.get(id);if(!principal)fail(401,'INVALID_SIGNATURE');secret=principal.secret;requiredVersion=principal.protocol_version??(this.deploymentIdentity.environment==='sandbox'?1:2);}
+  else{const k=this.get('SELECT * FROM api_keys WHERE id=? AND revoked_at IS NULL',id);if(!k)fail(401,'INVALID_SIGNATURE');secret=this.vault.open(k.secret_box);principal={operator:this.operator(k.operator_id),scopes:parse(k.scopes_json),key_id:id};requiredVersion=this.get('SELECT version FROM api_key_protocol WHERE key_id=?',id)?.version??1;}
+  const version=headers[prefix+'version']??'1',environment=this.deploymentIdentity.environment,audience=this.deploymentIdentity.deployment_id;
+  if(!['1','2'].includes(version)||requiredVersion===2&&version!=='2'||environment!=='sandbox'&&version!=='2')fail(401,'SIGNATURE_VERSION_REQUIRED');
+  if(version==='2'&&(headers[prefix+'environment']!==environment||headers[prefix+'audience']!==audience))fail(401,'SIGNATURE_AUDIENCE_MISMATCH');
+  if(version==='1'&&(headers[prefix+'environment']!==undefined||headers[prefix+'audience']!==undefined))fail(401,'SIGNATURE_VERSION_REQUIRED');
+  const message=version==='2'?canonicalV2(engine?'agency.v2':'softtech.v2',environment,audience,method,path,ts,nonce,body):canonical(engine?'agency.v1':'softtech.v1',method,path,ts,nonce,body);
+  if(!equal(sig,mac(secret,message)))fail(401,'INVALID_SIGNATURE');
   if(this.get('SELECT 1 FROM replay_nonces WHERE key_id=? AND nonce=?',id,nonce))fail(409,'REPLAY_DETECTED');
   this.run('INSERT INTO replay_nonces VALUES(?,?,?)',id,nonce,this.clock());
   if(engine)this.run('UPDATE games SET signed_seen_at=? WHERE id=?',this.clock(),principal.game);
@@ -152,6 +190,7 @@ export class Core {
   this.transaction(()=>{this.run('UPDATE games SET maintenance=? WHERE id=?',p.maintenance?1:0,id);this.audit(actor,'game.maintenance',id,{enabled:p.maintenance,policy:'block new launches and reserves; finish accepted rounds'});});return this.games().find(g=>g.id===id);
  }
  createLaunch(op,input,idem,actor='operator'){
+  if(this.deploymentIdentity.environment==='production')fail(423,'PRODUCTION_GATES_PENDING');
   text(idem,'idempotency_key',{min:8,max:100});const gameId=text(input.game_id,'game_id');const playerRef=text(input.player_ref,'player_ref',{max:120});
   const g=this.get('SELECT * FROM games WHERE id=?',gameId);if(!g||!parse(op.games_json).includes(gameId))fail(403,'GAME_NOT_ALLOWED');
   if(input.currency&&input.currency!==op.currency)fail(422,'CURRENCY_MISMATCH');
@@ -160,7 +199,8 @@ export class Core {
   const fingerprint=sha(JSON.stringify({gameId,playerRef,currency:op.currency,returnUrl}));
   return this.transaction(()=>{
    this.ensureOperatorEnabled(op);
-   const policy=this.gameMode(op,gameId);if(policy==='disabled')fail(403,'GAME_DISABLED_FOR_OPERATOR');if(policy==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');if(policy==='preproduction')fail(503,'PREPRODUCTION_ISOLATION_PENDING');
+   this.ensurePlayEnvironment(op,gameId);
+   const policy=this.gameMode(op,gameId);if(policy==='disabled')fail(403,'GAME_DISABLED_FOR_OPERATOR');if(policy==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');if(policy==='preproduction'&&this.deploymentIdentity.environment!=='preproduction')fail(503,'PREPRODUCTION_ISOLATION_PENDING');
    const old=this.get('SELECT * FROM idempotency WHERE operator_id=? AND route=? AND key=?',op.id,'launch',idem);
    if(old){if(old.payload_hash!==fingerprint)fail(409,'IDEMPOTENCY_CONFLICT');return parse(this.vault.open(old.response_box));}
    if(!g.enabled||g.maintenance)fail(409,'GAME_MAINTENANCE');if(!g.origin)fail(503,'ENGINE_NOT_CONFIGURED');
@@ -171,7 +211,7 @@ export class Core {
    }
    const token=random(36),sid='ss_'+random(24),expires=now+8*3600000;
    this.run('INSERT INTO sessions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',sid,op.id,pid,gameId,op.currency,op.scale,'created',sha(token),this.vault.seal(token),now+120000,null,returnUrl,now,expires,now,g.version);
-   const response={session_id:sid,game_id:gameId,environment:policy,currency:op.currency,scale:op.scale,launch_url:g.origin+g.play_path+'#softtech_launch='+token,launch_expires_at:new Date(now+120000).toISOString(),expires_at:new Date(expires).toISOString()};
+   const response={session_id:sid,game_id:gameId,environment:this.deploymentIdentity.environment,deployment_id:this.deploymentIdentity.deployment_id,currency:op.currency,scale:op.scale,launch_url:g.origin+g.play_path+'#softtech_launch='+token,launch_expires_at:new Date(now+120000).toISOString(),expires_at:new Date(expires).toISOString()};
    this.run('INSERT INTO idempotency VALUES(?,?,?,?,?,?)',op.id,'launch',idem,fingerprint,this.vault.seal(JSON.stringify(response)),now);
    this.audit(actor,'session.created',sid,{operator_id:op.id,game_id:gameId});return response;
   });
@@ -180,6 +220,7 @@ export class Core {
  sessionView(s){return {id:s.id,operator_id:s.operator_id,game_id:s.game_id,player_id:s.player_id,currency:s.currency,scale:s.scale,status:s.status==='active'&&s.expires_at<this.clock()?'expired':s.status,expires_at:s.expires_at,created_at:s.created_at,last_seen_at:s.last_seen_at,release:s.release};}
  revoke(opId,id,actor='operator'){this.session(id,opId);this.transaction(()=>{this.run("UPDATE sessions SET status='revoked' WHERE id=?",id);this.audit(actor,'session.revoked',id,{operator_id:opId});});return {session_id:id,status:'revoked',pending_round_policy:'accepted rounds remain settleable'};}
  redeem(key,p){
+  if(this.deploymentIdentity.environment==='production')fail(423,'PRODUCTION_GATES_PENDING');
   text(p.token,'token',{min:30,max:120});text(p.request_id,'request_id',{min:8,max:120});
   return this.transaction(()=>{
    const s=this.get('SELECT * FROM sessions WHERE launch_hash=?',sha(p.token));if(!s||s.game_id!==key.game)fail(404,'LAUNCH_NOT_FOUND');
@@ -188,7 +229,7 @@ export class Core {
    if(s.status==='revoked'||s.expires_at<=this.clock())fail(401,'SESSION_EXPIRED');
    if(s.launch_expires_at<=this.clock())fail(401,'LAUNCH_EXPIRED');
    this.run("UPDATE sessions SET status='active',redeem_request=?,last_seen_at=? WHERE id=?",p.request_id,this.clock(),s.id);
-   return {tenant_id:op.id,operator_id:op.id,player_id:s.player_id,session_id:s.id,game:s.game_id,coin_scale:s.scale,currency:s.currency,provider:'soft-tech',environment:'sandbox',expires_at:new Date(s.expires_at).toISOString(),navigation:s.return_url?{home_url:s.return_url,label:'Soft Tech'}:null};
+   return {tenant_id:op.id,operator_id:op.id,player_id:s.player_id,session_id:s.id,game:s.game_id,coin_scale:s.scale,currency:s.currency,provider:'soft-tech',environment:this.deploymentIdentity.environment,deployment_id:this.deploymentIdentity.deployment_id,core_deployment_id:this.deploymentIdentity.deployment_id,expires_at:new Date(s.expires_at).toISOString(),navigation:s.return_url?{home_url:s.return_url,label:'Soft Tech'}:null};
   });
  }
  async status(key,p){
@@ -230,6 +271,7 @@ export class Core {
  }
  async reserve(key,p){
   const s=this.session(p.session_id,p.tenant_id,key.game),op=this.operator(s.operator_id);
+  if(this.deploymentIdentity.environment==='production')fail(423,'PRODUCTION_GATES_PENDING');
   const stake=units(p.stake,{zero:false}),maximum=units(p.max_payout);text(p.round_ref,'round_ref',{min:3,max:150});
   const fingerprint=sha(JSON.stringify({session:s.id,stake:String(stake),maximum:String(maximum)}));
   const lock=op.id+':'+s.player_id;
@@ -285,6 +327,7 @@ export class Core {
   });
  }
  async engineAction(key,action,p){
+  if(this.deploymentIdentity.environment==='production')fail(423,'PRODUCTION_GATES_PENDING');
   if(!p||typeof p!=='object'||Array.isArray(p))fail(422,'OBJECT_REQUIRED');
   if(action==='redeem')return this.redeem(key,p);
   if(!p.tenant_id)fail(422,'OPERATOR_SCOPE_REQUIRED');
@@ -307,25 +350,25 @@ export class Core {
   }
   const players=this.all("SELECT p.* FROM players p JOIN operators o ON o.id=p.operator_id WHERE o.wallet_mode='sandbox'"+(opId?' AND p.operator_id=?':''),...(opId?[opId]:[]));
   for(const p of players){const total=this.all('SELECT amount_minor FROM ledger WHERE player_id=?',p.id).reduce((n,x)=>n+BigInt(x.amount_minor),0n);if(total!==BigInt(p.balance_minor))issues.push({player_id:p.id,code:'BALANCE_MISMATCH'});}
-  const result={id:'check_'+random(16),operator_id:opId,status:!rounds.length?'no_activity':issues.length?'attention':'matched',rounds_checked:rounds.length,issues,scope:'provider journal; external-wallet acknowledgements, not unrelated operator transactions',checked_at:this.clock()};
+  const result={id:'check_'+random(16),operator_id:opId,status:!rounds.length?'no_activity':issues.length?'attention':'matched',rounds_checked:rounds.length,issues,scope:'latest 1000 provider rounds plus sandbox balances; external-wallet acknowledgements, not unrelated operator transactions',round_limit:1000,total_rounds:this.get('SELECT count(*) n FROM rounds'+(opId?' WHERE operator_id=?':''),...(opId?[opId]:[])).n,checked_at:this.clock()};
   if(save)this.transaction(()=>{this.run('INSERT INTO checks VALUES(?,?,?,?)',result.id,opId,JSON.stringify(result),this.clock());this.audit(actor,'reconciliation.completed',opId||'all',{status:result.status,issues:issues.length});});return result;
  }
  reports(opId=null,{limit=100,offset=0,game=null}={}){
   limit=Math.min(200,Math.max(1,Math.floor(Number(limit)||100)));offset=Math.max(0,Math.floor(Number(offset)||0));
   const where=[],args=[];if(opId){where.push('operator_id=?');args.push(opId);}if(game){where.push('game_id=?');args.push(game);}
   const w=where.length?' WHERE '+where.join(' AND '):'';
-  return {sessions:this.all('SELECT * FROM sessions'+w+' ORDER BY created_at DESC LIMIT ? OFFSET ?',...args,limit,offset).map(x=>this.sessionView(x)),rounds:this.all('SELECT * FROM rounds'+w+' ORDER BY created_at DESC LIMIT ? OFFSET ?',...args,limit,offset),transactions:this.all('SELECT * FROM ledger'+w+' ORDER BY created_at DESC LIMIT ? OFFSET ?',...args,limit,offset),pagination:{limit,offset}};
+  return {sessions:this.all('SELECT * FROM sessions'+w+' ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?',...args,limit,offset).map(x=>this.sessionView(x)),rounds:this.all('SELECT * FROM rounds'+w+' ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?',...args,limit,offset),transactions:this.all('SELECT * FROM ledger'+w+' ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?',...args,limit,offset),pagination:{limit,offset}};
  }
  bootstrap(role){
   const reports=this.reports(),games=this.games();
   const summary={games:games.length,operators:this.get('SELECT count(*) n FROM operators WHERE internal=0').n,sessions:this.get("SELECT count(*) n FROM sessions WHERE status='active' AND expires_at>? AND last_seen_at>?",this.clock(),this.clock()-300000).n,rounds:this.get("SELECT count(*) n FROM rounds WHERE status='settled'").n,pending:this.get("SELECT count(*) n FROM rounds WHERE status IN('intent','reserved')").n,connected_games:games.filter(g=>g.adapter_verified&&g.health==='ok').length};
-  return {mode:'PROVIDER CORE',environment:'sandbox',version:'1.0.0',role,connected:games.some(g=>g.adapter_verified),persistent:true,source_commit:this.env.RAILWAY_GIT_COMMIT_SHA||'local',summary,games,operators:this.all('SELECT * FROM operators ORDER BY internal DESC,created_at DESC').map(o=>this.operatorView(o)),...reports,audit:this.all('SELECT * FROM audit ORDER BY created_at DESC LIMIT 100').map(a=>({...a,detail:parse(a.detail_json),detail_json:undefined})),checks:this.all('SELECT * FROM checks ORDER BY created_at DESC LIMIT 30').map(c=>parse(c.result_json)),selftests:this.all('SELECT id,status,created_at,updated_at FROM selftests ORDER BY created_at DESC LIMIT 10'),updated_at:this.clock()};
+  return {mode:'PROVIDER CORE',environment:this.deploymentIdentity.environment,version:'1.1.0',role,connected:games.some(g=>g.adapter_verified),persistent:true,source_commit:this.env.RAILWAY_GIT_COMMIT_SHA||'local',summary,games,operators:this.all('SELECT * FROM operators ORDER BY internal DESC,created_at DESC').map(o=>this.operatorView(o)),...reports,audit:this.all('SELECT * FROM audit ORDER BY created_at DESC LIMIT 100').map(a=>({...a,detail:parse(a.detail_json),detail_json:undefined})),checks:this.all('SELECT * FROM checks ORDER BY created_at DESC LIMIT 30').map(c=>parse(c.result_json)),selftests:this.all('SELECT id,status,created_at,updated_at FROM selftests ORDER BY created_at DESC LIMIT 10'),updated_at:this.clock()};
  }
  async refreshHealth(){
   await Promise.all(this.all('SELECT * FROM games').map(async g=>{
    if(!g.origin){this.run("UPDATE games SET health='not_configured',checked_at=? WHERE id=?",this.clock(),g.id);return;}
    let status='unreachable',data={};
-   try{const r=await fetch(g.origin+'/health',{signal:AbortSignal.timeout(10000),redirect:'error'});data=await r.json();status=r.ok&&data.ok===true&&data.provider==='soft-tech'?'ok':'degraded';}catch{data={error:'engine request failed'};}
+   try{const r=await fetch(g.origin+'/health',{signal:AbortSignal.timeout(10000),redirect:'error'});data=await r.json();const i=data.deployment_identity,expected=Array.from(this.engineKeys.values()).find(k=>k.game===g.id);const matches=i?.identity_bound===true&&i.environment===this.deploymentIdentity.environment&&i.core_deployment_id===this.deploymentIdentity.deployment_id&&i.game_id===g.id&&(!expected?.deployment_id||i.deployment_id===expected.deployment_id);status=r.ok&&data.ok===true&&data.provider==='soft-tech'&&(matches||this.deploymentIdentity.environment==='sandbox'&&!expected?.deployment_id)?'ok':'degraded';}catch{data={error:'engine request failed'};}
    this.run('UPDATE games SET health=?,health_json=?,version=?,checked_at=? WHERE id=?',status,JSON.stringify(data).slice(0,16000),String(data.version||data.engine_version||data.source_commit?.slice(0,12)||g.version).slice(0,80),this.clock(),g.id);
   }));return this.games();
  }

@@ -52,7 +52,7 @@ test('a copied DB rejects an explicit different deployment identity before any e
  // the existing database bytes, permissions, schema and catalog remain unchanged.
 });
 
-test('preproduction and production cannot relabel an existing DB or create a fresh one',t=>{
+test('preproduction and production require an explicit identity before opening existing or fresh databases',t=>{
  const {env,dir}=workspace(t);const core=new Core({env});core.close();const before=fingerprint(env.CORE_DB_PATH);
  for(const environment of ['preproduction','production']){
   assert.throws(()=>new Core({env:{...env,CORE_ENVIRONMENT:environment}}),/remain locked/);

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "target": {
+    "environment": "production",
+    "deployment_id": "REPLACE_WITH_PRODUCTION_CORE_ID",
+    "source_commits": {
+      "core": "REPLACE_WITH_FULL_COMMIT_SHA",
+      "uno": "REPLACE_WITH_FULL_COMMIT_SHA",
+      "mahjong": "REPLACE_WITH_FULL_COMMIT_SHA",
+      "skygate": "REPLACE_WITH_FULL_COMMIT_SHA",
+      "wallet": "REPLACE_WITH_FULL_COMMIT_SHA"
+    }
+  },
+  "attestations": [],
+  "release_approvals": {}
+}

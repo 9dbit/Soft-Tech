@@ -59,12 +59,8 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
   const a=await makeOperator('Conformance Operator A'),b=await makeOperator('Conformance Operator B');
   assert.notEqual(a.credential.key_id,b.credential.key_id);
   const releaseRequest=await fetch(base+'/api/release-requests',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:JSON.stringify({operator_id:a.operator.id,game_id:'uno-luck',mode:'preproduction'})});
-  assert.equal(releaseRequest.status,201);
-  const rr=await releaseRequest.json();
-  assert.equal(rr.status,'requested');
-  const advance=async action=>fetch(base+'/api/release-requests/'+rr.id+'/'+action,{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:'{}'});
-  const skipped=await advance('activate');assert.equal(skipped.status,409,'Approval cannot be skipped');
-  const validated=await advance('validate');assert.equal(validated.status,409,'Preproduction validation requires global gate');
+  assert.equal(releaseRequest.status,403,'Shared sandbox access cannot request releases');
+  assert.equal((await releaseRequest.json()).error,'NAMED_STAFF_REQUIRED');
   const prodRequest=await fetch(base+'/api/release-requests',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:JSON.stringify({operator_id:b.operator.id,game_id:'uno-luck',mode:'production'})});
   assert.equal(prodRequest.status,409,'Production requests remain locked');
   const modePath='/api/operators/'+a.operator.id+'/games/uno-luck/mode';
