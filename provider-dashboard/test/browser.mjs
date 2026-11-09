@@ -82,6 +82,7 @@ async function run(){
   await auditor.locator('.nav-link[data-page="reconcile"]').click();
   assert.equal(await auditor.locator("#run-reconcile").isDisabled(),true);
   await auditor.locator("#logout-button").click();
+  await auditor.locator("#auth-layout:not([hidden])").waitFor({state:"visible",timeout:15000});
   assert.equal(await auditor.locator("#auth-layout").isVisible(),true);
   console.log("PASS: 3 browser sizes/roles, 6 routes, computed Minecraft font, logo, API download, admin controls, read-only auditor, no horizontal overflow or JS errors.");
 }
