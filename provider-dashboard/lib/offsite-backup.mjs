@@ -13,7 +13,7 @@ export function signS3({method='PUT',endpoint,bucket,key,region,accessKeyId,secr
  if(url.protocol!=='https:'&&process.env.NODE_ENV!=='test')throw Error('Offsite S3 endpoint must use HTTPS');
  if(url.username||url.password||url.search||url.hash)throw Error('Unexpected S3 endpoint credentials or query');
  if(!/^[a-z0-9][a-z0-9.-]{2,62}$/.test(bucket)||!region||!accessKeyId||!secretAccessKey)throw Error('Missing S3 credentials');
- if(!/^[A-Za-z0-9/_-]{1,250}$/.test(key)||key.includes('..'))throw Error('Invalid object key');
+ if(!/^[A-Za-z0-9/_.-]{1,250}$/.test(key)||key.includes('..'))throw Error('Invalid object key');
  if(urlStyle!=='path'&&urlStyle!=='virtual-host')throw Error('Invalid S3 URL style');
  const parts=key.split('/').map(encode).join('/');
  if(urlStyle==='virtual-host')url.hostname=bucket+'.'+url.hostname;
