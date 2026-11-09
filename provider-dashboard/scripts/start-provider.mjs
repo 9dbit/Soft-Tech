@@ -1,6 +1,8 @@
 import {prepareCoreStartup} from '../lib/core-startup-rotation.mjs';
+import {requirePersistentMount} from '../lib/native-volume.mjs';
 
 try{
+ requirePersistentMount(process.env);
  const startup=await prepareCoreStartup();
  for(const key of ['CORE_OLD_MASTER_SECRET','CORE_OLD_MASTER_SECRET_FILE','CORE_NEW_MASTER_SECRET','CORE_NEW_MASTER_SECRET_FILE','PANEL_SESSION_SECRET_FILE'])delete process.env[key];
  Object.assign(process.env,startup.env);

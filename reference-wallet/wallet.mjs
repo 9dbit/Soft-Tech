@@ -1,9 +1,10 @@
 import {DatabaseSync} from 'node:sqlite';
 import {createHash,createHmac,randomBytes,timingSafeEqual,createCipheriv,createDecipheriv} from 'node:crypto';
-import {mkdirSync,chmodSync,existsSync,realpathSync} from 'node:fs';
+import {mkdirSync,chmodSync,existsSync,realpathSync,lstatSync,statSync} from 'node:fs';
 import path from 'node:path';
 import {types} from 'node:util';
 import {DurableWrites} from './durable-writes.mjs';
+import {requirePersistentMount} from './native-volume.mjs';
 export class WalletFault extends Error { constructor(status,code){super(code);this.status=status;this.code=code;} }
 export const fail=(status,code)=>{throw new WalletFault(status,code);};
 const hash=s=>createHash('sha256').update(s).digest('hex');
@@ -12,18 +13,42 @@ const id=(s,name,max=150)=>{if(typeof s!=='string'||s.length<1||s.length>max||/[
 const amount=(s,zero=true)=>{if(typeof s!=='string'||!/^(0|[1-9][0-9]{0,24})$/.test(s)||BigInt(s)>10n**24n||(!zero&&BigInt(s)===0n))fail(422,'INVALID_AMOUNT');return BigInt(s);};
 export function canonical(version,environment,audience,method,pathname,timestamp,nonce,body){return [`softtech.wallet.v${version}`,...(version===2?[environment,audience]:[]),method.toUpperCase(),pathname,timestamp,nonce,hash(body)].join('\n');}
 export function walletHeaders({secret,operatorId,version=2,environment,audience,method='POST',pathname,body,timestamp=String(Math.floor(Date.now()/1000)),nonce=randomBytes(18).toString('hex')}){return {'content-type':'application/json','x-softtech-key':'wallet-'+operatorId,'x-softtech-timestamp':timestamp,'x-softtech-nonce':nonce,'x-softtech-signature':createHmac('sha256',secret).update(canonical(version,environment,audience,method,pathname,timestamp,nonce,body)).digest('hex'),...(version===2?{'x-wallet-version':'2','x-wallet-environment':environment,'x-wallet-audience':audience}:{})};}
+
+function exists(pathname){
+ try{lstatSync(pathname);return true;}catch(error){if(error.code==='ENOENT')return false;throw error;}
+}
+function realPathForCreation(requested){
+ let ancestor=path.resolve(requested);const missing=[];
+ while(!exists(ancestor)){
+  const parent=path.dirname(ancestor);
+  if(parent===ancestor)throw Error('Wallet database parent is unavailable');
+  missing.unshift(path.basename(ancestor));ancestor=parent;
+ }
+ // lstat above sees dangling links. realpath must reject them before mkdir or SQLite.
+ return path.join(realpathSync(ancestor),...missing);
+}
+function databasePath(env){
+ requirePersistentMount(env);
+ const file=realPathForCreation(env.WALLET_DB_PATH||'./data/wallet.sqlite');
+ if(env.RAILWAY_VOLUME_MOUNT_PATH){
+  const mount=realpathSync(env.RAILWAY_VOLUME_MOUNT_PATH),relative=path.relative(mount,file);
+  if(!statSync(mount).isDirectory()||relative===''||relative==='..'||relative.startsWith('..'+path.sep)||path.isAbsolute(relative))throw Error('Wallet database must be on its dedicated volume');
+ }
+ return file;
+}
 export class ReferenceWallet {
  constructor({env=process.env,clock=Date.now}={}){
   this.env=env;this.clock=clock;this.authCount=0;this.transactionDepth=0;this.transactionSequence=0;this.writeMetrics={statements:0,total_ms:0,max_ms:0};
   const environment=env.WALLET_ENVIRONMENT||'sandbox',deploymentId=env.WALLET_DEPLOYMENT_ID,audience=env.WALLET_CORE_AUDIENCE;
   if(!['sandbox','preproduction','production'].includes(environment)||!/^[-\w.]{8,100}$/.test(deploymentId||'')||!/^[-\w.]{8,100}$/.test(audience||''))throw Error('Explicit wallet environment, deployment ID and Core audience are required');
   if(typeof env.WALLET_MASTER_KEY!=='string'||env.WALLET_MASTER_KEY.length<32||typeof env.WALLET_ADMIN_TOKEN!=='string'||env.WALLET_ADMIN_TOKEN.length<40)throw Error('Wallet master and admin secrets are required');
-  if(env.RAILWAY_SERVICE_ID&&!env.RAILWAY_VOLUME_MOUNT_PATH)throw Error('A dedicated wallet volume mount is required on Railway');
   if(environment==='production'&&env.WALLET_TEST_CONTROL_ENABLED==='true')throw Error('Production test control is forbidden');
   this.testControl=environment!=='production'&&env.WALLET_TEST_CONTROL_ENABLED==='true';
   this.key=createHash('sha256').update('softtech-reference-wallet-v1:'+env.WALLET_MASTER_KEY).digest();
-  const file=path.resolve(env.WALLET_DB_PATH||'./data/wallet.sqlite');mkdirSync(path.dirname(file),{recursive:true,mode:0o700});
-  if(env.RAILWAY_VOLUME_MOUNT_PATH){const mount=realpathSync(env.RAILWAY_VOLUME_MOUNT_PATH),parent=realpathSync(path.dirname(file));const actual=existsSync(file)?realpathSync(file):path.join(parent,path.basename(file));if((parent!==mount&&!parent.startsWith(mount+path.sep))||!actual.startsWith(mount+path.sep))throw Error('Wallet database must be on its dedicated volume');}
+  let file=databasePath(env);
+  mkdirSync(path.dirname(file),{recursive:true,mode:0o700});
+  // Recheck the live mount and actual ancestry before opening a writable database.
+  file=databasePath(env);
   if(existsSync(file)){const previous=new DatabaseSync(file,{readOnly:true});try{const row=previous.prepare('SELECT * FROM identity WHERE id=1').get();if(!row||row.environment!==environment||row.deployment_id!==deploymentId||row.core_audience!==audience)throw Error('Wallet database identity mismatch');if(this.open(row.key_check)!=='wallet-key-check')throw Error('Wallet key mismatch');}finally{previous.close();}}
   this.db=new DatabaseSync(file);this.databasePath=file;chmodSync(file,0o600);
   this.db.exec(`PRAGMA journal_mode=WAL;PRAGMA synchronous=FULL;PRAGMA foreign_keys=ON;PRAGMA busy_timeout=5000;

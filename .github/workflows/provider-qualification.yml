@@ -6,6 +6,9 @@ on:
       - 'qualification/**'
       - 'provider-dashboard/lib/**'
       - 'provider-dashboard/server.mjs'
+      - 'provider-dashboard/scripts/start-provider.mjs'
+      - 'provider-dashboard/test/native-volume*'
+      - 'provider-dashboard/Dockerfile'
       - '.github/workflows/provider-qualification.yml'
   pull_request:
     paths:
@@ -13,6 +16,9 @@ on:
       - 'qualification/**'
       - 'provider-dashboard/lib/**'
       - 'provider-dashboard/server.mjs'
+      - 'provider-dashboard/scripts/start-provider.mjs'
+      - 'provider-dashboard/test/native-volume*'
+      - 'provider-dashboard/Dockerfile'
       - '.github/workflows/provider-qualification.yml'
   workflow_dispatch:
 permissions:
@@ -20,7 +26,7 @@ permissions:
 jobs:
   safeguards:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,5 +34,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: node --check reference-wallet/server.mjs && node --check reference-wallet/wallet.mjs && node --check qualification/native-load.mjs && node --check qualification/evidence-gate.mjs
-      - run: node --test --test-concurrency=1 reference-wallet/test/*.test.mjs qualification/test/*.test.mjs
+      - run: node --check reference-wallet/server.mjs && node --check reference-wallet/wallet.mjs && node --check reference-wallet/native-volume.mjs && node --check qualification/native-load.mjs && node --check qualification/evidence-gate.mjs
+      - run: node --test --test-concurrency=1 provider-dashboard/test/native-volume.test.mjs reference-wallet/test/*.test.mjs qualification/test/*.test.mjs
+      - name: Verify actual Linux bind mount, stacked mount and detach behavior
+        run: sudo unshare --mount --propagation private "$(command -v node)" provider-dashboard/test/native-volume-mount-fixture.mjs
+      - name: Build the exact Core and reference-wallet images
+        run: |
+          docker build --tag softtech-core-mount-ci provider-dashboard
+          docker build --tag softtech-wallet-mount-ci --file reference-wallet/Dockerfile .
+      - name: Verify packaged startup and health on actual mounted volumes
+        run: node provider-dashboard/test/native-volume-image-fixture.mjs

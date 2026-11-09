@@ -2,6 +2,7 @@ import http from 'node:http';
 import {randomUUID} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {ReferenceWallet,WalletFault} from './wallet.mjs';
+import {platformHealth} from './native-volume.mjs';
 const bodyLimit=65536;
 async function body(req){let size=0;const parts=[];for await(const chunk of req){size+=chunk.length;if(size>bodyLimit)throw new WalletFault(413,'BODY_TOO_LARGE');parts.push(chunk);}return Buffer.concat(parts).toString('utf8');}
 function json(raw){try{const p=JSON.parse(raw);if(!p||typeof p!=='object'||Array.isArray(p))throw Error();return p;}catch{throw new WalletFault(400,'INVALID_JSON');}}
@@ -11,7 +12,7 @@ export function createWalletServer({env=process.env,clock=Date.now}={}){
  const server=http.createServer(async(req,res)=>{
   try{
    const u=new URL(req.url,'http://wallet'),pathname=u.pathname;
-   if(req.method==='GET'&&pathname==='/health'){send(res,200,{ok:true,service:'softtech-reference-wallet',classification:'internal-test-reference',production_enabled:false,identity:wallet.identity,source_commit:env.RAILWAY_GIT_COMMIT_SHA||env.SOURCE_COMMIT||null,process_boot_id:processBootId,uptime_seconds:Math.floor(process.uptime()),memory_rss_bytes:process.memoryUsage().rss,cpu_usage_microseconds:process.cpuUsage(),durable_journal:wallet.journal.status(),sqlite_writes:wallet.writeMetrics});return;}
+   if(req.method==='GET'&&pathname==='/health'){const volume=platformHealth(env);send(res,200,{ok:true,service:'softtech-reference-wallet',classification:'internal-test-reference',production_enabled:false,identity:wallet.identity,platform_deployment_id:volume.platform_deployment_id,persistent_volume:volume.native_volume,source_commit:env.RAILWAY_GIT_COMMIT_SHA||env.SOURCE_COMMIT||null,process_boot_id:processBootId,uptime_seconds:Math.floor(process.uptime()),memory_rss_bytes:process.memoryUsage().rss,cpu_usage_microseconds:process.cpuUsage(),durable_journal:wallet.journal.status(),sqlite_writes:wallet.writeMetrics});return;}
    if(u.search)throw new WalletFault(400,'QUERY_NOT_ALLOWED');
    const ip=req.socket.remoteAddress||'unknown',now=clock(),bucket=rate.get(ip)||{t:now,n:0};if(now-bucket.t>60000){bucket.t=now;bucket.n=0;}bucket.n++;rate.set(ip,bucket);if(rate.size>10000)for(const [k,v]of rate)if(now-v.t>60000)rate.delete(k);if(bucket.n>120000)throw new WalletFault(429,'RATE_LIMITED');
    if(pathname.startsWith('/admin/')){

@@ -34,6 +34,9 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
   assert.equal(health.deployment_identity.environment,'sandbox');
   assert.equal(health.deployment_identity.identity_bound,true);
   assert.equal(health.deployment_identity.physical_isolation_verified,false);
+  assert.equal(health.platform_deployment_id,null);
+  assert.deepEqual(health.persistent_volume,{required:false,verified:false,verification:'not_required_local',filesystem_type:null});
+  assert.equal(health.persistent,false);
   const backupHealth=await fetch(base+'/health/backup');
   assert.equal(backupHealth.status,503,'A reachable database must not imply verified offsite backup');
   const backupProof=await backupHealth.json();

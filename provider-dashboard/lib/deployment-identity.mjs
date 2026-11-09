@@ -2,6 +2,7 @@ import {DatabaseSync} from 'node:sqlite';
 import {lstatSync,mkdirSync,realpathSync,statSync} from 'node:fs';
 import {basename,dirname,isAbsolute,join,relative,resolve,sep} from 'node:path';
 import {randomUUID} from 'node:crypto';
+import {requirePersistentMount} from './native-volume.mjs';
 
 const identitySchema=`
 CREATE TABLE IF NOT EXISTS deployment_identity(
@@ -55,10 +56,11 @@ function contained(root,path){
 }
 
 function databasePath(env){
+ const mounted=requirePersistentMount(env);
  const requested=env.CORE_DB_PATH||resolve('.local-data/provider.sqlite');
  if(!isAbsolute(requested))throw Error('Absolute CORE_DB_PATH required');
  const path=realPathForCreation(requested);
- if(env.NODE_ENV==='production'){
+ if(env.NODE_ENV==='production'||mounted){
   const mount=env.RAILWAY_VOLUME_MOUNT_PATH;
   if(typeof mount!=='string'||!isAbsolute(mount))throw Error('A mounted persistent volume is required in production');
   let realMount;
