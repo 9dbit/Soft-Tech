@@ -3,7 +3,7 @@
 import {randomUUID} from 'node:crypto';
 import {signer} from '../lib/security.mjs';
 import {catalog} from '../lib/catalog.mjs';
-const wait=ms=>new Promise(r=>setTimeout(r,ms));
+import {waitForReadiness} from './readiness.mjs';
 function assert(ok,message){if(!ok)throw Error(message);}
 function assertEqual(a,b,message){assert(a===b,message);}
 export async function runAcceptance(core,id){
@@ -13,9 +13,7 @@ export async function runAcceptance(core,id){
  core.run('INSERT INTO selftests VALUES(?,?,?,?,?)',id,'running',JSON.stringify(report),started,started);
  const save=status=>core.run('UPDATE selftests SET status=?,result_json=?,updated_at=? WHERE id=?',status,JSON.stringify(report),core.clock(),id);
  try{
-  let ready=false;
-  for(let attempt=0;attempt<12;attempt++){const g=await core.refreshHealth();if(g.length===3&&g.every(x=>x.health==='ok')){ready=true;break;}await wait(5000);}
-  assert(ready,'Not all provider engines report ready');
+  report.readiness=await waitForReadiness(core,id);save('running');
   const profiles=[];
   for(const suffix of ['A','B'])profiles.push(core.createOperator({name:'Acceptance Operator '+suffix+' / '+id,games:catalog.map(g=>g.id),currency:'VCOIN',scale:2,initial_minor:'10000000',return_origins:[core.env.CORE_PUBLIC_ORIGIN]},'system:acceptance',{internal:true}));
   const local='http://127.0.0.1:'+(core.env.PORT||8080);
