@@ -21,7 +21,7 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
  const dir=await mkdtemp(join(tmpdir(),'st-operator-http-'));
  const port=await freePort(),base='http://127.0.0.1:'+port;
  const env={...process.env,NODE_ENV:'test',PORT:String(port),CORE_DB_PATH:join(dir,'core.sqlite'),PANEL_ADMIN_PASSWORD:'admin-test-password-123456',PANEL_AUDITOR_PASSWORD:'auditor-test-password-123456',PANEL_SESSION_SECRET:'test-root-secret-longer-than-32-chars-123456789',CORE_PUBLIC_ORIGIN:base,UNO_PROVIDER_ORIGIN:base,MAHJONG_PROVIDER_ORIGIN:base,SKYGATE_PROVIDER_ORIGIN:base,CORE_ENGINE_KEYS_JSON:'[]',OFFSITE_BACKUP_ENABLED:'false'};
- const child=spawn(process.execPath,['server.mjs'],{cwd:resolve('provider-dashboard'),env,stdio:'pipe'});
+ const child=spawn(process.execPath,['server.mjs'],{cwd:resolve('provider-dashboard'),env,stdio:['ignore','pipe','pipe']});
  let logs='';child.stdout.on('data',d=>logs+=d);child.stderr.on('data',d=>logs+=d);
  try{
   let healthy=false;
@@ -92,5 +92,5 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
   assert.equal(burst.filter(x=>x.status!==200).length,0,'concurrent signed game catalog calls failed');
   const logout=await fetch(base+'/api/logout',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf}});
   assert.equal(logout.status,200);
- }finally{child.kill('SIGTERM');await new Promise(r=>{if(child.exitCode!==null||child.signalCode!==null)r();else{child.once('exit',r);setTimeout(()=>{child.kill('SIGKILL');r();},3000).unref();}});await rm(dir,{recursive:true,force:true});}
+ }finally{child.kill('SIGTERM');await new Promise(r=>{if(child.exitCode!==null||child.signalCode!==null)r();else{child.once('exit',r);setTimeout(()=>{child.kill('SIGKILL');r();},3000).unref();}});child.stdout.destroy();child.stderr.destroy();await rm(dir,{recursive:true,force:true});}
 });
