@@ -27,3 +27,16 @@ jobs:
         run: npm run check
       - name: Authentication, RBAC, download and reconciliation tests
         run: npm test
+      - name: Install Playwright browser test library
+        run: npm install --no-save playwright
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Interactive browser and responsive screenshot QA
+        run: node test/browser.mjs
+      - name: Upload dashboard screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soft-tech-provider-panel-browser-qa
+          path: provider-dashboard/qa-artifacts/provider/
+          if-no-files-found: warn
