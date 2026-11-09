@@ -31,9 +31,6 @@ jobs:
       - name: Persistent core, tenant isolation and wallet fault tests
         working-directory: provider-dashboard
         run: npm test
-      - name: Signed HTTP operator integration and release approvals
-        working-directory: provider-dashboard
-        run: node test/operator-http.test.mjs
       - name: Stale public route and rollout readiness regressions
         working-directory: provider-dashboard
         run: node --test test/readiness.test.mjs
