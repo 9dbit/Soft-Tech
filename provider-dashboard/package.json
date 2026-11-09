@@ -9,6 +9,6 @@
   "scripts": {
     "start": "node server.mjs",
     "check": "node --check server.mjs && node --check lib/core.mjs && node --check public/app.js",
-    "test": "node --test test/core.test.mjs"
+    "test": "node --test test/*.test.mjs"
   }
 }
