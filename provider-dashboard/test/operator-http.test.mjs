@@ -85,7 +85,7 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
   const repeated=await fetch(base+'/v1/game-launches',signed({url:base+'/v1/game-launches',method:'POST',body,credential:a.credential,idempotencyKey:'external-conformance-launch-001'}));
   assert.equal(repeated.status,200);
   assert.equal((await repeated.json()).session_id,launched.session_id);
-  const burst=await Promise.all(Array.from({length:40},(_,i)=>{
+  const burst=await Promise.all(Array.from({length:100},(_,i)=>{
    const credential=i%2===0?a.credential:b.credential;
    return fetch(base+'/v1/games',signed({url:base+'/v1/games',credential}));
   }));
