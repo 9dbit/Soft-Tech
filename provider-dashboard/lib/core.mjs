@@ -50,8 +50,7 @@ export class Core {
   const op=this.operator(id);
   if(op.internal)fail(409,'INTERNAL_OPERATOR_PROTECTED');
   if(!parse(op.games_json).includes(gameId))fail(403,'GAME_NOT_ALLOWED');
-  if(!['sandbox','preproduction','disabled'].includes(mode))fail(409,'PRODUCTION_LOCKED');
-  if(mode==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
+  if(!['sandbox','disabled'].includes(mode))fail(409,'RELEASE_APPROVAL_REQUIRED');
   const old=this.gameMode(op,gameId),now=this.clock();
   if(old===mode)return {operator_id:id,game_id:gameId,mode,changed:false};
   this.transaction(()=>{
