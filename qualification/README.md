@@ -145,6 +145,17 @@ Acknowledgement alone never passes the test. The runner observes a changed rando
 
 `evidence-gate.mjs` supersedes reliance on a document merely saying PASS. It does not activate production. The actual human release workflow and platform controls remain separate.
 
+The former `provider-dashboard/scripts/release-evidence-gate.mjs <evidence.json>`
+invocation is rejected with `LEGACY_UNSIGNED_EVIDENCE_REJECTED`, even if all 14 old
+records contain PASS, URLs and reviewer names. That script path now delegates only
+the modern `--bundle --registry --target --evidence-root [--report]` command to
+this exact 20-gate signed verifier; it has no separate or reduced policy.
+The `Provider signed evidence gate tests` workflow runs temporary cryptographic
+fixtures only, including on manual dispatch. Its success is a code-test result,
+not a go-live decision. It does not read the obsolete `RELEASE_EVIDENCE_JSON`
+secret, enroll reviewers, upload operational material, or activate production.
+Run real signed verification within the protected review package described below.
+
 Twenty engineering, operator, security, mathematics and legal requirements are checked. Every signed attestation binds the exact production deployment and full Core/UNO/Mahjong/Skygate/wallet commits; dated material files have verified byte counts and SHA256 hashes. Ed25519 reviewer signatures must be trusted through an independently managed identity registry. Unknown, revoked, expired, wrong-role and automation-as-human identities are rejected. Independent reviewers cannot also be the implementation reviewer or release requester. An internally operated reference wallet cannot satisfy external operator certification.
 
 The final requester and approver must be different verified human identities. Both approvals bind the complete attestation-set hash and the same release ID. Changing any attestation invalidates their approval. A key, a signature or a green automated test alone is not proof that a real person independently reviewed the evidence; reviewer identity verification must occur before their key enters the trusted registry.

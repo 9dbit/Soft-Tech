@@ -1,45 +1,48 @@
-name: Provider production release evidence gate
+name: Provider signed evidence gate tests
 on:
   workflow_dispatch:
   push:
-    branches: [feat/provider-core-independent-20261109]
+    branches: [main, feat/provider-core-independent-20261109]
     paths:
       - 'provider-dashboard/scripts/release-evidence-gate.mjs'
       - 'provider-dashboard/test/release-evidence-gate.test.mjs'
+      - 'qualification/evidence-gate.mjs'
+      - 'qualification/test/evidence-gate.test.mjs'
+      - '.github/workflows/provider-release-gate.yml'
+  pull_request:
+    paths:
+      - 'provider-dashboard/scripts/release-evidence-gate.mjs'
+      - 'provider-dashboard/test/release-evidence-gate.test.mjs'
+      - 'qualification/evidence-gate.mjs'
+      - 'qualification/test/evidence-gate.test.mjs'
       - '.github/workflows/provider-release-gate.yml'
 permissions:
   contents: read
 jobs:
+  # Retain the existing fixture job ID for repository check compatibility.
   verify-gate-logic:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
-          node-version: '24.11.1'
-      - name: Validate evidence gate logic
-        working-directory: provider-dashboard
-        run: node --test test/release-evidence-gate.test.mjs
-  production-unlock:
-    if: github.event_name == 'workflow_dispatch'
-    needs: verify-gate-logic
-    runs-on: ubuntu-latest
-    environment: production-approval
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24.11.1'
-      - name: Require independently supplied release evidence
-        env:
-          RELEASE_EVIDENCE_JSON: ${{ secrets.RELEASE_EVIDENCE_JSON }}
+          node-version: '24'
+      - name: Validate signatures, material integrity and legacy rejection with temporary fixtures
+        run: node --test --test-concurrency=1 provider-dashboard/test/release-evidence-gate.test.mjs qualification/test/evidence-gate.test.mjs
+      - name: State the scope of this workflow
+        if: always()
         run: |
-          test -n "$RELEASE_EVIDENCE_JSON" || { echo "BLOCKED: no release evidence configured"; exit 1; }
-          printf '%s' "$RELEASE_EVIDENCE_JSON" > "$RUNNER_TEMP/release-evidence.json"
-          node provider-dashboard/scripts/release-evidence-gate.mjs "$RUNNER_TEMP/release-evidence.json"
-      - name: Release decision only
-        run: echo "Evidence format accepted; independent audit and runtime unlock remain separate."
+          cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
+          ## Verifier code tests only
+          This workflow uses temporary synthetic identities and materials. A green
+          result does not approve a release, attest to a real person, or activate production.
+
+          The obsolete unsigned 14-gate RELEASE_EVIDENCE_JSON path is removed.
+          Real review uses qualification/evidence-gate.mjs with the private signed
+          bundle, separately managed trusted registry, expected production target,
+          and exact material files. Keep operational evidence outside this public
+          repository and workflow artifacts. Production remains locked.
+          SUMMARY
