@@ -48,14 +48,14 @@ test('operator-game release workflow is audited, sequential and production locke
  f.core.run("INSERT INTO meta(key,value) VALUES('release_mode','preproduction')");
  assert.equal(f.core.advanceRelease(request.id,'validate').status,'validated');
  assert.equal(f.core.advanceRelease(request.id,'approve').status,'approved');
- assert.equal(f.core.advanceRelease(request.id,'activate').status,'activated');
- assert.equal(f.core.gameMode(f.core.operator(a.operator.id),ids[0]),'preproduction');
+ assert.throws(()=>f.core.advanceRelease(request.id,'activate'),code('PREPRODUCTION_ISOLATION_PENDING'));
+ assert.equal(f.core.gameMode(f.core.operator(a.operator.id),ids[0]),'sandbox');
  assert.equal(f.core.gameMode(f.core.operator(b.operator.id),ids[0]),'sandbox');
- assert.equal(launch(f.core,a.operator).environment,'preproduction');
+ assert.equal(f.core.get('SELECT status FROM release_requests WHERE id=?',request.id).status,'approved');
  f.core.setOperatorGameMode(a.operator.id,ids[0],'disabled');
  assert.throws(()=>launch(f.core,a.operator,ids[0],random(20),'blocked'),code('GAME_DISABLED_FOR_OPERATOR'));
  assert.equal(launch(f.core,b.operator).environment,'sandbox');
- assert.ok(f.core.all("SELECT * FROM audit WHERE event LIKE 'release.%'").length>=4);
+ assert.ok(f.core.all("SELECT * FROM audit WHERE event LIKE 'release.%'").length>=3);
  f.restart();
  assert.equal(f.core.gameMode(f.core.operator(a.operator.id),ids[0]),'disabled');
 });
