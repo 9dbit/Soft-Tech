@@ -54,6 +54,19 @@ const server=createServer({maxHeaderSize:16384},async(req,res)=>{
    if(method==='POST'&&!equal(req.headers['x-csrf-token']||'',session.csrf))fail(403,'CSRF_REQUIRED');
    if(path==='/api/logout'&&method==='POST'){core.run('DELETE FROM panel_sessions WHERE id_hash=?',session.id_hash);send(res,200,{success:true},undefined,{'Set-Cookie':cookie('',0)});return;}
    if(path==='/api/backup-status'&&method==='GET'){admin(session);send(res,200,backupState);return;}
+   if(path==='/api/release-control'&&method==='GET'){
+    const mode=core.get('SELECT value FROM meta WHERE key=?','release_mode')?.value||'sandbox';
+    send(res,200,{mode,production_enabled:false,credits:'virtual_nonredeemable',backup:backupState,checks:{backup_verified:backupState.last?.ok===true&&backupState.last?.remoteRestore==='verified',external_wallet_certified:false,engine_volume_recovery:false,mfa_enabled:false,legal_approval:false},message:'Production activation is locked until all independent release gates pass.'});return;
+   }
+   if(path==='/api/release-control'&&method==='POST'){
+    admin(session);const data=json(await readBody(req));
+    if(!['sandbox','preproduction'].includes(data.mode))fail(409,'PRODUCTION_LOCKED');
+    if(data.confirmation!=='CONFIRM '+data.mode.toUpperCase())fail(422,'CONFIRMATION_REQUIRED');
+    const old=core.get('SELECT value FROM meta WHERE key=?','release_mode')?.value||'sandbox';
+    if(data.mode==='preproduction'&&!(backupState.last?.ok===true&&backupState.last?.remoteRestore==='verified'))fail(409,'BACKUP_NOT_VERIFIED');
+    core.transaction(()=>{core.run('INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value','release_mode',data.mode);core.audit('panel:admin','release.mode_changed','provider',{from:old,to:data.mode,credits:'virtual_nonredeemable'});});
+    send(res,200,{mode:data.mode,production_enabled:false});return;
+   }
    if(path==='/api/bootstrap'&&method==='GET'){send(res,200,core.bootstrap(session.role));return;}
    if(path==='/api/download/openapi.json'&&method==='GET'){send(res,200,spec(),undefined,{'Content-Disposition':'attachment; filename="soft-tech-provider-openapi-v1.json"'});return;}
    if(path==='/api/download/developer.html'&&method==='GET'){send(res,200,developerHTML(),'text/html; charset=utf-8',{'Content-Disposition':'attachment; filename="soft-tech-provider-api-v1.html"'});return;}
