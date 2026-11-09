@@ -1,10 +1,14 @@
 # Native-session transport and runner observations
 
 The runner can keep one verified HTTPS connection per authenticated native
-session by setting `native_transport` to `per_user_https` in the protected
-qualification configuration. The default remains `shared_fetch`. The chosen
-transport is recorded in every load report and is included in the existing
-configuration fingerprint and runner plan hash.
+session by setting the nonsecret environment variable
+`QUALIFICATION_NATIVE_TRANSPORT=per_user_https`. This validates and overrides the
+optional `native_transport` setting in the existing protected configuration.
+There is no need to read, resend or edit that credential-bearing JSON. The default
+remains `shared_fetch`. Invalid transport values fail closed. The effective mode
+is recorded in health, plan state and reports, and is bound into the effective
+configuration fingerprint and runner plan hash. Changing the mode requires a new
+run ID; it cannot resume an earlier run under different connection semantics.
 
 Each session creates its own `https.Agent` immediately before its actual launch
 request. The Agent permits one socket and one idle socket, shares a process-wide
@@ -98,3 +102,22 @@ Primary API references:
 Undici's connector events cannot reliably be attributed to individual requests.
 The observer therefore times actual sockets and pairs request events by object
 identity, rather than matching connector events by hostname or assumed order.
+
+## Large reconciliation proof
+
+The temporary proof database materializes `expected_wallet_id` for every Core
+ledger entry and gives it a non-unique index. The wallet-orphan query uses that
+plain key. Its earlier concatenation join produced a scan of the entire provider
+table for every wallet receipt, including when all receipts matched. The index
+changes lookup cost without dropping any rows, changing pagination limits,
+changing amounts, or weakening orphan/mismatch/cardinality checks. The index is
+deliberately non-unique so duplicate debit or credit rows still reach the existing
+cardinality checks. A file-backed 200,000-receipt fixture asserts the actual SQLite
+query plan uses the index, verifies matched data, then detects missing receipts,
+orphan applied receipts, duplicate ledger entries, rejected status and altered
+amount/currency/scale.
+
+The heartbeat and final report also expose completed-round counts by game. The
+read-only health progress includes the same counters so storage projection can
+use measured game-specific throughput instead of assuming equal throughput from
+equal session counts. These counters do not change workload or gate decisions.
