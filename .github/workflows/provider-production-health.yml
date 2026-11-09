@@ -1,0 +1,260 @@
+name: Provider production health monitor
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [.github/workflows/provider-production-health.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provider-production-health
+  cancel-in-progress: false
+
+jobs:
+  provider-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Initialize health evidence
+        timeout-minutes: 1
+        shell: bash
+        run: |
+          mkdir -p health-evidence
+          python3 - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          Path('health-evidence/report.json').write_text(json.dumps({
+              'schema': 'softtech.health-monitor.v1',
+              'status': 'verifier_not_completed',
+              'started_at': datetime.now(timezone.utc).isoformat(),
+              'error': 'Verifier did not complete; inspect workflow logs.',
+              'services': [],
+          }, indent=2) + '\n', encoding='utf-8')
+          PY
+
+      - name: Verify provider and native backup health
+        id: verify
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import concurrent.futures
+          import json
+          import os
+          import re
+          import time
+          import urllib.error
+          import urllib.request
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          TARGETS = (
+              ('provider', 'https://soft-tech-provider-panel.up.railway.app'),
+              ('uno', 'https://softtech-engine-uno-production.up.railway.app'),
+              ('mahjong', 'https://softtech-engine-mahjong-production.up.railway.app'),
+              ('skygate', 'https://softtech-engine-skygate-production.up.railway.app'),
+          )
+          MAX_AGE_SECONDS = 25 * 60 * 60
+          REQUEST_TIMEOUT_SECONDS = 10
+          MAX_RESPONSE_BYTES = 32768
+          MAX_ATTEMPTS = 3
+          RETRY_DELAY_SECONDS = 5
+          SHA = re.compile(r'[0-9a-fA-F]{40}')
+
+          def utc_now():
+              return datetime.now(timezone.utc)
+
+          class ProbeError(Exception):
+              pass
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, request, response, code, message, headers, new_url):
+                  raise ProbeError('HTTP_REDIRECT_' + str(code))
+
+          def fetch_json(url):
+              # Only the fixed public HTTPS health URLs above are used.
+              request = urllib.request.Request(url, method='GET', headers={
+                  'Accept': 'application/json',
+                  'User-Agent': 'SoftTech-health-monitor/1',
+                  'Cache-Control': 'no-cache',
+              })
+              opener = urllib.request.build_opener(NoRedirect())
+              try:
+                  with opener.open(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+                      if response.status != 200:
+                          raise ProbeError('HTTP_' + str(response.status))
+                      payload = response.read(MAX_RESPONSE_BYTES + 1)
+              except urllib.error.HTTPError as error:
+                  raise ProbeError('HTTP_' + str(error.code)) from None
+              except (urllib.error.URLError, TimeoutError, OSError) as error:
+                  raise ProbeError('NETWORK_' + type(error).__name__) from None
+              if len(payload) > MAX_RESPONSE_BYTES:
+                  raise ProbeError('RESPONSE_TOO_LARGE')
+              try:
+                  data = json.loads(payload)
+              except (ValueError, UnicodeError):
+                  raise ProbeError('INVALID_JSON') from None
+              if not isinstance(data, dict):
+                  raise ProbeError('INVALID_JSON_OBJECT')
+              return data
+
+          def valid_sha(value):
+              return isinstance(value, str) and SHA.fullmatch(value) is not None
+
+          def validate_pair(health, backup, now):
+              errors = []
+              source = health.get('source_commit')
+              backup_source = backup.get('source_commit')
+              timestamp = backup.get('verified_at')
+              verified_at = None
+              age = None
+              if health.get('ok') is not True:
+                  errors.append('HEALTH_NOT_OK')
+              if not valid_sha(source):
+                  errors.append('INVALID_HEALTH_SOURCE_COMMIT')
+              if backup.get('ok') is not True:
+                  errors.append('BACKUP_NOT_OK')
+              if backup.get('backup_verified') is not True:
+                  errors.append('BACKUP_NOT_VERIFIED')
+              if not valid_sha(backup_source):
+                  errors.append('INVALID_BACKUP_SOURCE_COMMIT')
+              elif backup_source != source:
+                  errors.append('BACKUP_SOURCE_MISMATCH')
+              try:
+                  if not isinstance(timestamp, str):
+                      raise ValueError('Timestamp must be a string')
+                  parsed = datetime.fromisoformat(
+                      timestamp[:-1] + '+00:00' if timestamp.endswith('Z') else timestamp
+                  )
+                  if parsed.tzinfo is None or parsed.utcoffset() is None:
+                      raise ValueError('Timestamp must be timezone-aware')
+                  verified_at = parsed.astimezone(timezone.utc).isoformat()
+                  age = (now - parsed).total_seconds()
+                  if age < 0:
+                      errors.append('BACKUP_TIMESTAMP_IN_FUTURE')
+                  elif age > MAX_AGE_SECONDS:
+                      errors.append('BACKUP_STALE')
+              except (ValueError, TypeError, OverflowError):
+                  errors.append('INVALID_BACKUP_TIMESTAMP')
+              return {
+                  'ok': not errors,
+                  'source_commit': source if valid_sha(source) else None,
+                  'backup_source_commit': backup_source if valid_sha(backup_source) else None,
+                  'verified_at': verified_at,
+                  'backup_age_seconds': age,
+                  'errors': errors,
+              }
+
+          def check_service(name, origin, fetch=fetch_json, clock=utc_now, wait=time.sleep):
+              attempts = []
+              for number in range(1, MAX_ATTEMPTS + 1):
+                  health = {}
+                  backup = {}
+                  transport_errors = []
+                  started = clock().isoformat()
+                  for path in ('/health', '/health/backup'):
+                      try:
+                          value = fetch(origin + path)
+                          if not isinstance(value, dict):
+                              raise ProbeError('INVALID_JSON_OBJECT')
+                          if path == '/health':
+                              health = value
+                          else:
+                              backup = value
+                      except ProbeError as error:
+                          transport_errors.append(path + ':' + str(error))
+                  checked = clock()
+                  result = validate_pair(health, backup, checked)
+                  result['errors'] = transport_errors + result['errors']
+                  result['ok'] = not result['errors']
+                  result.update(attempt=number, started_at=started, checked_at=checked.isoformat())
+                  attempts.append(result)
+                  if result['ok']:
+                      break
+                  if number < MAX_ATTEMPTS:
+                      wait(RETRY_DELAY_SECONDS)
+              return {
+                  'service': name,
+                  'origin': origin,
+                  'ok': attempts[-1]['ok'],
+                  'attempts': attempts,
+              }
+
+          def main():
+              started = utc_now()
+              report = {
+                  'schema': 'softtech.health-monitor.v1',
+                  'run_id': os.getenv('GITHUB_RUN_ID'),
+                  'run_attempt': os.getenv('GITHUB_RUN_ATTEMPT'),
+                  'monitor_workflow_sha': os.getenv('GITHUB_SHA'),
+                  'started_at': started.isoformat(),
+                  'policy': {
+                      'max_backup_age_seconds': MAX_AGE_SECONDS,
+                      'request_timeout_seconds': REQUEST_TIMEOUT_SECONDS,
+                      'max_attempts': MAX_ATTEMPTS,
+                      'retry_delay_seconds': RETRY_DELAY_SECONDS,
+                      'max_response_bytes': MAX_RESPONSE_BYTES,
+                  },
+                  'services': [],
+              }
+              with concurrent.futures.ThreadPoolExecutor(max_workers=len(TARGETS)) as executor:
+                  jobs = [(name, origin, executor.submit(check_service, name, origin))
+                          for name, origin in TARGETS]
+                  for name, origin, job in jobs:
+                      try:
+                          report['services'].append(job.result())
+                      except Exception as error:
+                          report['services'].append({
+                              'service': name, 'origin': origin, 'ok': False,
+                              'attempts': [], 'error': 'VERIFIER_' + type(error).__name__,
+                          })
+              report['finished_at'] = utc_now().isoformat()
+              report['ok'] = len(report['services']) == len(TARGETS) and all(
+                  service['ok'] for service in report['services']
+              )
+              report['status'] = 'passed' if report['ok'] else 'failed'
+              Path('health-evidence').mkdir(exist_ok=True)
+              Path('health-evidence/report.json').write_text(
+                  json.dumps(report, indent=2) + '\n', encoding='utf-8'
+              )
+              summary = ['## Provider and native backup health', '',
+                         '| Service | Result | Source | Verified UTC | Errors |',
+                         '| --- | --- | --- | --- | --- |']
+              for service in report['services']:
+                  last = service['attempts'][-1] if service['attempts'] else {}
+                  errors = last.get('errors', [service.get('error', 'VERIFIER_INCOMPLETE')])
+                  summary.append('| ' + ' | '.join([
+                      service['service'], 'PASS' if service['ok'] else 'FAIL',
+                      (last.get('source_commit') or 'unknown')[:12],
+                      last.get('verified_at') or 'unavailable',
+                      ', '.join(errors) or 'none',
+                  ]) + ' |')
+                  print(json.dumps({
+                      'service': service['service'], 'ok': service['ok'],
+                      'source_commit': last.get('source_commit'),
+                      'verified_at': last.get('verified_at'), 'errors': errors,
+                  }))
+              if os.getenv('GITHUB_STEP_SUMMARY'):
+                  with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as stream:
+                      stream.write('\n'.join(summary) + '\n')
+              return 0 if report['ok'] else 1
+
+          if __name__ == '__main__':
+              raise SystemExit(main())
+          PY
+
+      - name: Upload health evidence
+        if: always()
+        timeout-minutes: 1
+        uses: actions/upload-artifact@v4
+        with:
+          name: provider-health-${{ github.run_id }}-${{ github.run_attempt }}
+          path: health-evidence/report.json
+          if-no-files-found: error
+          retention-days: 14
