@@ -248,3 +248,40 @@ node qualification/resource-proof.mjs \
 Capture Core, wallet, UNO, Mahjong, Skygate and runner summaries with `CPU_USAGE`, `CPU_LIMIT`, `MEMORY_USAGE_GB`, `MEMORY_LIMIT_GB` and `DISK_USAGE_GB`. Preserve the actual query start, response completion, `hours_back` and sample interval. A summary collected before the run finishes is insufficient. The helper requires the entire run, including setup and reconciliation, to fit inside the guaranteed query window. A one-hour soak usually requires a two-hour summary because setup and reconciliation extend beyond60minutes.
 
 Whole-hour maximum samples provide conservative bounds for the smaller run window; they may include earlier activity. Whole-hour averages remain labelled `enclosing_window_average`; `exact_run_window_average` remains null. Platform sample peaks are not instantaneous peaks. Do not copy a whole-hour average into a per-run average. Use a separately exported timestamped series if an exact test-window mean is required. Resource evidence can complete a functional PARTIAL report; it can never erase a failed session, latency threshold or ledger reconciliation.
+
+
+## Live Skygate code rollback with one retained session
+
+`code-rollback.mjs` provides three explicit CLI phases. It never changes Railway configuration. The platform operator supplies a fresh (at most15minutes old) actual successful deployment/volume observation for each phase using the schema in `code-rollback-platform.example.json`. Required fields bind the project, environment, service, attached volume, mount, platform deployment ID and full source SHA. The example placeholders cannot pass.
+
+Preparation pins both source SHAs and stores the actual native cookie and exact completed replay requests in a mode0600 file **outside every Git checkout**. The public reports contain only service/session IDs, source/boot identity, outcome hashes, platform metadata/digest and measured ledger evidence. Each report path must be new, so a failed phase cannot be overwritten.
+
+```bash
+node qualification/code-rollback.mjs \
+  --config /private/preproduction.json \
+  --phase prepare --run-id skygate-code-rollback-01 \
+  --current-source 725a4a070a8b13cb5f4b0e96b9a156f23e8a189b \
+  --rollback-source a5e4a2de2e100a9f11a5dafea63ce4393282a44f \
+  --private-state /private/skygate-rollback-state.json \
+  --platform-proof evidence/skygate-current-platform.json \
+  --report evidence/skygate-rollback-prepare.json
+
+# The platform operator deploys the pinned previous compatible source,
+# keeping the same service, environment and attached volume, then observes SUCCESS.
+node qualification/code-rollback.mjs \
+  --config /private/preproduction.json --phase after-rollback \
+  --private-state /private/skygate-rollback-state.json \
+  --platform-proof evidence/skygate-previous-platform.json \
+  --report evidence/skygate-rollback-verified.json
+
+# The platform operator restores the pinned current source and observes SUCCESS.
+node qualification/code-rollback.mjs \
+  --config /private/preproduction.json --phase after-forward \
+  --private-state /private/skygate-rollback-state.json \
+  --platform-proof evidence/skygate-forward-platform.json \
+  --report evidence/skygate-forward-verified.json
+```
+
+The preparation phase completes one genuine native round. The rollback phase requires the actual previous SHA and a changed process/deployment ID, replays that exact old outcome, and plays one additional round with the same cookie. The forward phase requires the original current SHA and another process/deployment change, replays both completed outcomes, verifies exactly two provider rounds/four provider entries/four authoritative wallet receipts, and revokes the session. Every phase also checks that health identity/source/boot stays unchanged while its checks run. A mismatched SHA, identity, volume, old result or ledger fails; there is no health or source override. Only a successful final phase has `full_rollback_completed: true`.
+
+Wait for earlier qualification rounds on the same operator to finish background recovery before the final reconciliation. A failed phase is retained with its private diagnostic state and cannot silently resume as a passing phase; investigate it and start a separate run. Any remaining session can be revoked through the normal operator API, while already accepted native outcomes retain their normal recovery path. This single-game code rollback does not substitute for full-volume recovery.

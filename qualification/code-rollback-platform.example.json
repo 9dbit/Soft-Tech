@@ -1,0 +1,13 @@
+{
+  "classification": "railway_authoritative_code_rollback_target",
+  "observed_at": "REPLACE_WITH_ACTUAL_UTC_OBSERVATION",
+  "environment": "preproduction",
+  "status": "REPLACE_WITH_OBSERVED_DEPLOYMENT_STATUS",
+  "project_id": "REPLACE_WITH_ACTUAL_PROJECT_ID",
+  "environment_id": "REPLACE_WITH_ACTUAL_ENVIRONMENT_ID",
+  "service_id": "REPLACE_WITH_ACTUAL_SKYGATE_SERVICE_ID",
+  "volume_id": "REPLACE_WITH_ACTUAL_ATTACHED_VOLUME_ID",
+  "mount_path": "/data",
+  "platform_deployment_id": "REPLACE_WITH_ACTUAL_SUCCESSFUL_DEPLOYMENT_ID",
+  "source_commit": "REPLACE_WITH_ACTUAL_FULL_SOURCE_SHA"
+}
