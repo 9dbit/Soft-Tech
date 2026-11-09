@@ -44,6 +44,22 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
   assert.equal(sandbox.status,200);
   const a=await makeOperator('Conformance Operator A'),b=await makeOperator('Conformance Operator B');
   assert.notEqual(a.credential.key_id,b.credential.key_id);
+  const modePath='/api/operators/'+a.operator.id+'/games/uno-luck/mode';
+  const setMode=async(mode)=>fetch(base+modePath,{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf,'Content-Type':'application/json'},body:JSON.stringify({mode})});
+  const prodMode=await setMode('production');
+  assert.equal(prodMode.status,409,'Per-game production cannot bypass global gate');
+  const premature=await setMode('preproduction');
+  assert.equal(premature.status,409,'Per-game preproduction cannot bypass global gate');
+  const disabled=await setMode('disabled');
+  assert.equal(disabled.status,200);
+  const forbiddenBody=JSON.stringify({game_id:'uno-luck',player_ref:'blocked-player',currency:'VCOIN'});
+  const forbidden=await fetch(base+'/v1/game-launches',signed({url:base+'/v1/game-launches',method:'POST',body:forbiddenBody,credential:a.credential,idempotencyKey:'mode-disabled-launch-001'}));
+  assert.equal(forbidden.status,403,'Disabled operator game must reject signed launches');
+  const unaffected=await fetch(base+'/v1/games',signed({url:base+'/v1/games',credential:b.credential}));
+  assert.equal(unaffected.status,200,'Other operator must remain unaffected');
+  const restored=await setMode('sandbox');
+  assert.equal(restored.status,200);
+
   const gameReq=signed({url:base+'/v1/games',credential:a.credential});
   const games=await fetch(base+'/v1/games',gameReq);
   assert.equal(games.status,200);assert.equal((await games.json()).games.length,3);
