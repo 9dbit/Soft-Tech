@@ -65,6 +65,9 @@ async function run(){
   await mobile.screenshot({path:out+"/mobile-overview.png",fullPage:true});
   await mobile.locator("#menu-toggle").click();
   assert.equal(await mobile.locator("#sidebar").evaluate(el=>el.classList.contains("open")),true);
+  await mobile.waitForTimeout(350);
+  const sidebarBox=await mobile.locator("#sidebar").boundingBox();
+  assert.ok(sidebarBox&&sidebarBox.x>=-2&&sidebarBox.width>=245,"mobile sidebar failed to enter viewport");
   await mobile.screenshot({path:out+"/mobile-menu.png",fullPage:false});
   await mobile.locator('.nav-link[data-page="games"]').click();
   assert.match(await mobile.locator("#page-content").innerText(),/UNO LUCK/);
