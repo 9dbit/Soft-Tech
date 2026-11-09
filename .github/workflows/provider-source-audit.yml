@@ -1,0 +1,63 @@
+name: Provider engine source audit
+on:
+  push:
+    branches: [feat/provider-core-independent-20261109]
+    paths: ['.github/workflows/provider-source-audit.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: repos/Soft-Tech
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: 9dbit/uno-luck
+          ref: main
+          path: repos/uno-luck
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: 9dbit/Mahjong-legend
+          ref: main
+          path: repos/Mahjong-legend
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: 9dbit/Skygate
+          ref: main
+          path: repos/Skygate
+          persist-credentials: false
+      - name: Bundle tracked source contracts without git credentials or runtime data
+        shell: bash
+        run: |
+          mkdir -p audit
+          python3 - <<'PY'
+          import pathlib, subprocess, zipfile, json
+          root=pathlib.Path('repos')
+          heads={}
+          extensions={'.py','.js','.mjs','.cjs','.ts','.tsx','.jsx','.css','.html','.json','.md','.yml','.yaml','.toml','.txt','.sql','.sh','.svg','.woff2'}
+          with zipfile.ZipFile('audit/provider-engine-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+            for repo in root.iterdir():
+              heads[repo.name]=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()
+              names=subprocess.check_output(['git','ls-files','-z'],cwd=repo).decode().split('\0')
+              for name in names:
+                p=repo/name
+                if not name or not p.is_file() or p.is_symlink(): continue
+                if pathlib.Path(name).name.startswith('.env'): continue
+                if p.suffix in extensions or p.name in ('Dockerfile','Procfile') or (repo.name=='Soft-Tech' and name.startswith('provider-dashboard/public/')):
+                  if p.stat().st_size < 8_000_000:
+                    z.write(p,repo.name+'/'+name)
+            z.writestr('SOURCE_HEADS.json',json.dumps(heads,indent=2))
+          print(json.dumps(heads,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: provider-engine-source
+          path: audit/provider-engine-source.zip
+          retention-days: 3
