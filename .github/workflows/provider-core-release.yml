@@ -1,0 +1,70 @@
+name: Soft Tech Provider Core v1 release
+on:
+  push:
+    branches: [feat/provider-core-independent-20261109]
+    paths: ['.provider-core-source.*.b64', '.github/workflows/provider-core-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Materialize integrity-checked provider sources
+        run: |
+          python - <<'PY'
+          import pathlib,base64,lzma,hashlib,json
+          parts=sorted(pathlib.Path('.').glob('.provider-core-source.*.b64'))
+          assert len(parts)==5,'All source parts are required'
+          raw=base64.b64decode(''.join(p.read_text().strip() for p in parts),validate=True)
+          assert hashlib.sha256(raw).hexdigest()=='8c65a1668d1ef0ccf089c070f55c6db433ddf83504dd9dd5f559e62e6bc23554','Provider source archive checksum mismatch'
+          files=json.loads(lzma.decompress(raw))
+          for name,content in files.items():
+              p=pathlib.Path(name)
+              assert name.startswith('provider-dashboard/') and not p.is_absolute() and '..' not in p.parts and not p.is_symlink(),name
+              p.parent.mkdir(parents=True,exist_ok=True);p.write_text(content)
+          pathlib.Path('/tmp/provider-core-files.json').write_text(json.dumps(list(files)))
+          print('Verified provider source archive. Marketing site and game assets are outside the change set.')
+          PY
+      - name: Core syntax and 19 persistence/security/transaction tests
+        working-directory: provider-dashboard
+        run: |
+          npm run check
+          npm test
+      - name: Install browser QA
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Actual HTTP desktop and mobile dashboard QA
+        working-directory: provider-dashboard
+        run: python test/browser.py
+      - name: Save visual evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: softtech-provider-core-qa
+          path: provider-dashboard/qa-artifacts/provider-core/
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Commit only validated provider runtime files
+        run: |
+          python - <<'PY'
+          import pathlib,json,subprocess
+          files=json.loads(pathlib.Path('/tmp/provider-core-files.json').read_text())
+          subprocess.run(['git','add','--',*files],check=True)
+          PY
+          git config user.name 'Soft Tech release validation'
+          git config user.email '154832153+9dbit@users.noreply.github.com'
+          if ! git diff --cached --quiet; then
+            git commit -m 'feat(provider): validated independent core with persistent sessions, ledger and operator API'
+            git push origin HEAD:feat/provider-core-independent-20261109
+          fi
+          git rev-parse HEAD
