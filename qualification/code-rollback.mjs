@@ -5,7 +5,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {args,readConfig,persist,request,operatorCall,must,digest} from './client.mjs';
-import {Metrics,establishSession,playRound,nativeCall,nativeOutcomeProof,reconcileRun} from './native-load.mjs';
+import {closeNativeSession,Metrics,establishSession,playRound,nativeCall,nativeOutcomeProof,reconcileRun} from './native-load.mjs';
 const fullSha=s=>typeof s==='string'&&/^[a-f0-9]{40}$/.test(s);
 const parse=(bytes,code)=>{try{return JSON.parse(bytes);}catch{throw Error(code);}};
 function privatePath(file){
@@ -69,7 +69,7 @@ export async function runCodeRollbackPhase(config,{phase,privateStateFile,platfo
   state.phase=phase==='prepare'?'prepared':phase==='after-rollback'?'rollback_verified':'complete';state.last_boot_id=after.process_boot_id;state.last_platform_deployment_id=platform.data.platform_deployment_id;
   report.status='PASS';report.full_rollback_completed=phase==='after-forward';
  }catch(e){report.status='FAIL';report.error=String(e.message).slice(0,180);state.phase='failed';if(state.context){state.failed_context_preserved=true;report.session_id=state.context.session_id;}}
- finally{report.metrics=metrics.summary();report.finished_at=new Date().toISOString();persist(reportFile,report);state.reports.push({phase,file:path.basename(reportFile),sha256:digest(readFileSync(reportFile))});savePrivate();}
+ finally{closeNativeSession(state.context);report.metrics=metrics.summary();report.finished_at=new Date().toISOString();persist(reportFile,report);state.reports.push({phase,file:path.basename(reportFile),sha256:digest(readFileSync(reportFile))});savePrivate();}
  return report;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){const a=args();runCodeRollbackPhase(readConfig(a.config),{phase:a.phase,privateStateFile:a['private-state'],platformProofFile:a['platform-proof'],reportFile:a.report,currentSource:a['current-source'],rollbackSource:a['rollback-source'],runId:a['run-id']}).then(r=>{console.log(JSON.stringify({status:r.status,phase:r.phase,run_id:r.run_id,full_rollback_completed:r.full_rollback_completed,error:r.error||null}));if(r.status!=='PASS')process.exitCode=1;}).catch(e=>{console.error(String(e.message));process.exitCode=1;});}

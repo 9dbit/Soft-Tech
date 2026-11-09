@@ -4,7 +4,7 @@ import {existsSync,readFileSync} from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {args,readConfig,persist,request,adminCall,operatorCall,must} from './client.mjs';
-import {Metrics,establishSession,playRound,reconcileRun} from './native-load.mjs';
+import {closeNativeSession,Metrics,establishSession,playRound,reconcileRun} from './native-load.mjs';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 export async function requestPlatformRestart(config,target,origin,{runId,controlFile,timeoutMs=300000,stage='restart'}={}){
  must(controlFile,'PLATFORM_RESTART_CONTROL_FILE_REQUIRED');const before=await request(origin+'/health',{timeout:15000});must(before.ok&&before.data.ok===true&&before.data.process_boot_id,'PRE_RESTART_PROCESS_ID_REQUIRED');
@@ -28,7 +28,7 @@ export async function runNativeChaos(config,{reportFile,controlFile,runId='chaos
   for(const ctx of contexts)await check(ctx.game_id+':native_restart_preserves_session_and_round_journal',async()=>{const evidence=await restart(config,ctx.game_id,ctx.origin,{runId,controlFile});const round=await playRound(ctx,{metrics,recoveryRetries:8});return {restart:evidence,session_reused:ctx.session_id,duplicate_result_verified:round.duplicate_verified};});
   await check('cross_ledger_reconciliation_after_faults_and_restarts',async()=>{const result=await reconcileRun(config,contexts,runId,{metrics});must(result.status==='PASS','CHAOS_LEDGER_MISMATCH');return {reconciliation:result};});
  }catch(e){report.cases.push({name:'chaos_setup',status:'FAIL',error:String(e.message).slice(0,200)});}
- finally{try{await adminCall(config,'/admin/faults/clear',{operator_id:config.operator.id});}catch{}for(const ctx of contexts)try{await operatorCall(config,'/v1/sessions/'+ctx.session_id+'/revoke',{});}catch{}report.metrics=metrics.summary();report.completed_native_rounds=contexts.reduce((n,c)=>n+(c.round_count||0),0);report.status=report.cases.length===12&&report.cases.every(c=>c.status==='PASS')?'PASS':'FAIL';report.finished_at=new Date().toISOString();save();}
+ finally{try{await adminCall(config,'/admin/faults/clear',{operator_id:config.operator.id});}catch{}for(const ctx of contexts)try{await operatorCall(config,'/v1/sessions/'+ctx.session_id+'/revoke',{});}catch{}for(const ctx of contexts)closeNativeSession(ctx);report.metrics=metrics.summary();report.completed_native_rounds=contexts.reduce((n,c)=>n+(c.round_count||0),0);report.status=report.cases.length===12&&report.cases.every(c=>c.status==='PASS')?'PASS':'FAIL';report.finished_at=new Date().toISOString();save();}
  return report;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){const a=args(),config=readConfig(a.config);runNativeChaos(config,{reportFile:a.report||'qualification/reports/native-chaos.json',controlFile:a['control-file'],runId:a['run-id']}).then(r=>{console.log(JSON.stringify({status:r.status,cases:r.cases.length,completed_native_rounds:r.completed_native_rounds}));if(r.status!=='PASS')process.exitCode=1;}).catch(e=>{console.error(e.message);process.exitCode=1;});}

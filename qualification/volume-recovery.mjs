@@ -2,7 +2,7 @@
    replacement. Process changes alone never certify loss/restoration of a volume. */
 import {pathToFileURL} from 'node:url';
 import {args,readConfig,persist,adminCall,operatorCall,must,digest} from './client.mjs';
-import {Metrics,establishSession,playRound,nativeCall,nativeOutcomeProof,reconcileRun} from './native-load.mjs';
+import {closeNativeSession,Metrics,establishSession,playRound,nativeCall,nativeOutcomeProof,reconcileRun} from './native-load.mjs';
 import {requestPlatformRestart} from './native-chaos.mjs';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const gameNames=['uno-luck','mahjong-wild','skygate-5000'];
@@ -42,7 +42,7 @@ export async function runVolumeRecovery(config,{reportFile,controlFile,runId='vo
  finally{
   try{await api.adminCall(config,'/admin/faults/clear',{operator_id:config.operator.id});}catch{}
   const cleanup=[];for(const ctx of contexts)try{const r=await api.operatorCall(config,'/v1/sessions/'+ctx.session_id+'/revoke',{});cleanup.push({session_id:ctx.session_id,revoked:r.ok});}catch{cleanup.push({session_id:ctx.session_id,revoked:false});}
-  report.cleanup=cleanup;report.metrics=metrics.summary();report.completed_native_rounds=contexts.reduce((n,c)=>n+(c.round_count||0),0);report.finished_at=new Date().toISOString();save();
+  for(const ctx of contexts)closeNativeSession(ctx);report.cleanup=cleanup;report.metrics=metrics.summary();report.completed_native_rounds=contexts.reduce((n,c)=>n+(c.round_count||0),0);report.finished_at=new Date().toISOString();save();
  }
  return report;
 }

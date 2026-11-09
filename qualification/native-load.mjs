@@ -3,6 +3,8 @@
 import {randomUUID,randomInt} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {DatabaseSync} from 'node:sqlite';
+import {RunnerDiagnostics} from './runner-diagnostics.mjs';
+import {SessionTransport} from './session-transport.mjs';
 import {mkdtempSync,rmSync,chmodSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,12 +21,14 @@ export class Metrics {
  async measure(label,fn){this.active++;this.peak=Math.max(this.peak,this.active);const started=performance.now();let status=0,ok=false;try{const r=await fn();status=r?.status??200;ok=r?.ok!==false;return r;}catch(e){this.error_counts[e.name==='TimeoutError'?'TIMEOUT':'TRANSPORT']=(this.error_counts[e.name==='TimeoutError'?'TIMEOUT':'TRANSPORT']||0)+1;throw e;}finally{this.active--;const duration=performance.now()-started;this.total++;if(!ok)this.failed++;sample(this.calls,this.total,duration,100000);const operation=this.operations.get(label)||{count:0,samples:[]};operation.count++;sample(operation.samples,operation.count,duration,10000);this.operations.set(label,operation);if(!ok&&status)this.error_counts['HTTP_'+status]=(this.error_counts['HTTP_'+status]||0)+1;}}
  summary(){return {requests:this.total,failed_requests:this.failed,request_error_rate:this.total?this.failed/this.total:0,peak_inflight_requests:this.peak,latency:sampledQuantiles(this.calls,this.total),by_operation:Object.fromEntries([...this.operations].map(([k,v])=>[k,sampledQuantiles(v.samples,v.count)])),error_counts:this.error_counts};}
 }
+export function closeNativeSession(ctx){ctx?.transport?.close();if(ctx&&Object.getOwnPropertyDescriptor(ctx,'transport')?.configurable)delete ctx.transport;}
+function sessionTransport(ctx){if(ctx.native_transport==='per_user_https'&&!ctx.transport)Object.defineProperty(ctx,'transport',{value:new SessionTransport(ctx.origin,{allowLocal:ctx.native_transport_allow_local===true}),configurable:true});return ctx.transport;}
 export async function nativeCall(ctx,pathname,payload,{metrics,recoveryRetries=0,timeout=45000,onFailure}={}){
  const method=payload===undefined?'GET':'POST',headers={'content-type':'application/json',...(ctx.game_id==='uno-luck'?{'X-UNO-Client':'spin-ui'}:ctx.game_id==='mahjong-wild'?{'X-ML-Request':'local-demo'}:{'X-Skygate-Client':'agency-ui'}),...(ctx.cookie?{cookie:ctx.cookie}:{})};
  if(payload!==undefined&&['/api/agency/pick','/api/spin','/api/agency/spin'].includes(pathname))ctx.last_round_request={pathname,payload:structuredClone(payload)};
  let last;
  for(let attempt=0;attempt<=recoveryRetries;attempt++){
-  try{const operation=()=>request(ctx.origin+pathname,{method,headers,...(payload===undefined?{}:{body:JSON.stringify(payload)}),timeout});const r=metrics?await metrics.measure(ctx.game_id+':'+pathname,operation):await operation();const cookies=r.headers.getSetCookie?.()||[];if(cookies.length)ctx.cookie=cookies.map(c=>c.split(';')[0]).join('; ');if(r.ok)return r.data;last=new Error('NATIVE_HTTP_'+r.status);if(r.status<500&&r.status!==409)throw last;}catch(e){last=e;if(attempt===recoveryRetries)throw e;}
+  try{const operation=()=>request(ctx.origin+pathname,{method,headers,...(payload===undefined?{}:{body:JSON.stringify(payload)}),timeout,transport:sessionTransport(ctx)});const r=metrics?await metrics.measure(ctx.game_id+':'+pathname,operation):await operation();const cookies=r.headers.getSetCookie?.()||[];if(cookies.length)ctx.cookie=cookies.map(c=>c.split(';')[0]).join('; ');if(r.ok)return r.data;last=new Error('NATIVE_HTTP_'+r.status);if(r.status<500&&r.status!==409)throw last;}catch(e){last=e;if(attempt===recoveryRetries)throw e;}
   if(attempt<recoveryRetries){if(onFailure)await onFailure({ctx,pathname,attempt,error:last?.message||'NATIVE_FAILURE'});await sleep(Math.min(2000,200*2**attempt));}
  }
  throw last;
@@ -48,8 +52,8 @@ export async function establishSession(config,index,runId,{metrics,game_id=games
  const url=new URL(launch.data.launch_url),token=new URLSearchParams(url.hash.slice(1)).get('softtech_launch');must(token,'LAUNCH_TOKEN_MISSING');
  const allowed=config.engine_origins?.[game_id];if(allowed)must(url.origin===allowed,'ENGINE_ORIGIN_MISMATCH');
  must(url.protocol==='https:'||config.allow_local===true&&url.protocol==='http:','INSECURE_ENGINE_URL');
- const ctx={game_id,origin:url.origin,session_id:launch.data.session_id,player_ref,cookie:'',rounds:[],established_at:new Date().toISOString()};
- await nativeCall(ctx,'/api/agency/launch',{token},{metrics});return ctx;
+ const ctx={game_id,origin:url.origin,session_id:launch.data.session_id,player_ref,cookie:'',rounds:[],native_transport:config.native_transport||'shared_fetch',...(config.allow_local===true?{native_transport_allow_local:true}:{}),established_at:new Date().toISOString()};
+ try{await nativeCall(ctx,'/api/agency/launch',{token},{metrics});return ctx;}catch(e){closeNativeSession(ctx);throw e;}
 }
 export async function playRound(ctx,{metrics,recoveryRetries=0,verifyDuplicate=true,onFailure}={}){
  const options={metrics,recoveryRetries,onFailure},started=performance.now();let final,duplicate,native_round_id;
@@ -88,27 +92,27 @@ export async function reconcileRun(config,contexts,runId,{metrics}={}){
 }
 export async function runNativeLoad(config,{concurrency=500,roundsPerSession=1,setupConcurrency=40,durationSeconds=0,minSoakSeconds=3600,thinkTimeMs=1000,reportFile,runId='load-'+Date.now(),recoveryRetries=0,chaosHook,keepSessions=false,onReady}={}){
  must([500,1000].includes(concurrency)||config.allow_small_test===true&&concurrency>=1,'Load requires 500 or 1000 sessions');
- must(config.environment!=='production','Production qualification forbidden');must(Number.isInteger(roundsPerSession)&&roundsPerSession>=1,'Invalid rounds');
+ must(config.environment!=='production','Production qualification forbidden');must(['shared_fetch','per_user_https'].includes(config.native_transport||'shared_fetch'),'Invalid native transport');must(Number.isInteger(roundsPerSession)&&roundsPerSession>=1,'Invalid rounds');
  const report={schema_version:1,run_id:runId,classification:'real_native_session_http_load',environment:config.environment,core_audience:config.core_audience,requested_concurrent_sessions:concurrency,rounds_per_session:roundsPerSession,duration_target_seconds:durationSeconds,minimum_soak_seconds:minSoakSeconds,started_at:new Date().toISOString(),status:'RUNNING',execution_model:'One independently authenticated native session per virtual user; real HTTP engine actions and wallet callbacks; not browser rendering load',thresholds:{request_error_rate:config.thresholds?.request_error_rate??0.01,round_p95_ms:config.thresholds?.round_p95_ms??10000},progress:{phase:'setup',established:0,completed_rounds:0},failures:[],external_operator_certified:false};
- const save=()=>{if(reportFile)persist(reportFile,report);};save();const metrics=new Metrics(),contexts=[];const origins={};let heartbeat;
+ const save=()=>{if(reportFile)persist(reportFile,report);};save();const metrics=new Metrics(),contexts=[],diagnostics=new RunnerDiagnostics();report.native_transport=config.native_transport||'shared_fetch';const origins={};let heartbeat;
  try{
   report.health_before=await probeHealth(config,config.engine_origins||{});must(report.health_before.core?.ok&&report.health_before.wallet?.ok,'QUALIFICATION_SERVICES_UNHEALTHY');
   const setup=await pool(Array.from({length:concurrency},(_,i)=>i),setupConcurrency,async i=>{const ctx=await establishSession(config,i,runId,{metrics});contexts.push(ctx);origins[ctx.game_id]=ctx.origin;report.progress.established=contexts.length;return ctx;});
   report.setup_failures=setup.filter(x=>!x.ok).map((x,i)=>({index:i,error:String(x.error.message).slice(0,100)}));report.established_sessions=contexts.length;report.active_sessions_at_barrier=contexts.length;report.established_by_game=Object.fromEntries(games.map(g=>[g,contexts.filter(c=>c.game_id===g).length]));report.barrier_at=new Date().toISOString();report.progress.phase='running';save();
   must(contexts.length===concurrency,'SESSION_SETUP_INCOMPLETE');
   if(onReady)await onReady({contexts,runId,report});
-  const runStart=performance.now(),deadline=runStart+durationSeconds*1000;let stopped=false;
-  heartbeat=setInterval(()=>{report.progress.elapsed_seconds=Math.round((performance.now()-runStart)/1000);report.progress.metrics=metrics.summary();report.client_memory_rss_bytes=process.memoryUsage().rss;save();},10000);heartbeat.unref();
+  diagnostics.setPhase('running');const runStart=performance.now(),deadline=runStart+durationSeconds*1000;let stopped=false;
+  heartbeat=setInterval(()=>{report.progress.elapsed_seconds=Math.round((performance.now()-runStart)/1000);report.progress.metrics=metrics.summary();report.client_memory_rss_bytes=process.memoryUsage().rss;report.runner_diagnostics=diagnostics.snapshot();save();},10000);heartbeat.unref();
   const chaos=chaosHook?Promise.resolve().then(()=>chaosHook({config,contexts,runId,report,metrics})).then(evidence=>{report.chaos=evidence;}).catch(e=>{report.chaos={status:'FAIL',error:String(e.message).slice(0,100)};}):Promise.resolve();
   await Promise.all(contexts.map(async ctx=>{let iteration=0;do{try{await playRound(ctx,{metrics,recoveryRetries});report.progress.completed_rounds++;}catch(e){report.failures.push({game_id:ctx.game_id,session_id:ctx.session_id,iteration,error:String(e.message).slice(0,100)});break;}iteration++;if(durationSeconds>0&&performance.now()<deadline&&thinkTimeMs)await sleep(thinkTimeMs);}while(durationSeconds>0?performance.now()<deadline:iteration<roundsPerSession);}));
-  await chaos;report.actual_execution_seconds=Math.round(performance.now()-runStart)/1000;report.progress.phase='reconciliation';save();
+  await chaos;report.actual_execution_seconds=Math.round(performance.now()-runStart)/1000;report.progress.phase='reconciliation';diagnostics.setPhase('reconciliation');report.runner_diagnostics=diagnostics.snapshot();save();
   report.reconciliation=await reconcileRun(config,contexts,runId,{metrics});report.health_after=await probeHealth(config,origins);
   report.source_identity_stable=['core','wallet',...Object.keys(origins)].every(name=>{const before=report.health_before[name],after=report.health_after[name];return before?.ok===true&&after?.ok===true&&before.identity&&JSON.stringify(before.identity)===JSON.stringify(after.identity)&&before.source_commit===after.source_commit&&(config.allow_local===true||/^[a-f0-9]{40}$/.test(before.source_commit||''));});
   report.round_latency=metrics.roundSummary();report.completed_rounds=contexts.reduce((n,c)=>n+(c.round_count||0),0);report.sessions_with_completed_rounds=contexts.filter(c=>c.round_count>0).length;report.duplicate_results_verified=contexts.every(c=>c.round_count>0&&c.duplicate_verified_count===c.round_count);report.metrics=metrics.summary();
   report.gates={concurrent_sessions:report.active_sessions_at_barrier===concurrency,all_sessions_played:report.sessions_with_completed_rounds===concurrency,no_round_failures:report.failures.length===0,exactly_once_reconciliation:report.reconciliation.status==='PASS',duplicate_native_results:report.duplicate_results_verified,request_error_rate:report.metrics.request_error_rate<=report.thresholds.request_error_rate,round_latency:report.round_latency.p95_ms<=report.thresholds.round_p95_ms,soak_duration:durationSeconds>0?report.actual_execution_seconds>=minSoakSeconds:null,source_identity_stable:report.source_identity_stable,server_resource_ceilings:null};
   report.status=Object.values(report.gates).some(v=>v===false)?'FAIL':report.gates.server_resource_ceilings===null?'PARTIAL':'PASS';report.resource_note='Server resource ceilings require separately attached Railway metrics for these exact timestamps; client RSS is not server memory evidence.';
  }catch(e){report.status='FAIL';report.error=String(e.message).slice(0,200);report.metrics=metrics.summary();}
- finally{if(heartbeat)clearInterval(heartbeat);if(!keepSessions){const revoked=await pool(contexts,20,async ctx=>{const r=await operatorCall(config,'/v1/sessions/'+ctx.session_id+'/revoke',{});must(r.ok,'REVOKE_FAILED');});report.cleanup={sessions:contexts.length,revoked:revoked.filter(x=>x.ok).length};}report.finished_at=new Date().toISOString();report.progress.phase='finished';report.sessions=contexts.map(c=>({session_id:c.session_id,game_id:c.game_id,player_ref:c.player_ref,completed_rounds:c.round_count||0}));save();}
+ finally{if(heartbeat)clearInterval(heartbeat);diagnostics.setPhase('cleanup');if(!keepSessions){const revoked=await pool(contexts,20,async ctx=>{const r=await operatorCall(config,'/v1/sessions/'+ctx.session_id+'/revoke',{});must(r.ok,'REVOKE_FAILED');});report.cleanup={sessions:contexts.length,revoked:revoked.filter(x=>x.ok).length};}for(const ctx of contexts)closeNativeSession(ctx);report.runner_diagnostics=diagnostics.stop();report.finished_at=new Date().toISOString();report.progress.phase='finished';report.sessions=contexts.map(c=>({session_id:c.session_id,game_id:c.game_id,player_ref:c.player_ref,completed_rounds:c.round_count||0}));save();}
  return report;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){const a=args(),config=readConfig(a.config);runNativeLoad(config,{concurrency:Number(a.sessions||500),roundsPerSession:Number(a.rounds||1),setupConcurrency:Number(a['setup-concurrency']||40),durationSeconds:Number(a['duration-seconds']||0),minSoakSeconds:Number(a['min-soak-seconds']||3600),thinkTimeMs:Number(a['think-time-ms']||1000),reportFile:a.report||'qualification/reports/native-load.json',runId:a['run-id'],recoveryRetries:Number(a['recovery-retries']||0)}).then(r=>{console.log(JSON.stringify({status:r.status,run_id:r.run_id,sessions:r.established_sessions,rounds:r.completed_rounds,error:r.error||null,failures:r.failures.length}));if(r.status==='FAIL')process.exitCode=1;}).catch(e=>{console.error(e.message);process.exitCode=1;});}
