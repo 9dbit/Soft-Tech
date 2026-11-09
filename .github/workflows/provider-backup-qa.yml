@@ -1,0 +1,25 @@
+name: Provider v1.1 backup restore QA
+on:
+  push:
+    branches: [feat/provider-core-independent-20261109]
+    paths:
+      - 'provider-dashboard/scripts/sqlite-backup.mjs'
+      - 'provider-dashboard/test/backup.test.mjs'
+      - '.github/workflows/provider-backup-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Backup, tamper and isolated restore tests
+        run: node --test provider-dashboard/test/backup.test.mjs
+      - name: Core regression tests
+        working-directory: provider-dashboard
+        run: npm test
