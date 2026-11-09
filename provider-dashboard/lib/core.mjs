@@ -123,9 +123,9 @@ export class Core {
   const fingerprint=sha(JSON.stringify({gameId,playerRef,currency:op.currency,returnUrl}));
   return this.transaction(()=>{
    this.ensureOperatorEnabled(op);
+   const policy=this.gameMode(op,gameId);if(policy==='disabled')fail(403,'GAME_DISABLED_FOR_OPERATOR');if(policy==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
    const old=this.get('SELECT * FROM idempotency WHERE operator_id=? AND route=? AND key=?',op.id,'launch',idem);
    if(old){if(old.payload_hash!==fingerprint)fail(409,'IDEMPOTENCY_CONFLICT');return parse(this.vault.open(old.response_box));}
-   const policy=this.gameMode(op,gameId);if(policy==='disabled')fail(403,'GAME_DISABLED_FOR_OPERATOR');if(policy==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
    if(!g.enabled||g.maintenance)fail(409,'GAME_MAINTENANCE');if(!g.origin)fail(503,'ENGINE_NOT_CONFIGURED');
    const pid='pl_'+sha(op.id+'\n'+playerRef+'\n'+op.currency).slice(0,40);const now=this.clock();
    if(!this.get('SELECT id FROM players WHERE id=?',pid)){
