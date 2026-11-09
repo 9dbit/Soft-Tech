@@ -1,0 +1,51 @@
+name: Independent provider integration QA
+on:
+  push:
+    branches: [feat/provider-core-independent-20261109]
+    paths:
+      - 'provider-dashboard/**'
+      - '.github/workflows/provider-integration-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate checked-in runtime and acceptance syntax
+        working-directory: provider-dashboard
+        run: |
+          npm run check
+          node --check test/acceptance.mjs
+          node --check test/readiness.mjs
+      - name: Persistent core, tenant isolation and wallet fault tests
+        working-directory: provider-dashboard
+        run: npm test
+      - name: Stale public route and rollout readiness regressions
+        working-directory: provider-dashboard
+        run: node --test test/readiness.test.mjs
+      - name: Install Chromium for dashboard verification
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Real HTTP desktop and mobile dashboard checks
+        working-directory: provider-dashboard
+        run: python test/browser.py
+      - name: Keep visual QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: independent-provider-integration-qa
+          path: provider-dashboard/qa-artifacts/provider-core/
+          if-no-files-found: warn
+          retention-days: 7
