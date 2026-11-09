@@ -24,3 +24,11 @@ CREATE TABLE IF NOT EXISTS selftests(id TEXT PRIMARY KEY,status TEXT NOT NULL,re
 
 CREATE TRIGGER IF NOT EXISTS audit_immutable_update BEFORE UPDATE ON audit BEGIN SELECT RAISE(ABORT,'audit is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS audit_immutable_delete BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT,'audit is immutable'); END;
+
+CREATE TABLE IF NOT EXISTS operator_game_modes(
+ operator_id TEXT NOT NULL REFERENCES operators(id),
+ game_id TEXT NOT NULL REFERENCES games(id),
+ mode TEXT NOT NULL CHECK(mode IN('sandbox','preproduction','disabled')),
+ updated_at INTEGER NOT NULL,
+ PRIMARY KEY(operator_id,game_id)
+);
