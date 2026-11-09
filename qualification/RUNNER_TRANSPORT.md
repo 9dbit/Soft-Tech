@@ -121,3 +121,10 @@ The heartbeat and final report also expose completed-round counts by game. The
 read-only health progress includes the same counters so storage projection can
 use measured game-specific throughput instead of assuming equal throughput from
 equal session counts. These counters do not change workload or gate decisions.
+
+The heartbeat, read-only health progress and final report include `round_latency_by_game` for the three fixed
+game IDs. Each measures the same whole-round boundary as the global latency,
+including the existing duplicate-result check. Each game retains at most 100,000
+uniform reservoir samples and labels whether its quantiles are exact or sampled.
+These diagnostic groups do not replace or alter the global p95 acceptance gate;
+unsupported caller-provided labels cannot create additional groups.
