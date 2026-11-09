@@ -4,7 +4,8 @@ import {spawn} from 'node:child_process';
 import {createHash,createHmac,randomBytes} from 'node:crypto';
 import {createServer} from 'node:net';
 import {mkdtemp,rm} from 'node:fs/promises';
-import {join,resolve} from 'node:path';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {tmpdir} from 'node:os';
 
 const sha=s=>createHash('sha256').update(s).digest('hex');
@@ -21,12 +22,14 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
  const dir=await mkdtemp(join(tmpdir(),'st-operator-http-'));
  const port=await freePort(),base='http://127.0.0.1:'+port;
  const env={...process.env,NODE_ENV:'test',PORT:String(port),CORE_DB_PATH:join(dir,'core.sqlite'),PANEL_ADMIN_PASSWORD:'admin-test-password-123456',PANEL_AUDITOR_PASSWORD:'auditor-test-password-123456',PANEL_SESSION_SECRET:'test-root-secret-longer-than-32-chars-123456789',CORE_PUBLIC_ORIGIN:base,UNO_PROVIDER_ORIGIN:base,MAHJONG_PROVIDER_ORIGIN:base,SKYGATE_PROVIDER_ORIGIN:base,CORE_ENGINE_KEYS_JSON:'[]',OFFSITE_BACKUP_ENABLED:'false'};
- const child=spawn(process.execPath,['server.mjs'],{cwd:resolve('provider-dashboard'),env,stdio:['ignore','pipe','pipe']});
+ const child=spawn(process.execPath,['server.mjs'],{cwd:fileURLToPath(new URL('../',import.meta.url)),env,stdio:['ignore','pipe','pipe']});
+ let spawnError;
+ child.once('error',error=>{spawnError=error;});
  let logs='';child.stdout.on('data',d=>logs+=d);child.stderr.on('data',d=>logs+=d);
  try{
   let healthy=false;
-  for(let i=0;i<60;i++){if(child.exitCode!==null)break;try{const r=await fetch(base+'/health');if(r.ok){healthy=true;break;}}catch{}await pause(200);}
-  assert.equal(healthy,true,'core did not become healthy: '+logs);
+  for(let i=0;i<60;i++){if(spawnError||child.exitCode!==null)break;try{const r=await fetch(base+'/health');if(r.ok){healthy=true;break;}}catch{}await pause(200);}
+  assert.equal(healthy,true,'core did not become healthy: '+(spawnError?.message||logs));
   const login=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'admin',password:env.PANEL_ADMIN_PASSWORD})});
   assert.equal(login.status,200);
   const {csrf}=await login.json(),cookie=login.headers.get('set-cookie').split(';')[0];
@@ -92,5 +95,5 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
   assert.equal(burst.filter(x=>x.status!==200).length,0,'concurrent signed game catalog calls failed');
   const logout=await fetch(base+'/api/logout',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf}});
   assert.equal(logout.status,200);
- }finally{child.kill('SIGTERM');await new Promise(r=>{if(child.exitCode!==null||child.signalCode!==null)r();else{child.once('exit',r);setTimeout(()=>{child.kill('SIGKILL');r();},3000).unref();}});child.stdout.destroy();child.stderr.destroy();await rm(dir,{recursive:true,force:true});}
+ }finally{child.kill('SIGTERM');await new Promise(r=>{if(spawnError||child.exitCode!==null||child.signalCode!==null)r();else{child.once('exit',r);setTimeout(()=>{child.kill('SIGKILL');r();},3000).unref();}});child.stdout.destroy();child.stderr.destroy();await rm(dir,{recursive:true,force:true});}
 });
