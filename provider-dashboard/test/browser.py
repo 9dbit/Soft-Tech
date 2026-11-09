@@ -15,7 +15,7 @@ with tempfile.TemporaryDirectory() as tmp:
             except Exception:time.sleep(.1)
         with sync_playwright() as p:
             browser=p.chromium.launch(headless=True,executable_path=os.getenv('CHROMIUM_PATH') or None,args=['--no-sandbox'])
-            errors=[];checks=[]
+            errors=[];checks=[];artwork=[]
             for width,height,role in [(1440,1000,'admin'),(390,844,'admin'),(1280,850,'auditor')]:
                 page=browser.new_page(viewport={'width':width,'height':height},accept_downloads=True)
                 page.on('pageerror',lambda e:errors.append(str(e)))
@@ -33,6 +33,17 @@ with tempfile.TemporaryDirectory() as tmp:
                     size=page.evaluate('({scroll:document.documentElement.scrollWidth,width:innerWidth})')
                     assert size['scroll']<=size['width']+3,(route,width,size)
                     if route=='operators' and role=='auditor':assert page.locator('[data-add-operator]').is_disabled()
+                    if route in ('overview','games'):
+                        images=page.locator('.original-art img')
+                        assert images.count()==3
+                        for image in images.all():
+                            image.scroll_into_view_if_needed()
+                            handle=image.element_handle()
+                            page.wait_for_function('(image)=>image.complete',arg=handle,timeout=30000)
+                            metadata=image.evaluate('(image)=>({src:image.currentSrc,width:image.naturalWidth,height:image.naturalHeight})')
+                            assert metadata['width']>0 and metadata['height']>0,('Original artwork failed to load',metadata)
+                            artwork.append({'role':role,'viewport':width,'page':route,**metadata})
+                        page.evaluate('window.scrollTo(0,0)')
                     if route in ('overview','games','developer'):
                         page.screenshot(path=str(OUT/f'{role}-{width}-{route}.png'),full_page=True,animations='disabled')
                     checks.append(f'{role}/{width}/{route}:pass')
@@ -56,8 +67,8 @@ with tempfile.TemporaryDirectory() as tmp:
                 page.locator('#logout-button').click();page.locator('#auth-layout:not([hidden])').wait_for()
                 page.close()
             browser.close();assert not errors,errors
-            (OUT/'report.json').write_text(json.dumps({'checks':checks,'errors':errors,'backend':'actual persistent provider core','engine_rounds':'tested separately against isolated native runtimes'},indent=2))
-            print('PASS: 18 responsive route/role checks + real operator credential creation, CSRF login/logout, document download and no-activity reconciliation')
+            (OUT/'report.json').write_text(json.dumps({'checks':checks,'errors':errors,'artwork':artwork,'backend':'actual persistent provider core','engine_rounds':'tested separately against isolated native runtimes'},indent=2))
+            print('PASS: 18 responsive route/role checks + verified original artwork + operator credentials, CSRF login/logout, document download and no-activity reconciliation')
     finally:
         srv.terminate()
         try:srv.wait(timeout=5)
