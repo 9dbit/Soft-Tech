@@ -14,9 +14,9 @@ export function signS3({method='PUT',endpoint,bucket,key,region,accessKeyId,secr
  if(url.username||url.password||url.search||url.hash)throw Error('Unexpected S3 endpoint credentials or query');
  if(!/^[a-z0-9][a-z0-9.-]{2,62}$/.test(bucket)||!region||!accessKeyId||!secretAccessKey)throw Error('Missing S3 credentials');
  if(!/^[A-Za-z0-9/_-]{1,250}$/.test(key)||key.includes('..'))throw Error('Invalid object key');
- if(urlStyle!=='path'&&urlStyle!=='virtual')throw Error('Invalid S3 URL style');
+ if(urlStyle!=='path'&&urlStyle!=='virtual-host')throw Error('Invalid S3 URL style');
  const parts=key.split('/').map(encode).join('/');
- if(urlStyle==='virtual')url.hostname=bucket+'.'+url.hostname;
+ if(urlStyle==='virtual-host')url.hostname=bucket+'.'+url.hostname;
  url.pathname=(url.pathname.replace(/\/$/,'')||'')+'/'+(urlStyle==='path'?encode(bucket)+'/':'')+parts;
  const date=now.toISOString().replace(/[-:]|\.\d{3}/g,'').slice(0,15)+'Z';
  const dateOnly=date.slice(0,8),bodyHash=hash(payload),host=url.host;
