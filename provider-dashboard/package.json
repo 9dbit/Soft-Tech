@@ -9,6 +9,6 @@
   "scripts": {
     "start": "node server.mjs",
     "check": "node --check server.mjs && node --check lib/core.mjs && node --check public/app.js",
-    "test": "node --test --test-concurrency=1 test/*.test.mjs"
+    "test": "node --test --test-concurrency=1 test/backup.test.mjs test/core.test.mjs test/offsite-backup.test.mjs test/readiness.test.mjs test/release-evidence-gate.test.mjs && node --test --test-isolation=none test/operator-http.test.mjs"
   }
 }
