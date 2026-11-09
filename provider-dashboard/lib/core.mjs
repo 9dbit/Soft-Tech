@@ -39,7 +39,28 @@ export class Core {
  async serial(key,fn){const before=this.locks.get(key)||Promise.resolve();const next=before.catch(()=>{}).then(fn);this.locks.set(key,next);try{return await next;}finally{if(this.locks.get(key)===next)this.locks.delete(key);}}
  audit(actor,event,scope,detail={}){this.run('INSERT INTO audit VALUES(?,?,?,?,?,?)',randomUUID(),actor,event,scope,JSON.stringify(detail),this.clock());}
  operator(id){const op=this.get('SELECT * FROM operators WHERE id=?',id);if(!op)fail(404,'OPERATOR_NOT_FOUND');return op;}
- operatorView(op){return {id:op.id,name:op.name,status:op.status,environment:op.environment,games:parse(op.games_json),currency:op.currency,scale:op.scale,wallet_mode:op.wallet_mode,wallet_url:op.wallet_url,return_origins:parse(op.return_origins_json),initial_minor:op.initial_minor,max_stake_minor:op.max_stake_minor,max_payout_minor:op.max_payout_minor,internal:!!op.internal,created_at:op.created_at};}
+ releaseMode(){return this.get('SELECT value FROM meta WHERE key=?','release_mode')?.value||'sandbox';}
+ operatorGameModes(id){
+  const op=this.operator(id),allowed=parse(op.games_json);
+  const rows=this.all('SELECT game_id,mode,updated_at FROM operator_game_modes WHERE operator_id=?',id);
+  return allowed.map(game_id=>{const found=rows.find(r=>r.game_id===game_id);return {game_id,mode:found?.mode||'sandbox',updated_at:found?.updated_at||null};});
+ }
+ gameMode(op,gameId){return this.get('SELECT mode FROM operator_game_modes WHERE operator_id=? AND game_id=?',op.id,gameId)?.mode||'sandbox';}
+ setOperatorGameMode(id,gameId,mode,actor='panel:admin'){
+  const op=this.operator(id);
+  if(op.internal)fail(409,'INTERNAL_OPERATOR_PROTECTED');
+  if(!parse(op.games_json).includes(gameId))fail(403,'GAME_NOT_ALLOWED');
+  if(!['sandbox','preproduction','disabled'].includes(mode))fail(409,'PRODUCTION_LOCKED');
+  if(mode==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
+  const old=this.gameMode(op,gameId),now=this.clock();
+  if(old===mode)return {operator_id:id,game_id:gameId,mode,changed:false};
+  this.transaction(()=>{
+   this.run('INSERT INTO operator_game_modes(operator_id,game_id,mode,updated_at) VALUES(?,?,?,?) ON CONFLICT(operator_id,game_id) DO UPDATE SET mode=excluded.mode,updated_at=excluded.updated_at',id,gameId,mode,now);
+   this.audit(actor,'operator.game_mode_changed',id,{game_id:gameId,from:old,to:mode,credits:'virtual_nonredeemable'});
+  });
+  return {operator_id:id,game_id:gameId,mode,changed:true};
+ }
+ operatorView(op){return {id:op.id,name:op.name,status:op.status,environment:op.environment,games:parse(op.games_json),game_modes:this.operatorGameModes(op.id),currency:op.currency,scale:op.scale,wallet_mode:op.wallet_mode,wallet_url:op.wallet_url,return_origins:parse(op.return_origins_json),initial_minor:op.initial_minor,max_stake_minor:op.max_stake_minor,max_payout_minor:op.max_payout_minor,internal:!!op.internal,created_at:op.created_at};}
  createOperator(input,actor='admin',{internal=false,id=null}={}){
   if(!input||typeof input!=='object'||Array.isArray(input))fail(422,'OBJECT_REQUIRED');
   const name=text(input.name,'name',{max:80});const gameIds=input.games;
@@ -104,6 +125,7 @@ export class Core {
    this.ensureOperatorEnabled(op);
    const old=this.get('SELECT * FROM idempotency WHERE operator_id=? AND route=? AND key=?',op.id,'launch',idem);
    if(old){if(old.payload_hash!==fingerprint)fail(409,'IDEMPOTENCY_CONFLICT');return parse(this.vault.open(old.response_box));}
+   const policy=this.gameMode(op,gameId);if(policy==='disabled')fail(403,'GAME_DISABLED_FOR_OPERATOR');if(policy==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
    if(!g.enabled||g.maintenance)fail(409,'GAME_MAINTENANCE');if(!g.origin)fail(503,'ENGINE_NOT_CONFIGURED');
    const pid='pl_'+sha(op.id+'\n'+playerRef+'\n'+op.currency).slice(0,40);const now=this.clock();
    if(!this.get('SELECT id FROM players WHERE id=?',pid)){
@@ -112,7 +134,7 @@ export class Core {
    }
    const token=random(36),sid='ss_'+random(24),expires=now+8*3600000;
    this.run('INSERT INTO sessions VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',sid,op.id,pid,gameId,op.currency,op.scale,'created',sha(token),this.vault.seal(token),now+120000,null,returnUrl,now,expires,now,g.version);
-   const response={session_id:sid,game_id:gameId,environment:'sandbox',currency:op.currency,scale:op.scale,launch_url:g.origin+g.play_path+'#softtech_launch='+token,launch_expires_at:new Date(now+120000).toISOString(),expires_at:new Date(expires).toISOString()};
+   const response={session_id:sid,game_id:gameId,environment:policy,currency:op.currency,scale:op.scale,launch_url:g.origin+g.play_path+'#softtech_launch='+token,launch_expires_at:new Date(now+120000).toISOString(),expires_at:new Date(expires).toISOString()};
    this.run('INSERT INTO idempotency VALUES(?,?,?,?,?,?)',op.id,'launch',idem,fingerprint,this.vault.seal(JSON.stringify(response)),now);
    this.audit(actor,'session.created',sid,{operator_id:op.id,game_id:gameId});return response;
   });
