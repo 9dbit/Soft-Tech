@@ -52,6 +52,11 @@ test('independent operator HTTP conformance: signed game listing, launch, tenant
   const repeated=await fetch(base+'/v1/game-launches',signed({url:base+'/v1/game-launches',method:'POST',body,credential:a.credential,idempotencyKey:'external-conformance-launch-001'}));
   assert.equal(repeated.status,200);
   assert.equal((await repeated.json()).session_id,launched.session_id);
+  const burst=await Promise.all(Array.from({length:40},(_,i)=>{
+   const credential=i%2===0?a.credential:b.credential;
+   return fetch(base+'/v1/games',signed({url:base+'/v1/games',credential}));
+  }));
+  assert.equal(burst.filter(x=>x.status!==200).length,0,'concurrent signed game catalog calls failed');
   const logout=await fetch(base+'/api/logout',{method:'POST',headers:{Cookie:cookie,'X-CSRF-Token':csrf}});
   assert.equal(logout.status,200);
  }finally{child.kill('SIGTERM');await new Promise(r=>{if(child.exitCode!==null||child.signalCode!==null)r();else{child.once('exit',r);setTimeout(()=>{child.kill('SIGKILL');r();},3000).unref();}});await rm(dir,{recursive:true,force:true});}
