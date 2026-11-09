@@ -87,6 +87,7 @@ export class Core {
    if(request.requested_mode==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
   }
   if(action==='activate'&&request.requested_mode==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
+  if(action==='activate'&&request.requested_mode==='preproduction')fail(409,'PREPRODUCTION_ISOLATION_PENDING');
   const now=this.clock();
   this.transaction(()=>{
    if(action==='activate')this.run('INSERT INTO operator_game_modes(operator_id,game_id,mode,updated_at) VALUES(?,?,?,?) ON CONFLICT(operator_id,game_id) DO UPDATE SET mode=excluded.mode,updated_at=excluded.updated_at',request.operator_id,request.game_id,request.requested_mode,now);
@@ -158,7 +159,7 @@ export class Core {
   const fingerprint=sha(JSON.stringify({gameId,playerRef,currency:op.currency,returnUrl}));
   return this.transaction(()=>{
    this.ensureOperatorEnabled(op);
-   const policy=this.gameMode(op,gameId);if(policy==='disabled')fail(403,'GAME_DISABLED_FOR_OPERATOR');if(policy==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');
+   const policy=this.gameMode(op,gameId);if(policy==='disabled')fail(403,'GAME_DISABLED_FOR_OPERATOR');if(policy==='preproduction'&&this.releaseMode()!=='preproduction')fail(409,'GLOBAL_PREPRODUCTION_REQUIRED');if(policy==='preproduction')fail(503,'PREPRODUCTION_ISOLATION_PENDING');
    const old=this.get('SELECT * FROM idempotency WHERE operator_id=? AND route=? AND key=?',op.id,'launch',idem);
    if(old){if(old.payload_hash!==fingerprint)fail(409,'IDEMPOTENCY_CONFLICT');return parse(this.vault.open(old.response_box));}
    if(!g.enabled||g.maintenance)fail(409,'GAME_MAINTENANCE');if(!g.origin)fail(503,'ENGINE_NOT_CONFIGURED');
