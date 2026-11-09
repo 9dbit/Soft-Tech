@@ -74,7 +74,7 @@ export function startOffsiteBackup({env=process.env,onStatus=()=>{},fetcher=fetc
  const run=async()=>{
   if(running||stopped)return;
   running=true;
-  try{const result=await runOffsiteBackup({env,fetcher});onStatus({ok:true,at:new Date().toISOString(),key:result.key,sha256:result.sha256,bytes:result.bytes});}
+  try{const result=await runOffsiteBackup({env,fetcher});onStatus({ok:true,at:new Date().toISOString(),key:result.key,sha256:result.sha256,bytes:result.bytes,remoteRestore:result.remoteRestore});}
   catch(e){onStatus({ok:false,at:new Date().toISOString(),error:e.message});}
   finally{running=false;}
  };
