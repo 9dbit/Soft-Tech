@@ -67,6 +67,10 @@ const server=createServer({maxHeaderSize:16384},async(req,res)=>{
     core.transaction(()=>{core.run('INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value','release_mode',data.mode);core.audit('panel:admin','release.mode_changed','provider',{from:old,to:data.mode,credits:'virtual_nonredeemable'});});
     send(res,200,{mode:data.mode,production_enabled:false});return;
    }
+   if(path==='/api/release-requests'&&method==='GET'){send(res,200,{requests:core.releaseRequests()});return;}
+   if(path==='/api/release-requests'&&method==='POST'){admin(session);const p=json(await readBody(req));send(res,201,core.requestRelease(p.operator_id,p.game_id,p.mode));return;}
+   let releaseMatch=path.match(/^\/api\/release-requests\/(rel_[\w-]+)\/(validate|approve|activate|reject|cancel)$/);
+   if(releaseMatch&&method==='POST'){admin(session);send(res,200,core.advanceRelease(releaseMatch[1],releaseMatch[2]));return;}
    if(path==='/api/bootstrap'&&method==='GET'){send(res,200,core.bootstrap(session.role));return;}
    if(path==='/api/download/openapi.json'&&method==='GET'){send(res,200,spec(),undefined,{'Content-Disposition':'attachment; filename="soft-tech-provider-openapi-v1.json"'});return;}
    if(path==='/api/download/developer.html'&&method==='GET'){send(res,200,developerHTML(),'text/html; charset=utf-8',{'Content-Disposition':'attachment; filename="soft-tech-provider-api-v1.html"'});return;}
