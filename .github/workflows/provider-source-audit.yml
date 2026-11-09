@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: 9dbit/uno-luck
-          ref: c8327f47086d524a43559e297a42bef183d514e4
+          ref: a46fa7b36cc54c9cba60a9361432f0ebe076d746
           path: repos/uno-luck
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -39,8 +39,7 @@ jobs:
           mkdir -p audit
           python3 - <<'PY'
           import pathlib, subprocess, zipfile, json, urllib.request
-          root=pathlib.Path('repos')
-          heads={}
+          root=pathlib.Path('repos');heads={}
           extensions={'.py','.js','.mjs','.cjs','.ts','.tsx','.jsx','.css','.html','.json','.md','.yml','.yaml','.toml','.txt','.sql','.sh','.svg','.woff2'}
           with zipfile.ZipFile('audit/provider-engine-source.zip','w',zipfile.ZIP_DEFLATED) as z:
             for repo in root.iterdir():
@@ -51,8 +50,7 @@ jobs:
                 if not name or not p.is_file() or p.is_symlink(): continue
                 if pathlib.Path(name).name.startswith('.env'): continue
                 if p.suffix in extensions or p.name in ('Dockerfile','Procfile') or (repo.name=='Soft-Tech' and name.startswith('provider-dashboard/public/')):
-                  if p.stat().st_size < 8_000_000:
-                    z.write(p,repo.name+'/'+name)
+                  if p.stat().st_size < 8_000_000:z.write(p,repo.name+'/'+name)
             z.writestr('SOURCE_HEADS.json',json.dumps(heads,indent=2))
             health={}
             for key,url in {'uno':'https://uno-luck-web-staging.up.railway.app/health','mahjong':'https://mahjong-legend-web-production.up.railway.app/health','skygate':'https://skygate-web-production.up.railway.app/health'}.items():
