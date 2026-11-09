@@ -1,31 +1,50 @@
-# Soft Tech / Provider Control Dashboard (Sandbox Demo)
+# Soft Tech Independent Provider Core v1
 
-Independent dashboard service that complements, without changing, the locked Soft Tech marketing website.
+A real, operator-neutral sandbox control plane for UNO LUCK, MAHJONG WILD and SKYGATE 5000. The approved six-page dashboard design is retained. Runtime statistics come from the provider database, not hard-coded sample records.
 
-## Scope
-Six pages: Overview, Games, Operators, Sessions & Ledger, Reconciliation, API Developer. Supports server-enforced administrator/auditor separation, in-memory operator toggles, simulated reconciliation, protected HTML and OpenAPI downloads, responsive menus, original logo and Minecraft typeface.
+## Boundaries
+- Isolated provider engine services preserve original public services and immutable game math.
+- Server-authoritative native engines persist outcomes before reserve/settlement requests.
+- Virtual, non-purchasable and non-redeemable sandbox credits only. No real-money enablement, deposits or withdrawals.
+- Master controls include game registry, actual engine health, Test Play, maintenance, scoped operator onboarding/key rotation, sessions, rounds, immutable journal, reconciliation and API downloads.
+- The existing game Studios remain separate. Master-panel visual/math release editing and promotion are not implemented in this release. Do not imply otherwise.
+- SQLite WAL/FULL is a deliberate first-release single-replica design. Migrate the transactional store and distributed locking before horizontal scaling. A PostgreSQL cluster is not provisioned by this release.
 
-IMPORTANT: This is a reconstructed demonstration based on the previous six-page dot checkpoint, NOT a copy of unavailable dot sandbox files. No live Playground integration, financial balances or real player sessions. All balances, operators and rounds are fictional and reset at process restart.
+## Required runtime configuration
+- Node.js 24+
+- PANEL_ADMIN_PASSWORD, PANEL_AUDITOR_PASSWORD: existing server-side access passwords, 16+ characters.
+- PANEL_SESSION_SECRET: persistent encryption root (32+ characters). Keep a recoverable copy in a secret manager. Changing it without key migration makes stored operator secrets unreadable.
+- CORE_DB_PATH=/data/provider.sqlite, with an attached Railway /data volume. Production refuses unmounted storage.
+- CORE_PUBLIC_ORIGIN: panel's HTTPS origin.
+- UNO_PROVIDER_ORIGIN, MAHJONG_PROVIDER_ORIGIN, SKYGATE_PROVIDER_ORIGIN: dedicated native engine HTTPS origins.
+- CORE_ENGINE_KEYS_JSON: array of three objects with id, canonical game ID and independently generated secret. Never expose in browser or repository.
+- CORE_ACCEPTANCE_RUN (optional): a new non-secret identifier runs six actual native rounds across two isolated internal operators, records the result, and never repeats the same identifier.
 
-## Requirements
-- Node.js 22 or later
-- PANEL_ADMIN_PASSWORD (min 16 chars)
-- PANEL_AUDITOR_PASSWORD (min 16 chars)
-- PANEL_SESSION_SECRET (min 32 chars)
-- PORT (optional, default 8080)
+## Operator API
+Download the exact OpenAPI v3.1 schema, HTML developer guide and Node signing example from API Developer. Request credentials are displayed once when creating/rotating an operator key. Operator accounts are distinguished from administrator panel sessions.
 
-Run npm start and visit http://localhost:8080. Run npm run check and npm test for QA.
+HMAC headers: X-SoftTech-Key, X-SoftTech-Timestamp, X-SoftTech-Nonce, X-SoftTech-Signature. Sign exact bytes of the body, method, path and query using the documented softtech.v1 format. Five-minute timestamp window and persistent replay-nonce rejection. Use a fresh nonce for every HTTP retry and preserve the Idempotency-Key and business body.
 
-## Deployment
-Existing Railway project Soft-Tech, isolated service soft-tech-provider-panel, source branch feat/provider-panel-demo-20261109, rootDirectory /provider-dashboard, command npm start, healthcheck /health. Set the three secrets in Railway service variables. Enable app sleeping when inactive and modest CPU/RAM caps. Confirm workspace plan, credits, real usage and spending limits before starting a new billable instance.
+Implemented endpoints: /v1/games, /v1/game-launches, /v1/sessions, /v1/sessions/{id}, /v1/sessions/{id}/revoke, /v1/rounds/{id}, /v1/transactions, /v1/reconciliation, /v1/openapi.json.
 
-## API documentation
-Authenticated API Developer section provides downloadable:
-- soft-tech-provider-api-developer-demo.html, self-contained draft
-- soft-tech-provider-openapi-demo.json, machine-readable implemented demo endpoints; planned game/wallet contract marked NOT_IMPLEMENTED
+## Wallets
+Sandbox wallet grants configured free virtual opening credits once per operator/player/currency. Seamless sandbox mode calls a conforming external operator wallet base plus /balance, /debit, /credit, /status and /reversal. Callback requests are signed with a separate per-operator secret. Responses must match transaction ID, amount, currency and scale.
 
-## Security and production gates
-- Signed HttpOnly SameSite=Strict session cookies, admin vs auditor authorization at the server, login rate limiting, CSP and same-origin write checks.
-- No real API keys, operator secrets or financial transactions are included.
-- Before live use: durable database, robust user management, scopes, secret rotation, audit persistence and signed Playground backend adapter.
-- No real ledger/wallet/game flow should be enabled before end-to-end test, security review and applicable licensing work.
+All transaction amounts use canonical integer strings. No cross-currency totals. Callback HTTPS hosts are DNS-resolved, validated against private/internal ranges, then pinned to prevent DNS rebinding. Redirects are forbidden. A timeout means an unknown result, never an automatic refund. Recovery queries transaction status before retrying the same transaction. Reversal and payout intents are mutually exclusive.
+
+## Internal engine contract
+Existing native adapters use the server-only /api/v4/agency-game/{redeem,status,reserve,settle,void} compatibility surface. The path naming is retained for adapter stability, not an operator dependency. Keys are independently scoped to one game and are not interchangeable with operator API credentials. All requests go to Soft Tech Core; no other operator platform is required or changed.
+
+## Durability and operations
+- One core instance and one instance per native engine; each has its own persistent volume.
+- Keep services awake while pending rounds/recovery work exist. This deployment disables app sleep for provider runtimes.
+- Ledger and audit rows are immutable; no reset/erase endpoint.
+- Maintenance and operator disable block new admission while allowing already accepted rounds to settle.
+- Health endpoints alone do not prove integration. The panel distinguishes health timestamps from verified signed engine calls. Acceptance additionally proves real settled rounds and journal matches.
+- Back up volume/database and encryption root before migration. Automated offsite backups and disaster-recovery rehearsal are NOT included yet.
+- Browser test viewport emulation is not a physical iPhone Safari test.
+
+## Tests
+`npm test` runs isolated signing, replay, tenant isolation, launch retry, timeout recovery, currency precision, idempotency, immutable journal, maintenance, API auth and CSRF tests.
+`python test/browser.py` runs Chromium control-panel checks against the real local core.
+`test/acceptance.mjs` runs opt-in real-engine acceptance after deployment, using only internal sandbox operators and virtual credits; no RNG overrides or fabricated rounds.
