@@ -7,11 +7,13 @@ import {openDeploymentDatabase} from './deployment-identity.mjs';
 import {isolationReadiness} from './isolation-proof.mjs';
 import {releaseStaff,recordReleaseSignoff} from './staff-policy.mjs';
 import {DurableWrites} from './durable-writes.mjs';
+import {corePhases} from './core-phases.mjs';
+import {nativeHealthSummary} from './native-health-summary.mjs';
 const scopes=['games:read','sessions:write','reports:read'];
 const parse=x=>JSON.parse(x);
 export class Core {
- constructor({env=process.env,clock=Date.now,transport=walletCall}={}){
-  this.env=env;this.clock=clock;this.transport=transport;this.locks=new Map();this.writeMetrics={statements:0,total_ms:0,max_ms:0};
+ constructor({env=process.env,clock=Date.now,transport=walletCall,phases=corePhases}={}){
+  this.env=env;this.clock=clock;this.transport=transport;this.phases=phases;this.locks=new Map();this.writeMetrics={statements:0,total_ms:0,max_ms:0};
   const master=env.PANEL_SESSION_SECRET||'';if(master.length<32)throw Error('PANEL_SESSION_SECRET is required');
   this.vault=vault(master);this.allowLocal=env.NODE_ENV==='test';
   const opened=openDeploymentDatabase({env,clock,validateExisting:db=>{
@@ -19,7 +21,7 @@ export class Core {
    const sentinel=db.prepare('SELECT value FROM meta WHERE key=?').get('vault_check');
    if(sentinel&&this.vault.open(sentinel.value)!=='softtech-core-v1')throw Error('Key mismatch: restore original master key');
   }});
-  this.db=opened.db;this.databasePath=opened.path;this.deploymentIdentity=opened.identity;this.journal=new DurableWrites(this.db);
+  this.db=opened.db;this.databasePath=opened.path;this.deploymentIdentity=opened.identity;this.journal=new DurableWrites(this.db,{phases});
   this.isolation=isolationReadiness(env,this.deploymentIdentity,this.clock());
   this.db.exec(readFileSync(new URL('./schema.sql',import.meta.url),'utf8'));chmodSync(opened.path,0o600);
   const sentinel=this.get('SELECT value FROM meta WHERE key=?','vault_check');
@@ -43,11 +45,17 @@ export class Core {
  }
  close(){this.journal.close();this.db.close();}
  run(sql,...args){const started=performance.now();try{return this.db.prepare(sql).run(...args);}finally{const elapsed=performance.now()-started;this.writeMetrics.statements++;this.writeMetrics.total_ms+=elapsed;this.writeMetrics.max_ms=Math.max(this.writeMetrics.max_ms,elapsed);}}
- durable(fn){return this.journal.run(fn);}
- authenticateDurable(request,engine=false){return this.durable(()=>this.authenticate(request,engine));}
+ durable(fn,kind='journal'){return this.journal.run(fn,kind);}
+ authenticateDurable(request,engine=false){return this.durable(()=>this.authenticate(request,engine),'auth');}
  get(sql,...args){return this.db.prepare(sql).get(...args);}
  all(sql,...args){return this.db.prepare(sql).all(...args);}
- transaction(fn){this.db.exec('BEGIN IMMEDIATE');try{const value=fn();if(value?.then)throw Error('Async transaction forbidden');this.db.exec('COMMIT');return value;}catch(e){this.db.exec('ROLLBACK');throw e;}}
+ transaction(fn){
+  const begin=this.phases.start('transaction_begin');try{this.db.exec('BEGIN IMMEDIATE');}finally{this.phases.end(begin);}
+  try{
+   const body=this.phases.start('transaction_body');let value;try{value=fn();if(value?.then)throw Error('Async transaction forbidden');}finally{this.phases.end(body);}
+   const commit=this.phases.start('transaction_commit');try{this.db.exec('COMMIT');}finally{this.phases.end(commit);}return value;
+  }catch(e){this.phases.increment('transaction_failures');const rollback=this.phases.start('transaction_rollback');try{this.db.exec('ROLLBACK');}finally{this.phases.end(rollback);}throw e;}
+ }
  async serial(key,fn){const before=this.locks.get(key)||Promise.resolve();const next=before.catch(()=>{}).then(fn);this.locks.set(key,next);try{return await next;}finally{if(this.locks.get(key)===next)this.locks.delete(key);}}
  audit(actor,event,scope,detail={}){this.run('INSERT INTO audit VALUES(?,?,?,?,?,?)',randomUUID(),actor,event,scope,JSON.stringify(detail),this.clock());}
  operator(id){const op=this.get('SELECT * FROM operators WHERE id=?',id);if(!op)fail(404,'OPERATOR_NOT_FOUND');if(op.environment!==this.deploymentIdentity.environment)fail(403,'OPERATOR_ENVIRONMENT_MISMATCH');return {...op,wallet_protocol_version:this.get('SELECT version FROM operator_wallet_protocol WHERE operator_id=?',id)?.version??1,deployment_id:this.deploymentIdentity.deployment_id};}
@@ -238,7 +246,7 @@ export class Core {
  async status(key,p){
   const s=this.session(p.session_id,p.tenant_id,key.game);const op=this.operator(s.operator_id),player=this.get('SELECT * FROM players WHERE id=?',s.player_id);
   if(this.clock()-s.last_seen_at>=30000)await this.durable(()=>this.run('UPDATE sessions SET last_seen_at=? WHERE id=? AND last_seen_at<?',this.clock(),s.id,this.clock()-30000));
-  const bal=op.wallet_mode==='sandbox'?{balance_minor:player.balance_minor}:await this.transport(op,this.vault.open(op.wallet_secret),'balance',{player_ref:player.player_ref},{allowLocal:this.allowLocal});
+  const bal=op.wallet_mode==='sandbox'?{balance_minor:player.balance_minor}:await this.phases.walletCall('balance',()=>this.transport(op,this.vault.open(op.wallet_secret),'balance',{player_ref:player.player_ref},{allowLocal:this.allowLocal}));
   units(bal.balance_minor);
   return {session_id:s.id,tenant_id:op.id,player_id:s.player_id,game:s.game_id,balance:bal.balance_minor,reserved:'0',coin_scale:s.scale,currency:s.currency,expires_at:new Date(s.expires_at).toISOString(),session_expired:s.status==='revoked'||s.expires_at<=this.clock(),navigation:s.return_url?{home_url:s.return_url,label:'Soft Tech'}:null};
  }
@@ -261,10 +269,10 @@ export class Core {
   if(row.status==='ok')return parse(row.response_json);if(row.status==='rejected')fail(409,'WALLET_REJECTED');
   const secret=this.vault.open(op.wallet_secret);let receipt;
   try{
-   if(row.attempts){receipt=await this.transport(op,secret,'status',{transaction_id:txid,player_ref:player.player_ref},{allowLocal:this.allowLocal});if(receipt.status==='pending')throw new WalletError('WALLET_OUTCOME_UNKNOWN');}
+   if(row.attempts){receipt=await this.phases.walletCall('status',()=>this.transport(op,secret,'status',{transaction_id:txid,player_ref:player.player_ref},{allowLocal:this.allowLocal}));if(receipt.status==='pending')throw new WalletError('WALLET_OUTCOME_UNKNOWN');}
    if(!receipt||receipt.status==='not_found'){
     await this.durable(()=>this.run('UPDATE wallet_ops SET attempts=attempts+1,updated_at=? WHERE id=?',this.clock(),txid));
-    receipt=await this.transport(op,secret,action,payload,{allowLocal:this.allowLocal});
+    receipt=await this.phases.walletCall(action,()=>this.transport(op,secret,action,payload,{allowLocal:this.allowLocal}));
    }
    if(receipt.status==='rejected'){await this.durable(()=>this.run("UPDATE wallet_ops SET status='rejected',response_json=?,updated_at=? WHERE id=?",JSON.stringify(receipt),this.clock(),txid));fail(409,'WALLET_REJECTED');}
    if(receipt.status!=='applied'||receipt.transaction_id!==txid||receipt.amount_minor!==amount||receipt.currency!==op.currency||receipt.scale!==op.scale)throw new WalletError('WALLET_OUTCOME_UNKNOWN');
@@ -375,7 +383,7 @@ export class Core {
    if(!g.origin){this.run("UPDATE games SET health='not_configured',checked_at=? WHERE id=?",this.clock(),g.id);return;}
    let status='unreachable',data={};
    try{const r=await fetch(g.origin+'/health',{signal:AbortSignal.timeout(10000),redirect:'error'});data=await r.json();const i=data.deployment_identity,expected=Array.from(this.engineKeys.values()).find(k=>k.game===g.id);const matches=i?.identity_bound===true&&i.environment===this.deploymentIdentity.environment&&i.core_deployment_id===this.deploymentIdentity.deployment_id&&i.game_id===g.id&&(!expected?.deployment_id||i.deployment_id===expected.deployment_id);status=r.ok&&data.ok===true&&data.provider==='soft-tech'&&(matches||this.deploymentIdentity.environment==='sandbox'&&!expected?.deployment_id)?'ok':'degraded';}catch{data={error:'engine request failed'};}
-   this.run('UPDATE games SET health=?,health_json=?,version=?,checked_at=? WHERE id=?',status,JSON.stringify(data).slice(0,16000),String(data.version||data.engine_version||data.source_commit?.slice(0,12)||g.version).slice(0,80),this.clock(),g.id);
+   this.run('UPDATE games SET health=?,health_json=?,version=?,checked_at=? WHERE id=?',status,nativeHealthSummary(data),String(data.version||data.engine_version||data.source_commit?.slice(0,12)||g.version).slice(0,80),this.clock(),g.id);
   }));return this.games();
  }
  async recover(){

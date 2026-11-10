@@ -11,6 +11,7 @@ import {StaffAuth} from './lib/staff-auth.mjs';
 import {requireStaff} from './lib/staff-policy.mjs';
 import {bootstrapQualification} from './lib/qualification-bootstrap.mjs';
 import {platformHealth} from './lib/native-volume.mjs';
+import {corePhases} from './lib/core-phases.mjs';
 const env=process.env,port=Number(env.PORT||8080),root=resolve(import.meta.dirname,'public');
 if((env.PANEL_ADMIN_PASSWORD||'').length<16||(env.PANEL_AUDITOR_PASSWORD||'').length<16)throw Error('Admin and auditor passwords must be configured');
 export const core=new Core({env});
@@ -27,8 +28,8 @@ let backupState={enabled:env.OFFSITE_BACKUP_ENABLED==='true',last:null};
 const backupEnv={...env,CORE_DB_PATH:core.databasePath};
 const backupRunner=startOffsiteBackup({env:backupEnv,onStatus:status=>{const proof={...status,source_commit:env.RAILWAY_GIT_COMMIT_SHA||'local'};backupState={enabled:true,last:proof};console.log('provider.offsite_backup',JSON.stringify(proof));}});
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.woff2':'font/woff2','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.jpeg':'image/jpeg'};
-function send(res,status,data,type='application/json; charset=utf-8',extra={}){res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY',...extra});res.end(type.startsWith('application/json')?JSON.stringify(data):data);}
-async function readBody(req){if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'JSON_REQUIRED');let size=0,chunks=[];for await(const c of req){size+=c.length;if(size>65536)fail(413,'BODY_TOO_LARGE');chunks.push(c);}return Buffer.concat(chunks).toString('utf8');}
+function send(res,status,data,type='application/json; charset=utf-8',extra={}){const span=corePhases.responseStart();try{res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'DENY',...extra});res.end(type.startsWith('application/json')?JSON.stringify(data):data);}finally{corePhases.end(span);}}
+async function readBody(req){const span=corePhases.start('body_read');try{if(!String(req.headers['content-type']||'').startsWith('application/json'))fail(415,'JSON_REQUIRED');let size=0,chunks=[];for await(const c of req){size+=c.length;if(size>65536)fail(413,'BODY_TOO_LARGE');chunks.push(c);}const raw=Buffer.concat(chunks).toString('utf8');corePhases.bodyComplete();return raw;}catch(error){corePhases.increment('body_failures');throw error;}finally{corePhases.end(span);}}
 function panelSession(req){const raw=(req.headers.cookie||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('stp_session='))?.slice(12);if(!raw||raw.length>100)return null;const named=staff.session(raw);if(named)return named;if(core.deploymentIdentity.environment!=='sandbox'&&!staff.readiness().bootstrap_available)return null;return core.get('SELECT * FROM panel_sessions WHERE id_hash=? AND expires_at>?',sha(raw),Date.now());}
 function cookie(value,maxAge){const secure=env.NODE_ENV==='production';return `stp_session=${value}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${maxAge}${secure?'; Secure':''}`;}
 function originGuard(req){if(req.headers['sec-fetch-site']==='cross-site')fail(403,'INVALID_ORIGIN');if(req.headers.origin){let origin;try{origin=new URL(req.headers.origin);}catch{fail(403,'INVALID_ORIGIN');}if(origin.host!==req.headers.host)fail(403,'INVALID_ORIGIN');}}
@@ -37,17 +38,20 @@ const actor=session=>session.kind==='staff'?'staff:'+session.staff_id:'panel:'+s
 // Account limits are durable; the peer limit cannot be bypassed with a forged forwarding header.
 const authIp=req=>String(req.socket.remoteAddress||'unknown').slice(0,100);
 function sendStaffSession(res,result){const {token,max_age,...body}=result;send(res,200,body,undefined,{'Set-Cookie':cookie(token,max_age)});}
-const server=createServer({maxHeaderSize:16384},async(req,res)=>{
+async function handleRequest(req,res,phaseLease){
  try{
   const u=new URL(req.url||'/','http://localhost'),path=u.pathname,method=req.method||'GET';
   if(path==='/health/backup'&&method==='GET'){const report=backupReadiness(backupState,{env});send(res,report.ok?200:503,report);return;}
-  if(path==='/health'&&method==='GET'){const volume=platformHealth(env);core.get('SELECT 1');const last=core.get('SELECT id,status,updated_at FROM selftests ORDER BY created_at DESC LIMIT 1');send(res,200,{ok:true,status:'ok',app:'soft-tech-provider-core',version:'1.1.0',environment:core.deploymentIdentity.environment,deployment_identity:core.deploymentIdentity,isolation_readiness:core.isolation,production_enabled:false,qualification:qualificationState,platform_deployment_id:volume.platform_deployment_id,persistent_volume:volume.native_volume,process_boot_id:processBootId,uptime_seconds:Math.floor(process.uptime()),memory_rss_bytes:process.memoryUsage().rss,cpu_usage_microseconds:process.cpuUsage(),durable_journal:core.journal.status(),sqlite_writes:core.writeMetrics,wallet_transport:walletTransportStatus(),persistent:volume.native_volume.verified,replicas_supported:1,acceptance:last||null,source_commit:env.RAILWAY_GIT_COMMIT_SHA||'local'});return;}
+  if(path==='/health'&&method==='GET'){const volume=platformHealth(env);core.get('SELECT 1');const last=core.get('SELECT id,status,updated_at FROM selftests ORDER BY created_at DESC LIMIT 1');send(res,200,{ok:true,status:'ok',app:'soft-tech-provider-core',version:'1.1.0',environment:core.deploymentIdentity.environment,deployment_identity:core.deploymentIdentity,isolation_readiness:core.isolation,production_enabled:false,qualification:qualificationState,platform_deployment_id:volume.platform_deployment_id,persistent_volume:volume.native_volume,process_boot_id:processBootId,uptime_seconds:Math.floor(process.uptime()),memory_rss_bytes:process.memoryUsage().rss,cpu_usage_microseconds:process.cpuUsage(),durable_journal:core.journal.status(),sqlite_writes:core.writeMetrics,wallet_transport:walletTransportStatus(),core_phases:corePhases.snapshot(),persistent:volume.native_volume.verified,replicas_supported:1,acceptance:last||null,source_commit:env.RAILWAY_GIT_COMMIT_SHA||'local'});return;}
   if(path.startsWith('/api/v4/agency-game/')){
-   if(method!=='POST')fail(405,'METHOD_NOT_ALLOWED');const raw=await readBody(req);const key=await core.authenticateDurable({method,path:u.pathname+u.search,body:raw,headers:req.headers},true);
-   const result=await core.engineAction(key,path.slice('/api/v4/agency-game/'.length),json(raw));send(res,200,result);return;
+   if(method!=='POST')fail(405,'METHOD_NOT_ALLOWED');const raw=await readBody(req);const authentication=corePhases.authStart();let key;
+   try{key=await core.authenticateDurable({method,path:u.pathname+u.search,body:raw,headers:req.headers},true);}catch(error){corePhases.increment('auth_failures');throw error;}finally{corePhases.authResume(authentication);}
+   const action=corePhases.start('engine_action');let result;
+   try{result=await core.engineAction(key,path.slice('/api/v4/agency-game/'.length),json(raw));}finally{corePhases.end(action);}send(res,200,result);return;
   }
   if(path.startsWith('/v1/')){
-   const raw=method==='POST'?await readBody(req):'';const p=await core.authenticateDurable({method,path:u.pathname+u.search,body:raw,headers:req.headers});const op=p.operator;
+   const raw=method==='POST'?await readBody(req):'';const authentication=corePhases.authStart();let p;
+   try{p=await core.authenticateDurable({method,path:u.pathname+u.search,body:raw,headers:req.headers});}catch(error){corePhases.increment('auth_failures');throw error;}finally{corePhases.authResume(authentication);}const op=p.operator;
    const data=raw?json(raw):{};
    if(path==='/v1/games'&&method==='GET'){core.requireScope(p,'games:read');core.ensureOperatorEnabled(op);send(res,200,{games:core.games(op)});return;}
    if(path==='/v1/game-launches'&&method==='POST'){core.requireScope(p,'sessions:write');if(Object.keys(data).some(k=>!['game_id','player_ref','currency','return_url'].includes(k)))fail(422,'UNKNOWN_FIELD');send(res,200,core.createLaunch(op,data,req.headers['idempotency-key'],'operator:'+op.id));return;}
@@ -129,8 +133,11 @@ const server=createServer({maxHeaderSize:16384},async(req,res)=>{
   if(!['/index.html','/app.js','/staff.js','/style.css','/core.css','/Minecraft.woff2','/logo.png'].includes(file))fail(404,'NOT_FOUND');
   const bytes=await readFile(resolve(root,'.'+file)),type=types[extname(file)]||'application/octet-stream';
   send(res,200,method==='HEAD'?'':bytes,type,{'Cache-Control':file.endsWith('.html')?'no-store':'public, max-age=60','Content-Security-Policy':"default-src 'self'; img-src 'self' data: https://soft-tech-web-production.up.railway.app; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"});
- }catch(e){if(!res.headersSent)send(res,e.status||500,{error:e.code||'INTERNAL_ERROR',message:e instanceof Fault?e.message:'Request failed safely; use original request ID to retry'});else res.destroy();if(!(e instanceof Fault))console.error('provider.error',e?.message);}
-});
+ }catch(e){corePhases.requestError(phaseLease);if(!res.headersSent)send(res,e.status||500,{error:e.code||'INTERNAL_ERROR',message:e instanceof Fault?e.message:'Request failed safely; use original request ID to retry'});else res.destroy();if(!(e instanceof Fault))console.error('provider.error',e?.message);}
+ finally{corePhases.handlerDone(phaseLease);}
+}
+const server=createServer({maxHeaderSize:16384},(req,res)=>{const lease=corePhases.beginHttp(req.method,req.url);corePhases.attachResponse(res,lease);return corePhases.run(lease,()=>handleRequest(req,res,lease));});
+corePhases.startLoop();
 server.requestTimeout=20000;server.headersTimeout=10000;
 server.listen(port,'0.0.0.0',()=>{
  console.log('Soft Tech Provider Core v1 listening on '+port);
@@ -140,5 +147,5 @@ server.listen(port,'0.0.0.0',()=>{
 });
 const healthTimer=setInterval(()=>void core.refreshHealth().catch(()=>{}),60000);healthTimer.unref();
 const recoveryTimer=setInterval(()=>void core.recover().catch(()=>{}),30000);recoveryTimer.unref();
-function shutdown(){backupRunner.stop();clearTimeout(qualificationTimer);clearInterval(healthTimer);clearInterval(recoveryTimer);server.close(()=>{core.close();process.exit(0);});setTimeout(()=>process.exit(1),15000).unref();}
+function shutdown(){backupRunner.stop();corePhases.stopLoop();clearTimeout(qualificationTimer);clearInterval(healthTimer);clearInterval(recoveryTimer);server.close(()=>{core.close();process.exit(0);});setTimeout(()=>process.exit(1),15000).unref();}
 process.on('SIGTERM',shutdown);process.on('SIGINT',shutdown);
