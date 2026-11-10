@@ -263,15 +263,27 @@ export class Core {
   const txid=r.id+':'+action;const player=this.get('SELECT * FROM players WHERE id=?',r.player_id);
   const payload={transaction_id:txid,player_ref:player.player_ref,session_id:r.session_id,round_id:r.id,game_id:r.game_id,amount_minor:amount,...(action==='reversal'?{original_transaction_id:r.id+':debit'}:{})};
   const encoded=JSON.stringify(payload),hash=sha(encoded),now=this.clock();
-  await this.durable(()=>this.run('INSERT OR IGNORE INTO wallet_ops(id,operator_id,round_id,action,payload_json,payload_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,\'pending\',?,?)',txid,op.id,r.id,action,encoded,hash,now,now));
-  let row=this.get('SELECT * FROM wallet_ops WHERE id=?',txid);
+  let secret,credentialError,firstAttempt=false;
+  const row=await this.durable(()=>{
+   const inserted=this.run('INSERT OR IGNORE INTO wallet_ops(id,operator_id,round_id,action,payload_json,payload_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,\'pending\',?,?)',txid,op.id,r.id,action,encoded,hash,now,now);
+   const stored=this.get('SELECT * FROM wallet_ops WHERE id=?',txid);
+   if(inserted.changes===1){
+    // A new intent and its first dispatch marker share one commit. Preserve the
+    // unattempted intent if credentials cannot be opened; never call the wallet
+    // inside this transaction or before the durable promise has resolved.
+    try{secret=this.vault.open(op.wallet_secret);}catch(error){credentialError=error;return stored;}
+    this.run('UPDATE wallet_ops SET attempts=attempts+1,updated_at=? WHERE id=?',this.clock(),txid);firstAttempt=true;
+   }
+   return stored;
+  });
   if(row.payload_hash!==hash)fail(409,'IDEMPOTENCY_CONFLICT');
   if(row.status==='ok')return parse(row.response_json);if(row.status==='rejected')fail(409,'WALLET_REJECTED');
-  const secret=this.vault.open(op.wallet_secret);let receipt;
+  if(credentialError)throw credentialError;
+  secret??=this.vault.open(op.wallet_secret);let receipt;
   try{
-   if(row.attempts){receipt=await this.phases.walletCall('status',()=>this.transport(op,secret,'status',{transaction_id:txid,player_ref:player.player_ref},{allowLocal:this.allowLocal}));if(receipt.status==='pending')throw new WalletError('WALLET_OUTCOME_UNKNOWN');}
+   if(!firstAttempt&&row.attempts){receipt=await this.phases.walletCall('status',()=>this.transport(op,secret,'status',{transaction_id:txid,player_ref:player.player_ref},{allowLocal:this.allowLocal}));if(receipt.status==='pending')throw new WalletError('WALLET_OUTCOME_UNKNOWN');}
    if(!receipt||receipt.status==='not_found'){
-    await this.durable(()=>this.run('UPDATE wallet_ops SET attempts=attempts+1,updated_at=? WHERE id=?',this.clock(),txid));
+    if(!firstAttempt)await this.durable(()=>this.run('UPDATE wallet_ops SET attempts=attempts+1,updated_at=? WHERE id=?',this.clock(),txid));
     receipt=await this.phases.walletCall(action,()=>this.transport(op,secret,action,payload,{allowLocal:this.allowLocal}));
    }
    if(receipt.status==='rejected'){await this.durable(()=>this.run("UPDATE wallet_ops SET status='rejected',response_json=?,updated_at=? WHERE id=?",JSON.stringify(receipt),this.clock(),txid));fail(409,'WALLET_REJECTED');}

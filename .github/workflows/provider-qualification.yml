@@ -9,6 +9,8 @@ on:
       - 'provider-dashboard/scripts/start-provider.mjs'
       - 'provider-dashboard/test/native-volume*'
       - 'provider-dashboard/test/core-phases*'
+      - 'provider-dashboard/test/core-fresh-admission*'
+      - 'provider-dashboard/test/fixtures/admission*'
       - 'provider-dashboard/Dockerfile'
       - '.github/workflows/provider-qualification.yml'
   pull_request:
@@ -20,6 +22,8 @@ on:
       - 'provider-dashboard/scripts/start-provider.mjs'
       - 'provider-dashboard/test/native-volume*'
       - 'provider-dashboard/test/core-phases*'
+      - 'provider-dashboard/test/core-fresh-admission*'
+      - 'provider-dashboard/test/fixtures/admission*'
       - 'provider-dashboard/Dockerfile'
       - '.github/workflows/provider-qualification.yml'
   workflow_dispatch:
@@ -38,9 +42,9 @@ jobs:
           node-version: '24'
       - run: node --check reference-wallet/server.mjs && node --check reference-wallet/wallet.mjs && node --check reference-wallet/native-volume.mjs && node --check qualification/native-load.mjs && node --check qualification/evidence-gate.mjs
       - run: node --test --test-concurrency=1 provider-dashboard/test/native-volume.test.mjs reference-wallet/test/*.test.mjs qualification/test/*.test.mjs
-      - name: Verify Core phase attribution and business boundaries
+      - name: Verify Core phase attribution, admission durability and business boundaries
         working-directory: provider-dashboard
-        run: node --test --test-concurrency=1 test/core-phases*.test.mjs test/core.test.mjs test/durable-writes.test.mjs test/wallet-transport.test.mjs
+        run: node --test --test-concurrency=1 test/core-phases*.test.mjs test/core.test.mjs test/core-fresh-admission.test.mjs test/durable-writes.test.mjs test/wallet-transport.test.mjs
       - name: Verify actual Linux bind mount, stacked mount and detach behavior
         run: sudo unshare --mount --propagation private "$(command -v node)" provider-dashboard/test/native-volume-mount-fixture.mjs
       - name: Build the exact Core and reference-wallet images
