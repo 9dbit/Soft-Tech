@@ -37,7 +37,11 @@ export function createWalletServer({env=process.env,clock=Date.now}={}){
    if(fault?.kind==='network_partition'){send(res,503,{error:'TEST_NETWORK_PARTITION'});return;}
    if(fault?.kind==='before_timeout'){await new Promise(r=>setTimeout(r,fault.delay_ms));if(req.destroyed)return;}
    if(fault?.kind==='pending_once'){send(res,200,{transaction_id:p.transaction_id,status:'pending',currency:op.currency,scale:op.scale});return;}
-   const receipt=await wallet.durable(()=>wallet.perform(op,action,p,{reject:fault?.kind==='reject'}));
+   // These business actions only SELECT. The awaited authentication above has
+   // already committed the nonce and fault selection; synchronous reads now see
+   // committed state without a second writer admission. Mutations stay durable.
+   const perform=()=>wallet.perform(op,action,p,{reject:fault?.kind==='reject'});
+   const receipt=action==='balance'||action==='status'?perform():await wallet.durable(perform);
    if(fault?.kind==='after_disconnect'){req.socket.destroy();return;}
    if(fault?.kind==='after_timeout')await new Promise(r=>setTimeout(r,fault.delay_ms));
    if(!res.destroyed)send(res,200,receipt);

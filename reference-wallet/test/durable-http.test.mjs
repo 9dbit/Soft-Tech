@@ -28,6 +28,151 @@ async function fixture(t,{seed='1000'}={}){
  return {env,config,observer,payload,signed,send,get base(){return base;},get service(){return service;},restart:async()=>{await stop();service=createWalletServer({env});port=await listen(0);base='http://127.0.0.1:'+port;config.wallet_url=base;}};
 }
 
+const businessState=db=>Object.fromEntries([
+ ['accounts','operator_id,player_ref'],['transactions','operator_id,id'],['ledger','seq'],['audit','seq']
+].map(([table,order])=>[table,db.prepare('SELECT * FROM '+table+' ORDER BY '+order).all()]));
+
+test('balance and status read committed data after one durable authentication without a business write',async t=>{
+ const f=await fixture(t),debit=await walletCall(f.config,'debit',f.payload('read-receipt'));
+ assert.equal(debit.data.status,'applied');
+ const wallet=f.service.wallet,before=businessState(f.observer),observations=[],perform=wallet.perform;
+ const healthBefore=await (await fetch(f.base+'/health')).json();let currentNonce;
+ wallet.perform=function(op,action,p,options){
+  const observation={action,inOperation:this.journal.inOperation,transactionDepth:this.transactionDepth,
+   nonceCommitted:!!f.observer.prepare('SELECT 1 FROM nonces WHERE nonce=?').get(currentNonce)};
+  const writes=this.writeMetrics.statements,result=perform.call(this,op,action,p,options);
+  observations.push({...observation,businessWrites:this.writeMetrics.statements-writes});return result;
+ };
+ for(const [action,payload,expected] of [
+  ['balance',{player_ref:'alice'},{currency:'VCOIN',scale:2,balance_minor:'999'}],
+  ['status',{player_ref:'alice',transaction_id:'read-receipt'},debit.data],
+  ['status',{player_ref:'alice',transaction_id:'missing-receipt'},{currency:'VCOIN',scale:2,transaction_id:'missing-receipt',status:'not_found'}]
+ ]){
+  const request=f.signed(action,payload),operations=wallet.journal.status().operations;currentNonce=request.headers['x-softtech-nonce'];
+  const result=await f.send(request);assert.equal(result.status,200);assert.deepEqual(result.data,expected);
+  assert.equal(wallet.journal.status().operations-operations,1,'read queued a second durable operation');
+ }
+ assert.deepEqual(observations.map(({action,...observation})=>observation),Array.from({length:3},()=>({inOperation:false,transactionDepth:0,nonceCommitted:true,businessWrites:0})));
+ assert.deepEqual(businessState(f.observer),before);
+ const healthAfter=await (await fetch(f.base+'/health')).json();
+ assert.equal(healthAfter.durable_journal.operations-healthBefore.durable_journal.operations,3);
+ assert.equal(healthAfter.sqlite_writes.statements-healthBefore.sqlite_writes.statements,3,'only the three required nonce inserts should write');
+ assert.equal(healthAfter.durable_journal.pending,0);
+});
+
+test('failed authentication commits prevent balance and status reads and preserve their unconsumed faults',async t=>{
+ const f=await fixture(t),wallet=f.service.wallet,perform=wallet.perform;let reads=0;
+ wallet.perform=function(...args){reads++;return perform.apply(this,args);};
+ for(const action of ['balance','status']){
+  const armed=await adminCall(f.config,'/admin/faults',{operator_id:f.config.operator.id,action,kind:'after_disconnect',count:1});
+  const request=f.signed(action,{player_ref:'alice',transaction_id:'auth-failure-'+action}),original=wallet.journal.db,beforeReads=reads;let injected=false;
+  wallet.journal.db={exec(sql){if(sql==='COMMIT'&&!injected){injected=true;throw Error('INJECTED_READ_AUTH_COMMIT_FAILURE');}return original.exec(sql);}};
+  try{assert.deepEqual(await f.send(request),{status:500,data:{error:'INTERNAL_ERROR'}});}finally{wallet.journal.db=original;}
+  assert.equal(injected,true);assert.equal(reads,beforeReads,'business read ran before the authentication commit succeeded');
+  assert.equal(f.observer.prepare('SELECT 1 FROM nonces WHERE nonce=?').get(request.headers['x-softtech-nonce']),undefined);
+  assert.equal(f.observer.prepare('SELECT remaining FROM faults WHERE id=?').get(armed.data.id).remaining,1);
+  // Retrying the same nonce can now authenticate; its one-shot fault closes the
+  // socket only after the successful durable boundary and the read itself.
+  await assert.rejects(f.send(request));assert.equal(reads,beforeReads+1);
+  assert.ok(f.observer.prepare('SELECT 1 FROM nonces WHERE nonce=?').get(request.headers['x-softtech-nonce']));
+  assert.equal(f.observer.prepare('SELECT remaining FROM faults WHERE id=?').get(armed.data.id).remaining,0);
+  assert.equal((await f.send(request)).data.error,'REPLAY_DETECTED');
+ }
+ assert.equal(f.observer.prepare('SELECT count(*) n FROM transactions').get().n,0);
+ assert.equal(f.observer.prepare("SELECT balance_minor FROM accounts WHERE player_ref='alice'").get().balance_minor,'1000');
+});
+
+test('debit, credit and reversal still use a durable business boundary before acknowledging receipts',async t=>{
+ const f=await fixture(t),wallet=f.service.wallet,perform=wallet.perform,observations=[];
+ wallet.perform=function(op,action,p,options){
+  const result=perform.call(this,op,action,p,options);
+  observations.push({action,inOperation:this.journal.inOperation,visibleBeforeCommit:!!f.observer.prepare('SELECT 1 FROM transactions WHERE id=?').get(p.transaction_id)});
+  return result;
+ };
+ const steps=[
+  ['debit',f.payload('credit-debit')],
+  ['credit',{...f.payload('credit-receipt'),round_id:'round-credit-debit',amount_minor:'2'}],
+  ['debit',f.payload('reversal-debit')],
+  ['reversal',{...f.payload('reversal-receipt'),round_id:'round-reversal-debit',original_transaction_id:'reversal-debit'}]
+ ];
+ for(const [action,payload] of steps){
+  const operations=wallet.journal.status().operations,result=await walletCall(f.config,action,payload);
+  assert.equal(result.status,200);assert.equal(result.data.status,'applied');
+  assert.equal(wallet.journal.status().operations-operations,2);
+  assert.deepEqual(JSON.parse(f.observer.prepare('SELECT receipt_json FROM transactions WHERE id=?').get(payload.transaction_id).receipt_json),result.data);
+ }
+ assert.deepEqual(observations,steps.map(([action])=>({action,inOperation:true,visibleBeforeCommit:false})));
+ assert.equal(f.observer.prepare("SELECT balance_minor FROM accounts WHERE player_ref='alice'").get().balance_minor,'1001');
+ assert.equal(wallet.reconcile(f.config.operator.id).status,'matched');
+});
+
+test('overlapping reads may precede a queued mutation but never expose its uncommitted balance or receipt', {timeout:10000},async t=>{
+ const f=await fixture(t),wallet=f.service.wallet,journal=wallet.journal,schedule=journal.schedule,perform=wallet.perform,waiters=[],requests=[],insideMutation=[];
+ const waitForPending=count=>journal.pending.length>=count?Promise.resolve():new Promise(resolve=>waiters.push({count,resolve}));
+ // Hold real queue batches at explicit boundaries, without sleeping or changing
+ // their operations. HTTP authentication and all commits still use the queue.
+ journal.schedule=function(){for(const waiter of [...waiters])if(this.pending.length>=waiter.count){waiters.splice(waiters.indexOf(waiter),1);waiter.resolve();}};
+ const start=(action,payload)=>{const promise=f.send(f.signed(action,payload));promise.catch(()=>{});requests.push(promise);return promise;};
+ wallet.perform=function(op,action,p,options){
+  const result=perform.call(this,op,action,p,options);
+  if(action==='debit')insideMutation.push({balance:f.observer.prepare("SELECT balance_minor FROM accounts WHERE player_ref='alice'").get().balance_minor,receipt:f.observer.prepare('SELECT 1 FROM transactions WHERE id=?').get(p.transaction_id)});
+  return result;
+ };
+ try{
+  const debit=start('debit',f.payload('queued-debit'));await waitForPending(1);
+  const balance=start('balance',{player_ref:'alice'});await waitForPending(2);
+  const status=start('status',{player_ref:'alice',transaction_id:'queued-debit'});await waitForPending(3);
+  journal.flush(); // Commit all three nonces; the debit business phase is still queued.
+  const [beforeBalance,beforeStatus]=await Promise.all([balance,status]);
+  assert.equal(beforeBalance.data.balance_minor,'1000');assert.equal(beforeStatus.data.status,'not_found');
+  assert.equal(journal.pending.length,1);assert.equal(f.observer.prepare('SELECT count(*) n FROM transactions').get().n,0);
+  journal.flush();const applied=await debit;assert.equal(applied.data.status,'applied');
+  assert.deepEqual(insideMutation,[{balance:'1000',receipt:undefined}],'independent reader observed an uncommitted mutation');
+  const afterBalance=start('balance',{player_ref:'alice'});await waitForPending(1);
+  const afterStatus=start('status',{player_ref:'alice',transaction_id:'queued-debit'});await waitForPending(2);
+  journal.flush();const acknowledged=await Promise.all([afterBalance,afterStatus]);
+  assert.equal(acknowledged[0].data.balance_minor,'999');assert.deepEqual(acknowledged[1].data,applied.data);
+  assert.equal(journal.pending.length,0);assert.equal(wallet.reconcile(f.config.operator.id).status,'matched');
+ }finally{journal.schedule=schedule;wallet.perform=perform;journal.flush();await Promise.allSettled(requests);}
+});
+
+test('direct reads retain operator, currency, scale and player validation while consuming authenticated nonces',async t=>{
+ const f=await fixture(t),before=businessState(f.observer);
+ for(const action of ['balance','status'])for(const [change,status,error] of [
+  [{operator_id:'another-operator'},403,'OPERATOR_MISMATCH'],[{currency:'USD'},422,'CURRENCY_MISMATCH'],
+  [{scale:3},422,'CURRENCY_MISMATCH'],[{player_ref:'missing-player'},404,'PLAYER_NOT_FOUND']
+ ]){
+  const request=f.signed(action,{player_ref:'alice',transaction_id:'validation-receipt',...change}),operations=f.service.wallet.journal.status().operations;
+  assert.deepEqual(await f.send(request),{status,data:{error}});
+  assert.equal(f.service.wallet.journal.status().operations-operations,1);
+  assert.ok(f.observer.prepare('SELECT 1 FROM nonces WHERE nonce=?').get(request.headers['x-softtech-nonce']));
+ }
+ assert.deepEqual(businessState(f.observer),before);
+});
+
+test('balance and status preserve one-shot fault selection and before/after business behavior',async t=>{
+ const f=await fixture(t),debit=await walletCall(f.config,'debit',f.payload('fault-read-receipt')),wallet=f.service.wallet,perform=wallet.perform;let reads=0;
+ wallet.perform=function(...args){assert.equal(this.journal.inOperation,false);reads++;return perform.apply(this,args);};
+ for(const action of ['balance','status'])for(const kind of ['before_disconnect','after_disconnect','network_partition','pending_once','reject']){
+  const armed=await adminCall(f.config,'/admin/faults',{operator_id:f.config.operator.id,action,kind,count:1});
+  const request=f.signed(action,{player_ref:'alice',transaction_id:'fault-read-receipt'}),before=businessState(f.observer),beforeReads=reads,operations=wallet.journal.status().operations;
+  if(kind.endsWith('_disconnect'))await assert.rejects(f.send(request));
+  else{
+   const result=await f.send(request);
+   if(kind==='network_partition')assert.deepEqual(result,{status:503,data:{error:'TEST_NETWORK_PARTITION'}});
+   else if(kind==='pending_once')assert.deepEqual(result,{status:200,data:{transaction_id:'fault-read-receipt',status:'pending',currency:'VCOIN',scale:2}});
+   else{assert.equal(result.status,200);assert.deepEqual(result.data,action==='status'?debit.data:{currency:'VCOIN',scale:2,balance_minor:'999'});}
+  }
+  assert.equal(reads-beforeReads,['after_disconnect','reject'].includes(kind)?1:0);
+  assert.equal(wallet.journal.status().operations-operations,1);
+  assert.equal(f.observer.prepare('SELECT remaining FROM faults WHERE id=?').get(armed.data.id).remaining,0);
+  assert.ok(f.observer.prepare('SELECT 1 FROM nonces WHERE nonce=?').get(request.headers['x-softtech-nonce']));
+  assert.deepEqual(businessState(f.observer),before);
+  const recovered=await walletCall(f.config,action,{player_ref:'alice',transaction_id:'fault-read-receipt'});
+  assert.equal(recovered.status,200);assert.deepEqual(recovered.data,action==='status'?debit.data:{currency:'VCOIN',scale:2,balance_minor:'999'});
+ }
+});
+
 test('500 real HTTP charges on one account commit serial balances and exactly-once receipts before every acknowledgement',async t=>{
  const f=await fixture(t,{seed:'250'}),receipt=f.observer.prepare('SELECT receipt_json FROM transactions WHERE operator_id=? AND id=?'),ledger=f.observer.prepare("SELECT count(*) n FROM ledger WHERE operator_id=? AND transaction_id=? AND kind='debit'");
  const outcomes=await Promise.all(Array.from({length:500},(_,i)=>walletCall(f.config,'debit',f.payload('concurrent-'+i)).then(result=>{
@@ -51,12 +196,16 @@ test('500 real HTTP charges on one account commit serial balances and exactly-on
 });
 
 test('invalid JSON and failing business operations consume valid nonces durably without affecting other operations',async t=>{
- const f=await fixture(t),malformed=f.signed('balance',{}, {raw:'{invalid-json'}),invalid=f.signed('debit',{...f.payload('invalid-business'),currency:'USD'});
- const results=await Promise.all([f.send(malformed),f.send(invalid),walletCall(f.config,'debit',f.payload('valid-neighbor'))]);
- assert.equal(results[0].status,400);assert.equal(results[1].status,422);assert.equal(results[2].status,200);assert.equal(results[2].data.status,'applied');
- for(const request of [malformed,invalid])assert.ok(f.observer.prepare('SELECT 1 FROM nonces WHERE operator_id=? AND nonce=?').get(f.config.operator.id,request.headers['x-softtech-nonce']));
+ const f=await fixture(t),requests=[
+  f.signed('balance',{}, {raw:'{invalid-json'}),f.signed('status',{}, {raw:'{invalid-json'}),
+  f.signed('debit',{...f.payload('invalid-business'),currency:'USD'}),
+  f.signed('balance',{player_ref:'alice',currency:'USD'}),f.signed('status',{player_ref:'alice'})
+ ];
+ const results=await Promise.all([...requests.map(request=>f.send(request)),walletCall(f.config,'debit',f.payload('valid-neighbor'))]);
+ assert.deepEqual(results.slice(0,-1).map(result=>result.status),[400,400,422,422,422]);assert.equal(results.at(-1).status,200);assert.equal(results.at(-1).data.status,'applied');
+ for(const request of requests)assert.ok(f.observer.prepare('SELECT 1 FROM nonces WHERE operator_id=? AND nonce=?').get(f.config.operator.id,request.headers['x-softtech-nonce']));
  assert.equal(f.observer.prepare('SELECT count(*) n FROM transactions').get().n,1);
- await f.restart();assert.equal((await f.send(malformed)).data.error,'REPLAY_DETECTED');assert.equal((await f.send(invalid)).data.error,'REPLAY_DETECTED');
+ await f.restart();for(const request of requests)assert.equal((await f.send(request)).data.error,'REPLAY_DETECTED');
 });
 
 test('failed authentication commit sends no success or fault disconnect, and failed business commit preserves consumed nonce',async t=>{
