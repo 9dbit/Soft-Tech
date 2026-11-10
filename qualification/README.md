@@ -357,3 +357,28 @@ UNO's existing `dispatch_to_worker` observation may additionally expose three fi
 Read the additive intervals under `gameplay_diagnostics.comparison.services['uno-luck'].delta.operations[action].phases`. Use operation counts with each phase: cancellation before successful acquisition has no successful admission or worker-entry sample. Legacy producers remain readable but do not acquire synthetic zero values for missing split phases. Histograms and cumulative maxima cannot be added to derive a percentile for the whole path; separately rounded microsecond totals can differ slightly from the existing combined interval.
 
 Mahjong and UNO registries expose a random `registry_id` for the lifetime of the aggregate collector and `reset_count: 0` while those aggregates have no in-place reset API. Reusing an individual request slot does not reset the collector. A replacement or restarted collector must use a new registry ID. The comparator still rejects missing or changed identity, nonzero or unverified reset counts, source or process changes, nonquiet boundaries, invalid schema, telemetry loss and saturation. This registry addition makes valid Mahjong interval evidence available without weakening any comparison or qualification gate.
+
+Mahjong may expose the same three admission labels using the unchanged default
+40-token limiter. Read them under
+`gameplay_diagnostics.comparison.services['mahjong-wild'].delta.operations[action].phases`
+with the same successful-acquisition, operation-population and cancellation
+qualifications as UNO. A missing label in a legacy producer remains missing;
+registry identity alone does not supply an admission measurement.
+
+Two additional fixed worker phases are accepted: `ticket_read` observes the
+existing ticket SELECT and fetch, and `manifest_prepare` observes the existing
+manifest function inclusively. Neither label carries ticket IDs, asset paths,
+manifest contents or caller-defined names. The consumer adds no request, query,
+in-gameplay health poll, retry or runtime optimization.
+
+Worker timing already includes fixed `db_open_total`, `open_bound_total`,
+`connection_pragmas`, `session_validation`, `autocommit_intent_execute`,
+`autocommit_result_execute`, `autocommit_ticket_execute`, `history_read`, callback,
+and `response_assembly_inclusive` labels. These are not disjoint components:
+database setup and ticket/manifest work can be nested inside larger scopes, and
+one phase may have several invocations per completed operation. Use
+`total_us / operations` for the mean phase sum per observed operation, and label
+`total_us / invocations` separately if reporting per-call means. Do not sum nested
+phase totals or histogram percentiles to reconstruct worker or round latency.
+The fixed response limit, source/boot/registry/reset guards and qualification
+verdicts remain unchanged.

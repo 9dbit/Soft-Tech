@@ -203,6 +203,42 @@ test('UNO admission split retains bounded additive phases without fabricating le
  assert(safe.native_phases.validation_errors.includes('UNSUPPORTED_PHASE_LABEL'));
 });
 
+test('Mahjong admission and worker spans retain bounded per-operation totals and distinct invocation counts',()=>{
+ const name='mahjong-wild';
+ const measured=count=>{
+  const health=nativeHealth(count),operation=health.native_phases.operations.state;
+  health.native_phases.operations={spin_new:operation};
+  for(const [phase,us,invocations,maxInvocation]of [
+   ['dispatch_to_worker',61,1,61],['dispatch_to_admission',11,1,11],
+   ['admission_wait',20,1,20],['admission_to_worker',30,1,30],
+   ['ticket_read',35,2,20],['manifest_prepare',60,3,25],
+  ])operation.phases[phase]={operations:count,invocations:count*invocations,total_us:count*us,max_operation_us:us,max_invocation_us:maxInvocation,buckets:PHASE_BUCKETS.map((_,i)=>i===0?count:0)};
+  return health;
+ };
+ const result=compareGameplayBoundaries(wrap(measured(1),name),wrap(measured(4),name,later)).services[name];
+ assert.equal(result.comparable,true,JSON.stringify(result));
+ const phases=result.delta.operations.spin_new.phases;
+ assert.equal(phases.dispatch_to_worker.total_us,183);
+ assert.equal(phases.dispatch_to_admission.total_us,33);
+ assert.equal(phases.admission_wait.total_us,60);
+ assert.equal(phases.admission_to_worker.total_us,90);
+ assert.equal(phases.ticket_read.operations,3);assert.equal(phases.ticket_read.invocations,6);assert.equal(phases.ticket_read.total_us,105);
+ assert.equal(phases.manifest_prepare.operations,3);assert.equal(phases.manifest_prepare.invocations,9);assert.equal(phases.manifest_prepare.total_us,180);
+ for(const phase of Object.values(phases)){assert.equal(phase.max_operation_us,undefined);assert.equal(phase.max_invocation_us,undefined);}
+ const legacy=compareGameplayBoundaries(wrap(nativeHealth(1),name),wrap(nativeHealth(4),name,later)).services[name];
+ assert.equal(legacy.comparable,true);assert.equal(legacy.delta.operations.state.phases.ticket_read,undefined);assert.equal(legacy.delta.operations.state.phases.manifest_prepare,undefined);assert.equal(legacy.delta.operations.state.phases.admission_wait,undefined);
+ const invalid=measured(4);invalid.native_phases.operations.spin_new.phases.manifest_prepare.invocations=3;
+ const bad=compareGameplayBoundaries(wrap(measured(1),name),wrap(invalid,name,later)).services[name];
+ assert.equal(bad.comparable,false);assert(bad.errors.includes('INVALID_PHASE_SNAPSHOT'));assert.equal(bad.delta,undefined);
+ const secret='PRIVATE_TICKET_OR_ASSET',untrusted=measured(1);
+ untrusted.native_phases.operations.spin_new.phases.ticket_read.ticket_id=secret;
+ untrusted.native_phases.operations.spin_new.phases.manifest_prepare.assets=Array(10000).fill(secret);
+ untrusted.native_phases.operations.spin_new.phases[secret]={path:secret};
+ const safe=sanitizeDiagnosticHealth(untrusted,name);assert(!JSON.stringify(safe).includes(secret));
+ assert(safe.native_phases.validation_errors.includes('UNSUPPORTED_PHASE_LABEL'));
+ assert.equal(DIAGNOSTIC_LIMITS.response_bytes,262144);
+});
+
 test('Mahjong registry continuity enables deltas while replacement, reset and unavailable telemetry remain blocked',()=>{
  const name='mahjong-wild',before=wrap(nativeHealth(1),name),after=wrap(nativeHealth(3),name,later);
  const valid=compareGameplayBoundaries(before,after).services[name];
