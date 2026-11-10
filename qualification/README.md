@@ -200,6 +200,7 @@ Leave `QUALIFICATION_RUN_ID` unset on the initial deployment. `/health` will sho
 | --- | --- |
 | `standard` (default) |500 sessions, then1,000 sessions, then60-minute soak |
 | `baseline500` |500 sessions only |
+| `load1000_only` |1,000 sessions only, after a separately verified 500-session and resource gate |
 | `capacity` |500 sessions, then1,000; stop for resource/disk review |
 | `soak_only` |A separate60-minute soak after capacity/resource review |
 | `wallet_conformance` |17 deployed reference-wallet conformance cases, including an actual wallet restart |
@@ -207,6 +208,46 @@ Leave `QUALIFICATION_RUN_ID` unset on the initial deployment. `/health` will sho
 | `network_restart` |12 native network/restart cases, with actual Core, wallet and three native process restarts |
 
 The standard soak uses500 concurrent sessions by default; set `QUALIFICATION_SOAK_SESSIONS=1000` explicitly for1,000. It always runs a full3,600seconds. A failed functional or latency gate stops the plan before its next step. A load report can remain PARTIAL only because independently attached platform resource measurements are still required.
+
+### Advance after a separately reviewed 500-session run
+
+Use `load1000_only` when the prior 500-session stage has already completed and
+its independent resource assessment has passed. The release orchestration must
+verify these prerequisites **before setting a prospective new
+`QUALIFICATION_RUN_ID`**:
+
+- Preserve the original 500-session report and verify all functional, latency,
+  source-identity, exactly-once and duplicate-result gates. Verify cleanup has
+  revoked every established test session.
+- Verify a matching independently produced resource attachment with
+  `status: "PASS"` and `combined_status: "PASS"`, bound to that original report's
+  run ID and SHA-256, with the previously declared resource budget. The original
+  report may remain `PARTIAL`; do not rewrite it or substitute a boolean
+  approval flag for the resource evidence.
+- Preserve the same protected configuration, effective native transport and
+  config fingerprint, Core audience, and explicit pins for all five target
+  source commits (`core`, `wallet`, `uno`, `mahjong`, `skygate`). Complete fresh
+  target/source and resource preflight. A reviewed runner-only source update
+  is recorded separately and bound to the new run; it does not rewrite the
+  prior 500 evidence or provide resource evidence for 1,000 sessions.
+
+Deploy the runner with its run ID unset so it stays `IDLE`, then select
+`QUALIFICATION_PLAN=load1000_only` with a new declared run ID after those checks.
+This fixed mode runs only `load1000`: 1,000 sessions, one round per session, no
+duration target, and the existing setup concurrency 40, think time 1,000 ms and
+zero recovery retries. It does not repeat 500 sessions or start a soak. It changes
+no native worker-token limit, financial behavior or acceptance threshold.
+
+The selector does not validate external resource attachments itself; that
+predecessor check belongs to release orchestration. The new 1,000-session report
+still needs its own independent resource assessment after completion. Preserve
+that report unchanged, verify cleanup and the combined result, and only then
+consider the separate `soak_only` plan. Do not select `capacity` or `standard`
+to simulate this pause: those existing plans advance between load steps on
+functional/latency results while resource attachments remain external. Do not
+copy or edit an old plan/report to mark a 500 step complete. Existing resume
+rules reuse a completed same-plan report without re-execution and reject failed
+or source/config/plan-mismatched attempts.
 
 `QUALIFICATION_EXPECTED_SOURCES_JSON` may pin all five target source commits with keys `core`, `wallet`, `uno`, `mahjong` and `skygate`. The runner validates actual `/health` identities and source SHAs before starting, between steps and before resuming. Without an explicit map, it pins the first observed valid source set. Reports bind the runner SHA, target source set, configuration fingerprint, plan and run ID. Completed steps are not repeated after a runner restart. An incomplete/failed attempt or a changed source/configuration requires a new run ID; previous evidence is preserved.
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync,readFileSync} from 'node:fs';
+import {mkdtempSync,rmSync,readFileSync,readdirSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createCloudRunner,fixedPlan} from '../cloud-runner.mjs';
@@ -27,6 +27,62 @@ test('production config, absent Railway volume and changed target source cannot 
 test('fixed wallet plan exposes pending restart and verifies actual process change before PASS',async()=>{const dir=mkdtempSync(path.join(os.tmpdir(),'runner-wallet-plan-')),e={...env(dir),QUALIFICATION_RUN_ID:'unit-wallet-plan',QUALIFICATION_PLAN:'wallet_conformance'};let runner,requests=0,observedWaiting=false;const identity={environment:'preproduction',deployment_id:'wallet-fixture',core_audience:config.core_audience};const healthRequest=async()=>{requests++;if(requests>1)observedWaiting=runner.getState().waiting_restart?.target==='wallet';return {ok:true,status:200,data:{ok:true,process_boot_id:requests===1?'old-process':'new-process',source_commit:'b'.repeat(40),identity}};};try{runner=createCloudRunner({env:e,snapshot,healthRequest,run:async()=>{throw Error('Load must not execute');},walletRun:async(_c,o)=>{const proof=await o.restart();assert.equal(proof.process_boot_id_before,'old-process');assert.equal(proof.process_boot_id_after,'new-process');return {schema_version:1,run_id:o.runId,status:'PASS',classification:'unit_test_fixture_not_live_evidence',external_operator_certified:false,cases:Array.from({length:17},(_,i)=>({name:'fixture-'+i,status:'PASS'}))};}});assert.equal((await runner.start()).status,'PASS');assert.equal(observedWaiting,true);assert.equal(runner.getState().waiting_restart,undefined);assert.deepEqual(fixedPlan(e).map(s=>s.kind),['wallet_conformance']);}finally{rmSync(dir,{recursive:true,force:true});}});
 test('fixed native chaos plan cannot pass when restart changes deployment identity',async()=>{const dir=mkdtempSync(path.join(os.tmpdir(),'runner-chaos-plan-')),e={...env(dir),QUALIFICATION_RUN_ID:'unit-chaos-plan',QUALIFICATION_PLAN:'network_restart'};let requests=0;const healthRequest=async()=>({ok:true,status:200,data:{ok:true,process_boot_id:++requests===1?'old':'new',source_commit:'b'.repeat(40),identity:{environment:'preproduction',deployment_id:requests===1?'wallet-fixture':'wrong-wallet',core_audience:config.core_audience}}});try{const runner=createCloudRunner({env:e,snapshot,healthRequest,chaosRun:async(c,o)=>{await o.restart(c,'wallet',c.wallet_url);throw Error('Should reject identity change');}});assert.equal((await runner.start()).status,'FAIL');assert.match(runner.getState().error,/IDENTITY_CHANGED_DURING_RESTART/);assert.deepEqual(fixedPlan(e).map(s=>s.kind),['network_restart']);}finally{rmSync(dir,{recursive:true,force:true});}});
 test('capacity and soak-only remain separate fixed plans with a hardcoded one-hour duration',()=>{const capacity=fixedPlan({QUALIFICATION_PLAN:'capacity'}),soak=fixedPlan({QUALIFICATION_PLAN:'soak_only',QUALIFICATION_SOAK_SESSIONS:'1000'});assert.deepEqual(capacity.map(s=>[s.sessions,s.duration_seconds]),[[500,0],[1000,0]]);assert.deepEqual(soak.map(s=>[s.sessions,s.duration_seconds,s.min_soak_seconds]),[[1000,3600,3600]]);});
+test('load1000-only selects exactly the existing fixed thousand-session step',()=>{
+ const expected=[{id:'load1000',sessions:1000,duration_seconds:0,rounds:1}];
+ assert.deepEqual(fixedPlan({QUALIFICATION_PLAN:'load1000_only'}),expected);
+ assert.deepEqual(fixedPlan({QUALIFICATION_PLAN:'load1000_only',QUALIFICATION_SOAK_SESSIONS:'1000'}),expected);
+ assert.deepEqual(fixedPlan({QUALIFICATION_PLAN:'baseline500'}).map(s=>s.id),['load500']);
+ assert.deepEqual(fixedPlan({QUALIFICATION_PLAN:'capacity'}).map(s=>s.id),['load500','load1000']);
+ assert.deepEqual(fixedPlan({}).map(s=>s.id),['load500','load1000','soak60m']);
+ for(const mode of ['load1000','capacity1000_only','load2000_only'])assert.throws(()=>fixedPlan({QUALIFICATION_PLAN:mode}),/UNKNOWN_FIXED_PLAN/);
+});
+test('declared load1000-only runs once with unchanged transport/options and stops for independent resources',async()=>{
+ const dir=mkdtempSync(path.join(os.tmpdir(),'runner-1000-only-'));
+ const idleEnv={...env(dir),QUALIFICATION_PLAN:'load1000_only',QUALIFICATION_NATIVE_TRANSPORT:'per_user_https'},calls=[];
+ const run=async(c,o)=>{calls.push({transport:c.native_transport,sessions:o.concurrency,rounds:o.roundsPerSession,duration:o.durationSeconds,minSoak:o.minSoakSeconds,setup:o.setupConcurrency,think:o.thinkTimeMs,recovery:o.recoveryRetries});return report(o);};
+ try{
+  const idle=createCloudRunner({env:idleEnv,run,snapshot});await idle.start();assert.equal(idle.getState().status,'IDLE');assert.equal(calls.length,0);
+  const e={...idleEnv,QUALIFICATION_RUN_ID:'unit-1000-only'},runner=createCloudRunner({env:e,run,snapshot});
+  const result=await runner.start();
+  assert.equal(result.status,'PARTIAL');assert.equal(result.active_step,null);
+  assert.deepEqual(calls,[{transport:'per_user_https',sessions:1000,rounds:1,duration:0,minSoak:3600,setup:40,think:1000,recovery:0}]);
+  assert.deepEqual(result.steps.map(s=>s.id),['load1000']);
+  const reportPath=path.join(dir,'reports','unit-1000-only-load1000.json'),original=readFileSync(reportPath,'utf8'),saved=JSON.parse(original);
+  assert.equal(saved.status,'PARTIAL');assert.equal(saved.gates.server_resource_ceilings,null);
+  assert.equal(saved.runner.step_id,'load1000');assert.equal(saved.runner.plan_hash,result.plan_hash);
+  assert.equal(saved.runner.config_fingerprint,result.config_fingerprint);assert.deepEqual(saved.runner.source_snapshot,await snapshot());
+  assert.deepEqual(readdirSync(path.join(dir,'reports')).sort(),['unit-1000-only-load1000.json','unit-1000-only-plan.json']);
+  const resumed=createCloudRunner({env:e,run,snapshot});assert.equal((await resumed.start()).status,'PARTIAL');
+  assert.equal(calls.length,1);assert.equal(resumed.getState().steps[0].resumed_completed_report,true);
+  assert.equal(readFileSync(reportPath,'utf8'),original);
+  assert.throws(()=>createCloudRunner({env:{...e,QUALIFICATION_PLAN:'capacity'},run,snapshot}),/MISMATCH_USE_NEW_RUN_ID/);
+  assert.throws(()=>createCloudRunner({env:{...e,SOURCE_COMMIT:'c'.repeat(40)},run,snapshot}),/MISMATCH_USE_NEW_RUN_ID/);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('failed load1000-only remains terminal without retry, a preceding 500, or automatic soak',async()=>{
+ const dir=mkdtempSync(path.join(os.tmpdir(),'runner-1000-failure-')),e={...env(dir),QUALIFICATION_PLAN:'load1000_only',QUALIFICATION_RUN_ID:'unit-1000-failure'};
+ let calls=0;const run=async(_c,o)=>{calls++;assert.equal(o.concurrency,1000);const result=report(o);result.status='FAIL';result.gates.round_latency=false;return result;};
+ try{
+  const first=createCloudRunner({env:e,run,snapshot});assert.equal((await first.start()).status,'FAIL');assert.equal(calls,1);
+  assert.match(first.getState().error,/QUALIFICATION_STEP_FAILED_load1000/);
+  const reportPath=path.join(dir,'reports','unit-1000-failure-load1000.json'),original=readFileSync(reportPath,'utf8');
+  const resumed=createCloudRunner({env:e,run,snapshot});assert.equal((await resumed.start()).status,'FAIL');assert.equal(calls,1);
+  assert.match(resumed.getState().error,/PREVIOUS_STEP_DID_NOT_PASS_USE_NEW_RUN_ID/);
+  assert.equal(readFileSync(reportPath,'utf8'),original);
+  assert.deepEqual(readdirSync(path.join(dir,'reports')).sort(),['unit-1000-failure-load1000.json','unit-1000-failure-plan.json']);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
+test('load1000-only still refuses a changed pinned target before any load execution',async()=>{
+ const dir=mkdtempSync(path.join(os.tmpdir(),'runner-1000-pins-')),sources=Object.fromEntries(['core','wallet','uno','mahjong','skygate'].map(name=>[name,'b'.repeat(40)]));
+ const e={...env(dir),QUALIFICATION_PLAN:'load1000_only',QUALIFICATION_RUN_ID:'unit-1000-pins',QUALIFICATION_EXPECTED_SOURCES_JSON:JSON.stringify(sources)};
+ let calls=0;
+ try{
+  const runner=createCloudRunner({env:e,run:async()=>{calls++;throw Error('Must not execute');},snapshot:async()=>({...await snapshot(),uno:{source_commit:'c'.repeat(40),deployment_id:'uno-fixture',environment:'preproduction'}})});
+  assert.equal((await runner.start()).status,'FAIL');assert.equal(calls,0);
+  assert.match(runner.getState().error,/EXPECTED_SOURCE_MISMATCH_uno/);
+  assert.deepEqual(readdirSync(path.join(dir,'reports')),['unit-1000-pins-plan.json']);
+ }finally{rmSync(dir,{recursive:true,force:true});}
+});
 test('volume plan exposes two distinct stages with ten-minute restore deadline and remains PARTIAL',async()=>{
  const dir=mkdtempSync(path.join(os.tmpdir(),'runner-volume-plan-')),e={...env(dir),QUALIFICATION_RUN_ID:'unit-volume-plan',QUALIFICATION_PLAN:'volume_recovery'};let runner,requests=0;const stages=[];
  const healthRequest=async()=>{requests++;const waiting=runner?.getState().waiting_restart;if(waiting){stages.push(waiting.stage);assert.equal(Date.parse(waiting.deadline)-Date.parse(waiting.requested_at),waiting.stage==='volume_restore'?600000:300000);}return {ok:true,data:{ok:true,process_boot_id:'process-'+Math.ceil((requests+1)/2),source_commit:'b'.repeat(40),identity:{environment:'preproduction',deployment_id:'uno-fixture'}}};};

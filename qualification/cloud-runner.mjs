@@ -29,13 +29,13 @@ function configFromEnvironment(env){
  return {...c,native_transport:nativeTransport,allow_local:false,allow_small_test:false};
 }
 export function fixedPlan(env){
- const mode=env.QUALIFICATION_PLAN||'standard';need(['standard','capacity','soak_only','baseline500','wallet_conformance','network_restart','volume_recovery'].includes(mode),'UNKNOWN_FIXED_PLAN');
+ const mode=env.QUALIFICATION_PLAN||'standard';need(['standard','capacity','soak_only','baseline500','load1000_only','wallet_conformance','network_restart','volume_recovery'].includes(mode),'UNKNOWN_FIXED_PLAN');
  if(mode==='wallet_conformance')return [{id:'wallet-conformance',kind:'wallet_conformance'}];
  if(mode==='network_restart')return [{id:'network-restart',kind:'network_restart'}];
  if(mode==='volume_recovery')return [{id:'volume-recovery',kind:'volume_recovery'}];
  const soakSessions=Number(env.QUALIFICATION_SOAK_SESSIONS||500);need([500,1000].includes(soakSessions),'INVALID_SOAK_CONCURRENCY');
  const first={id:'load500',sessions:500,duration_seconds:0,rounds:1};
- const capacity=[first,{id:'load1000',sessions:1000,duration_seconds:0,rounds:1}],soak={id:'soak60m',sessions:soakSessions,duration_seconds:3600,min_soak_seconds:3600,rounds:1};return mode==='baseline500'?[first]:mode==='capacity'?capacity:mode==='soak_only'?[soak]:[...capacity,soak];
+ const capacity=[first,{id:'load1000',sessions:1000,duration_seconds:0,rounds:1}],soak={id:'soak60m',sessions:soakSessions,duration_seconds:3600,min_soak_seconds:3600,rounds:1};return mode==='baseline500'?[first]:mode==='load1000_only'?[capacity[1]]:mode==='capacity'?capacity:mode==='soak_only'?[soak]:[...capacity,soak];
 }
 export function functionalPass(report){return ['PASS','PARTIAL'].includes(report?.status)&&report?.gates&&Object.values(report.gates).every(x=>x!==false)&&report.gates.concurrent_sessions===true&&report.gates.all_sessions_played===true&&report.gates.no_round_failures===true&&report.gates.exactly_once_reconciliation===true&&report.gates.duplicate_native_results===true&&report.gates.request_error_rate===true&&report.gates.round_latency===true;}
 async function sourceSnapshot(config){
