@@ -19,3 +19,56 @@ test('actual platform float-mean roundoff is accepted without relaxing a resourc
  m.average=.9999974400000011;const cpu=metrics.services[0].metrics.find(m=>m.measurement==='CPU_USAGE');cpu.max=.8000000000000002;
  const exceeded=buildResourceProof(report,metrics,limits);assert.equal(exceeded.status,'FAIL');assert.ok(exceeded.errors.includes('SAMPLED_RESOURCE_CEILING_EXCEEDED_OR_UNKNOWN_core_cpu'));
 });
+test('all-zero Core metric series cannot certify resources or mutate the original report',()=>{
+ const {report,metrics,limits}=fixture(),original=structuredClone(report);
+ for(const m of metrics.services[0].metrics)Object.assign(m,{current:0,average:0,min:0,max:0});
+ const r=buildResourceProof(report,metrics,limits);
+ assert.equal(r.status,'FAIL');assert.equal(r.combined_status,'FAIL');assert.equal(r.server_resource_ceilings,false);
+ assert.ok(r.errors.includes('OBSERVED_CPU_LIMIT_MISSING_OR_MISMATCH_core'));
+ assert.ok(r.errors.includes('OBSERVED_MEMORY_LIMIT_MISSING_OR_MISMATCH_core'));
+ assert.deepEqual(r.services[0].observed_limit_checks,{cpu:false,memory:false});
+ assert.deepEqual(report,original);
+});
+test('positive current limits allow genuine zero usage and historical zero limit minima',()=>{
+ const {report,metrics,limits}=fixture();
+ for(const s of metrics.services)for(const m of s.metrics)Object.assign(m,m.measurement.includes('LIMIT')?{current:1,min:0,max:1,average:.9}:{current:0,min:0,max:0,average:0});
+ const r=buildResourceProof(report,metrics,limits);
+ assert.equal(r.status,'PASS',r.errors.join(','));assert.equal(r.combined_status,'PASS');
+ assert.deepEqual(r.services[0].observed_limit_checks,{cpu:true,memory:true});
+ assert.equal(r.services[0].measurements.CPU_USAGE.enclosing_window_peak,0);
+});
+test('missing or unusable latest observed limits fail despite positive historical samples',()=>{
+ for(const measurement of ['CPU_LIMIT','MEMORY_LIMIT_GB'])for(const missing of [true,false]){
+  const {report,metrics,limits}=fixture(),service=metrics.services[0];
+  if(missing)service.metrics=service.metrics.filter(m=>m.measurement!==measurement);
+  else service.metrics.find(m=>m.measurement===measurement).current=0;
+  const r=buildResourceProof(report,metrics,limits),kind=measurement==='CPU_LIMIT'?'CPU':'MEMORY';
+  assert.equal(r.status,'FAIL');assert.ok(r.errors.includes('OBSERVED_'+kind+'_LIMIT_MISSING_OR_MISMATCH_core'));
+ }
+});
+test('mismatched current CPU or memory limits cannot match a declared effective limit',()=>{
+ for(const [measurement,value] of [['CPU_LIMIT',2],['CPU_LIMIT',.9999999999999999],['MEMORY_LIMIT_GB',2],['MEMORY_LIMIT_GB',.99999]]){
+  const {report,metrics,limits}=fixture(),m=metrics.services[0].metrics.find(m=>m.measurement===measurement);
+  Object.assign(m,{current:value,max:Math.max(value,m.max)});
+  const r=buildResourceProof(report,metrics,limits),kind=measurement==='CPU_LIMIT'?'CPU':'MEMORY';
+  assert.equal(r.status,'FAIL');assert.ok(r.errors.includes('OBSERVED_'+kind+'_LIMIT_MISSING_OR_MISMATCH_core'));
+ }
+});
+test('one-page RAM rounding allowance never relaxes a usage budget ceiling',()=>{
+ const {report,metrics,limits}=fixture(),m=metrics.services[0].metrics.find(m=>m.measurement==='MEMORY_LIMIT_GB');
+ Object.assign(m,{current:.99999744,min:0,max:1,average:.9});
+ assert.equal(buildResourceProof(report,metrics,limits).status,'PASS');
+ m.current=(1e9-4096)/1e9;assert.equal(buildResourceProof(report,metrics,limits).status,'PASS');
+ m.current=(1e9-8192)/1e9;
+ assert.ok(buildResourceProof(report,metrics,limits).errors.includes('OBSERVED_MEMORY_LIMIT_MISSING_OR_MISMATCH_core'));
+ m.current=.99999744;metrics.services[0].metrics.find(m=>m.measurement==='MEMORY_USAGE_GB').max=.8000000000000002;
+ const r=buildResourceProof(report,metrics,limits);assert.equal(r.status,'FAIL');
+ assert.ok(r.errors.includes('SAMPLED_RESOURCE_CEILING_EXCEEDED_OR_UNKNOWN_core_memory'));
+});
+test('enclosing-window limit maxima may describe another arm when current limits agree',()=>{
+ const {report,metrics,limits}=fixture(),service=metrics.services[0];
+ Object.assign(service.metrics.find(m=>m.measurement==='CPU_LIMIT'),{current:1,min:0,max:2,average:1.2});
+ Object.assign(service.metrics.find(m=>m.measurement==='MEMORY_LIMIT_GB'),{current:.99999744,min:0,max:8,average:1.3});
+ const r=buildResourceProof(report,metrics,limits);assert.equal(r.status,'PASS',r.errors.join(','));
+ assert.deepEqual(r.services[0].observed_limit_checks,{cpu:true,memory:true});
+});

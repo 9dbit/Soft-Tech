@@ -11,6 +11,10 @@ const finite=n=>typeof n==='number'&&Number.isFinite(n);
 // its reported min/max. This tolerance validates summary consistency only;
 // the resource budget comparisons below remain strict and unchanged.
 const statisticLTE=(a,b)=>a<=b||a-b<=16*Number.EPSILON*Math.max(Math.abs(a),Math.abs(b));
+// Platform RAM limits can be rounded to a 4 KiB page (SI GB in the metric).
+// This allowance verifies the observed limit only; budget ceilings stay exact.
+const MEMORY_LIMIT_PAGE_ROUNDING_BYTES=4096;
+const memoryLimitMatches=(observed,configured)=>finite(observed)&&observed>0&&finite(configured)&&configured>0&&Math.abs(observed*1e9-configured*1e9)<=MEMORY_LIMIT_PAGE_ROUNDING_BYTES;
 const when=s=>typeof s==='string'?Date.parse(s):NaN;
 const validId=s=>typeof s==='string'&&s.length>=8;
 export function buildResourceProof(report,metrics,limits,{inputDigests={}}={}){
@@ -46,10 +50,18 @@ export function buildResourceProof(report,metrics,limits,{inputDigests={}}={}){
    const m=byName.get(mname);if(!require(m&&Number.isInteger(m.sampleCount)&&m.sampleCount>0&&['current','average','min','max'].every(k=>finite(m[k])&&m[k]>=0)&&statisticLTE(m.min,m.average)&&statisticLTE(m.average,m.max)&&statisticLTE(m.min,m.current)&&statisticLTE(m.current,m.max),'VALID_METRIC_REQUIRED_'+name+'_'+mname))continue;
    measurements[mname]={sample_count:m.sampleCount,enclosing_window_peak:m.max,enclosing_window_average:m.average,latest_sample:m.current,exact_run_window_average:null};
   }
+  // Zero usage can be genuine idle data. Zero/missing current limits cannot
+  // corroborate a positive effective configuration and must fail closed.
+  // Historical minima may include restarts, and enclosing maxima may include
+  // another experiment arm, so compare only usable current limit samples.
+  const observedCpuLimit=byName.get('CPU_LIMIT')?.current,observedMemoryLimit=byName.get('MEMORY_LIMIT_GB')?.current;
+  const limitChecks={cpu:finite(observedCpuLimit)&&observedCpuLimit>0&&observedCpuLimit===limit.cpu_limit_vcpu,memory:memoryLimitMatches(observedMemoryLimit,limit.memory_limit_gb)};
+  require(limitChecks.cpu,'OBSERVED_CPU_LIMIT_MISSING_OR_MISMATCH_'+name);
+  require(limitChecks.memory,'OBSERVED_MEMORY_LIMIT_MISSING_OR_MISMATCH_'+name);
   const cpu=byName.get('CPU_USAGE')?.max,memory=byName.get('MEMORY_USAGE_GB')?.max,disk=byName.get('DISK_USAGE_GB')?.max;
   const checks={cpu:finite(cpu)&&cpu<=limit.cpu_limit_vcpu*budget.cpu_peak_fraction,memory:finite(memory)&&memory<=limit.memory_limit_gb*budget.memory_peak_fraction,disk:finite(disk)&&disk<=limit.disk_capacity_gb*budget.disk_peak_fraction};
   for(const [kind,ok]of Object.entries(checks))require(ok,'SAMPLED_RESOURCE_CEILING_EXCEEDED_OR_UNKNOWN_'+name+'_'+kind);
-  out.services.push({kind:name,service_id:expected,source_commit:name==='runner'?report.runner?.source_commit:report.runner?.source_snapshot?.[name]?.source_commit,volume_id:limit.volume_id,limits:{cpu_vcpu:limit.cpu_limit_vcpu,memory_gb:limit.memory_limit_gb,disk_gb:limit.disk_capacity_gb},budget,measurements,checks});
+  out.services.push({kind:name,service_id:expected,source_commit:name==='runner'?report.runner?.source_commit:report.runner?.source_snapshot?.[name]?.source_commit,volume_id:limit.volume_id,limits:{cpu_vcpu:limit.cpu_limit_vcpu,memory_gb:limit.memory_limit_gb,disk_gb:limit.disk_capacity_gb},budget,measurements,observed_limit_checks:limitChecks,checks});
  }
  out.status=errors.length?'FAIL':'PASS';out.server_resource_ceilings=errors.length===0;
  const functional=report.gates&&['concurrent_sessions','all_sessions_played','no_round_failures','exactly_once_reconciliation','duplicate_native_results','request_error_rate','round_latency'].every(k=>report.gates[k]===true)&&Object.entries(report.gates).filter(([name])=>name!=='server_resource_ceilings').every(([,value])=>value!==false)&&(report.duration_target_seconds>0?report.gates.soak_duration===true:true);
