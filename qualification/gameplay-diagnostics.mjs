@@ -3,6 +3,7 @@
 export const DIAGNOSTIC_LIMITS=Object.freeze({response_bytes:262144,request_timeout_ms:5000,services:5});
 export const PHASE_BUCKETS=Object.freeze([250,500,1000,2000,4000,8000,16000,32000,64000,128000,256000,512000,1000000,2000000,4000000,8000000,16000000,30000000,60000000,null]);
 const games=['uno-luck','mahjong-wild','skygate-5000'];
+const coreGameLabels=Object.freeze(['unattributed',...games]);
 const services=['core','wallet',...games];
 const coreActions=['engine_redeem','engine_status','engine_reserve','engine_settle','engine_void','engine_other','operator'];
 const corePhases=['arrival_to_body_complete','body_read','auth_total','auth_queue','auth_batch_begin','auth_entry_to_operation','auth_operation_body','auth_batch_body','auth_batch_commit','auth_commit_to_resolve','auth_resolve_to_resume','journal_queue','journal_batch_begin','journal_entry_to_operation','journal_operation_body','journal_batch_body','journal_batch_commit','journal_commit_to_resolve','engine_action','wallet_balance','wallet_debit','wallet_credit','wallet_reversal','wallet_status','transaction_begin','transaction_body','transaction_commit','transaction_rollback','handler_total','response_write','response_to_finish','request_total'];
@@ -30,6 +31,50 @@ function cell(value,errors){
  if(Object.values(out).some(v=>v===null)||out.buckets?.some(v=>v===null)||out.buckets?.reduce((n,v)=>n+v,0)!==out.operations||out.invocations<out.operations||out.max_invocation_us>out.max_operation_us||out.max_operation_us>out.total_us||out.operations===0&&['invocations','total_us','max_operation_us','max_invocation_us'].some(k=>out[k]!==0))errors.add('INVALID_PHASE_CELL');
  return out;
 }
+function operationSnapshot(value,counters,phases,errors){
+ const out={...numeric(value,['completed','errors','aborted']),counters:numeric(value?.counters,counters),phases:{}};
+ if(!object(value)||!object(value.phases)||Object.values(out.counters).some(x=>x===null)||['completed','errors','aborted'].some(k=>out[k]===null)||out.errors>out.completed||out.aborted>out.completed)errors.add('INVALID_OPERATION');
+ for(const phase of phases)if(Object.hasOwn(value?.phases||{},phase))out.phases[phase]=cell(value.phases[phase],errors);
+ if(Object.values(out.phases).some(p=>p.operations>out.completed))errors.add('PHASE_OPERATION_COUNT_MISMATCH');
+ if(Object.keys(value?.phases||{}).some(k=>!phases.includes(k)))errors.add('UNSUPPORTED_PHASE_LABEL');
+ return out;
+}
+function operationSnapshots(value,actions,counters,phases,errors){
+ const out={};if(!object(value))errors.add('INVALID_OPERATIONS');
+ // Iterate only fixed labels; no caller-supplied key is ever retained.
+ for(const action of actions)if(Object.hasOwn(value||{},action))out[action]=operationSnapshot(value[action],counters,phases,errors);
+ if(Object.keys(value||{}).some(k=>!actions.includes(k)))errors.add('UNSUPPORTED_OPERATION_LABEL');
+ return out;
+}
+const fixedGameLabels=value=>Array.isArray(value)&&value.length===coreGameLabels.length&&coreGameLabels.every((label,i)=>value[i]===label);
+function conserved(values,total){return integer(total)&&values.every(integer)&&integer(values.reduce((sum,value)=>sum+value,0))&&values.reduce((sum,value)=>sum+value,0)===total;}
+function gameConservation(groups,parent,errors,includeMaxima=true){
+ if(!conserved(coreGameLabels.map(label=>groups[label]?.completed_operations),parent.completed_operations))errors.add('GAME_TOTAL_MISMATCH');
+ for(const action of coreActions){
+  const total=parent.operations[action],entries=coreGameLabels.map(label=>groups[label]?.operations[action]);
+  for(const key of ['completed','errors','aborted'])if(!conserved(entries.map(entry=>entry===undefined?0:entry[key]),total===undefined?0:total[key]))errors.add('GAME_OPERATION_MISMATCH');
+  for(const key of coreCounters)if(!conserved(entries.map(entry=>entry===undefined?0:entry.counters[key]),total===undefined?0:total.counters[key]))errors.add('GAME_COUNTER_MISMATCH');
+  for(const phase of corePhases){
+   const all=total?.phases[phase]||zeroCell(),cells=entries.map(entry=>entry?.phases[phase]||zeroCell());
+   for(const key of ['operations','invocations','total_us'])if(!conserved(cells.map(value=>value[key]),all[key]))errors.add('GAME_PHASE_MISMATCH');
+   for(let i=0;i<PHASE_BUCKETS.length;i++)if(!conserved(cells.map(value=>value.buckets?.[i]),all.buckets?.[i]))errors.add('GAME_BUCKET_MISMATCH');
+   if(includeMaxima)for(const key of ['max_operation_us','max_invocation_us'])if(!integer(all[key])||!cells.every(value=>integer(value[key]))||Math.max(...cells.map(value=>value[key]))!==all[key])errors.add('GAME_MAXIMUM_MISMATCH');
+  }
+ }
+}
+function gameAttributionSnapshot(value,parent){
+ if(value===undefined)return null;
+ const errors=new Set(),out={schema:value?.schema===1?1:null,provenance:fixed(value?.provenance,['authenticated_engine_key']),labels:fixedGameLabels(value?.labels)?[...coreGameLabels]:null,groups:{}};
+ if(!object(value)||out.schema!==1||out.provenance===null||out.labels===null||!object(value.groups))errors.add('INVALID_GAME_ATTRIBUTION_SCHEMA');
+ if(Object.keys(value?.groups||{}).some(label=>!coreGameLabels.includes(label)))errors.add('UNSUPPORTED_GAME_LABEL');
+ for(const label of coreGameLabels){
+  const group=value?.groups?.[label],entry={...numeric(group,['completed_operations']),operations:operationSnapshots(group?.operations,coreActions,coreCounters,corePhases,errors)};
+  if(!object(group)||entry.completed_operations===null||!conserved(Object.values(entry.operations).map(operation=>operation.completed),entry.completed_operations))errors.add('INVALID_GAME_GROUP');
+  if(label!=='unattributed'&&(Object.hasOwn(entry.operations,'operator')||Object.values(entry.operations).some(operation=>operation.counters.auth_failures!==0||operation.counters.body_failures!==0)))errors.add('UNVERIFIED_GAME_ATTRIBUTION');
+  out.groups[label]=entry;
+ }
+ gameConservation(out.groups,parent,errors);out.validation_errors=[...errors];return out;
+}
 function phaseSnapshot(value,kind){
  if(!object(value))return null;
  const errors=new Set(),isCore=kind==='core',actions=isCore?coreActions:nativeActions,phases=isCore?corePhases:nativePhases,counters=isCore?coreCounters:nativeCounters;
@@ -41,18 +86,7 @@ function phaseSnapshot(value,kind){
  if(isCore)Object.assign(out,numeric(value,['span_limit_per_capture','dropped_spans','invalid_clock','late_observations']));
  if(out.schema!==1||!out.available||out.unit===null||out.histogram===null||out.bucket_upper_us===null||out.telemetry_error===null||out.saturated===null||['capture_limit','active_captures','completed_operations','dropped_captures',...(isCore?['span_limit_per_capture','dropped_spans','invalid_clock','late_observations']:[])].some(k=>out[k]===null))errors.add('INCOMPLETE_PHASE_SCHEMA');
  if(out.capture_limit<1||out.capture_limit>1024||out.active_captures>out.capture_limit||isCore&&(out.span_limit_per_capture<1||out.span_limit_per_capture>4096))errors.add('INVALID_PHASE_CAPACITY');
- if(!object(value.operations))errors.add('INVALID_OPERATIONS');
- // Iterate only fixed labels; no caller-supplied key is ever retained.
- for(const action of actions){
-  if(!Object.hasOwn(value.operations||{},action))continue;
-  const v=value.operations[action],operation={...numeric(v,['completed','errors','aborted']),counters:numeric(v?.counters,counters),phases:{}};
-  if(!object(v)||!object(v.phases)||Object.values(operation.counters).some(x=>x===null)||['completed','errors','aborted'].some(k=>operation[k]===null)||operation.errors>operation.completed||operation.aborted>operation.completed)errors.add('INVALID_OPERATION');
-  for(const phase of phases)if(Object.hasOwn(v?.phases||{},phase))operation.phases[phase]=cell(v.phases[phase],errors);
-  if(Object.values(operation.phases).some(p=>p.operations>operation.completed))errors.add('PHASE_OPERATION_COUNT_MISMATCH');
-  if(Object.keys(v?.phases||{}).some(k=>!phases.includes(k)))errors.add('UNSUPPORTED_PHASE_LABEL');
-  out.operations[action]=operation;
- }
- if(Object.keys(value.operations||{}).some(k=>!actions.includes(k)))errors.add('UNSUPPORTED_OPERATION_LABEL');
+ out.operations=operationSnapshots(value.operations,actions,counters,phases,errors);
  if(Object.values(out.operations).reduce((n,v)=>n+v.completed,0)!==out.completed_operations)errors.add('OPERATION_COUNT_MISMATCH');
  if(isCore){
   const b=value.journal_batches;
@@ -63,6 +97,9 @@ function phaseSnapshot(value,kind){
   const e=value.event_loop;
   out.event_loop={...numeric(e,['interval_ms','invalid_clock']),histogram:fixed(e?.histogram,['timer_callback_delay_after_nominal_interval']),running:typeof e?.running==='boolean'?e.running:null,samples:cell(e?.samples,errors)};
   if(out.event_loop.histogram===null||out.event_loop.interval_ms===null||out.event_loop.invalid_clock===null||out.event_loop.running===null)errors.add('INVALID_EVENT_LOOP_SCHEMA');
+  // Optional additive diagnostics never invalidate otherwise valid legacy totals.
+  // Their own comparison fails closed when schema or conservation is unavailable.
+  out.game_attribution=gameAttributionSnapshot(value.game_attribution,out);
  }
  out.validation_errors=[...errors];return out;
 }
@@ -165,6 +202,33 @@ function comparePhases(before,after,kind){
  return errors.size?{comparable:false,errors:[...errors]}:{comparable:true,errors:[],delta};
 }
 
+function compareGameAttribution(before,after,parent){
+ if(!parent.comparable)return {comparable:false,errors:['CORE_PHASE_COMPARISON_UNAVAILABLE']};
+ const b=before?.game_attribution,a=after?.game_attribution;
+ if(!b||!a)return {comparable:false,errors:['GAME_ATTRIBUTION_NOT_EXPOSED']};
+ const errors=new Set();
+ if(!Array.isArray(b.validation_errors)||!Array.isArray(a.validation_errors)||b.validation_errors.length||a.validation_errors.length)errors.add('INVALID_GAME_ATTRIBUTION_SNAPSHOT');
+ if(b.schema!==1||a.schema!==1||b.provenance!=='authenticated_engine_key'||a.provenance!==b.provenance||!fixedGameLabels(b.labels)||!fixedGameLabels(a.labels))errors.add('GAME_ATTRIBUTION_SCHEMA_MISMATCH');
+ if(errors.size)return {comparable:false,errors:[...errors]};
+ const delta={completed_operations:parent.delta.completed_operations,groups:{}};
+ for(const label of coreGameLabels){
+  const beforeGroup=b.groups[label],afterGroup=a.groups[label],group={completed_operations:monotone(beforeGroup.completed_operations,afterGroup.completed_operations,errors),operations:{}};
+  for(const action of coreActions){
+   const first=beforeGroup.operations[action],last=afterGroup.operations[action];if(!first&&!last)continue;
+   const operation={};for(const key of ['completed','errors','aborted'])operation[key]=monotone(first?.[key]??0,last?.[key]??0,errors);
+   operation.counters={};for(const key of coreCounters)operation.counters[key]=monotone(first?.counters[key]??0,last?.counters[key]??0,errors);
+   operation.phases={};for(const phase of corePhases)if(first?.phases[phase]||last?.phases[phase])operation.phases[phase]=cellDelta(first?.phases[phase],last?.phases[phase],errors);
+   if(operation.errors>operation.completed||operation.aborted>operation.completed||Object.values(operation.phases).some(value=>value.operations>operation.completed))errors.add('INVALID_GAME_INTERVAL_POPULATION');
+   group.operations[action]=operation;
+  }
+  if(!conserved(Object.values(group.operations).map(operation=>operation.completed),group.completed_operations))errors.add('INVALID_GAME_INTERVAL_POPULATION');
+  delta.groups[label]=group;
+ }
+ gameConservation(delta.groups,parent.delta,errors,false);
+ return errors.size?{comparable:false,errors:[...errors]}:{schema:1,comparable:true,errors:[],provenance:'authenticated_engine_key',labels:[...coreGameLabels],delta,
+  interpretation:'Request phases are partitioned by the authenticated engine key, including earlier body/auth time after successful authentication. Unauthenticated and operator traffic is unattributed. Physical journal batches and event-loop samples remain shared; phase times overlap.'};
+}
+
 export function compareGameplayBoundaries(before,after){
  const result={schema_version:1,scope:'process_wide_interval_including_background_work',services:{},
   interpretation:'Deltas use additive counters and fixed histogram buckets only. Phases overlap; do not sum phase percentiles or subtract lifetime maxima. Other traffic and background work may be included. Diagnostic availability never changes qualification gates.'};
@@ -177,6 +241,7 @@ export function compareGameplayBoundaries(before,after){
   if(Date.parse(b?.finished_at)>Date.parse(a?.started_at)||!Number.isFinite(Date.parse(b?.finished_at))||!Number.isFinite(Date.parse(a?.started_at)))errors.push('BOUNDARY_ORDER_UNVERIFIED');
   const kind=name==='core'?'core':'native',key=kind+'_phases';
   result.services[name]={identity_stable:errors.length===0,...(errors.length?{comparable:false,errors}:name==='wallet'?{comparable:false,errors:['PHASES_NOT_EXPOSED']}:{...comparePhases(b[key],a[key],kind)})};
+  if(name==='core')result.services[name].game_attribution=compareGameAttribution(b?.core_phases,a?.core_phases,result.services[name]);
  }
  return result;
 }
@@ -185,6 +250,7 @@ export function compareGameplayBoundaries(before,after){
  * aggregates. No actor, player, round, URL, credential or exception text. */
 export function completionAggregate(report,stepId){
  const cleanLatency=value=>numeric(value,['count','p50_ms','p95_ms','p99_ms'],number);
+ const coreDiagnostics=report?.gameplay_diagnostics?.comparison?.services?.core;
  const out={schema_version:1,step:fixed(stepId,['load500','load1000','soak60m','wallet-conformance','network-restart','volume-recovery']),
   status:fixed(report?.status,['PASS','PARTIAL','FAIL','INTERRUPTED']),
   classification:fixed(report?.classification,['real_native_session_http_load']),run_id:runId(report?.run_id),
@@ -193,7 +259,7 @@ export function completionAggregate(report,stepId){
   actual_execution_seconds:number(report?.actual_execution_seconds)?report.actual_execution_seconds:null,cleanup:numeric(report?.cleanup,['sessions','revoked']),completed_by_game:{},
   round_latency:cleanLatency(report?.round_latency),round_latency_by_game:{},
   request_error_rate:number(report?.metrics?.request_error_rate)&&report.metrics.request_error_rate<=1?report.metrics.request_error_rate:null,
-  reconciliation_passed:['PASS','FAIL'].includes(report?.reconciliation?.status)?report.reconciliation.status==='PASS':null,duplicate_results_verified:typeof report?.duplicate_results_verified==='boolean'?report.duplicate_results_verified:null,gates:{},diagnostic_comparability:{}};
+  reconciliation_passed:['PASS','FAIL'].includes(report?.reconciliation?.status)?report.reconciliation.status==='PASS':null,duplicate_results_verified:typeof report?.duplicate_results_verified==='boolean'?report.duplicate_results_verified:null,gates:{},diagnostic_comparability:{},core_game_attribution_comparable:coreDiagnostics?.comparable===true&&coreDiagnostics?.game_attribution?.comparable===true};
  for(const name of ['core','wallet','uno','mahjong','skygate'])out.source_commits[name]=sha(report?.runner?.source_snapshot?.[name]?.source_commit);
  for(const game of games){out.round_latency_by_game[game]=cleanLatency(report?.round_latency_by_game?.[game]);out.completed_by_game[game]=integer(report?.completed_by_game?.[game])?report.completed_by_game[game]:null;}
  for(const gate of ['concurrent_sessions','all_sessions_played','no_round_failures','exactly_once_reconciliation','duplicate_native_results','request_error_rate','round_latency','soak_duration','source_identity_stable','server_resource_ceilings'])out.gates[gate]=typeof report?.gates?.[gate]==='boolean'?report.gates[gate]:null;

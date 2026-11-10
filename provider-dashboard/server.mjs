@@ -46,6 +46,7 @@ async function handleRequest(req,res,phaseLease){
   if(path.startsWith('/api/v4/agency-game/')){
    if(method!=='POST')fail(405,'METHOD_NOT_ALLOWED');const raw=await readBody(req);const authentication=corePhases.authStart();let key;
    try{key=await core.authenticateDurable({method,path:u.pathname+u.search,body:raw,headers:req.headers},true);}catch(error){corePhases.increment('auth_failures');throw error;}finally{corePhases.authResume(authentication);}
+   corePhases.attributeAuthenticatedGame(key.game);
    const action=corePhases.start('engine_action');let result;
    try{result=await core.engineAction(key,path.slice('/api/v4/agency-game/'.length),json(raw));}finally{corePhases.end(action);}send(res,200,result);return;
   }

@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {EventEmitter} from 'node:events';
 import {execFileSync} from 'node:child_process';
-import {CorePhases,CORE_ACTIONS,CORE_PHASES,CORE_CAPTURE_LIMIT,CORE_SPAN_LIMIT,CORE_COUNTER_MAX} from '../lib/core-phases.mjs';
+import {CorePhases,CORE_ACTIONS,CORE_GAME_LABELS,CORE_PHASES,CORE_CAPTURE_LIMIT,CORE_SPAN_LIMIT,CORE_COUNTER_MAX} from '../lib/core-phases.mjs';
 import {DurableWrites} from '../lib/durable-writes.mjs';
 import {Core} from '../lib/core.mjs';
 import {random,signer} from '../lib/security.mjs';
@@ -15,6 +15,24 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
 function database(t){const dir=mkdtempSync(join(tmpdir(),'core-phase-')),path=join(dir,'proof.sqlite'),db=new DatabaseSync(path);db.exec('PRAGMA journal_mode=WAL;PRAGMA synchronous=FULL;CREATE TABLE proofs(id TEXT PRIMARY KEY,value TEXT)');t.after(()=>{db.close();rmSync(dir,{recursive:true,force:true});});return {db,path};}
 function complete(phases,lease,{error=false,aborted=false}={}){if(error)phases.requestError(lease);phases.handlerDone(lease);phases.responseDone(lease,aborted,error?500:200);}
+function assertGameConservation(snapshot){
+ const attribution=snapshot.game_attribution;assert.equal(attribution.schema,1);assert.equal(attribution.provenance,'authenticated_engine_key');assert.deepEqual(attribution.labels,CORE_GAME_LABELS);assert.deepEqual(Object.keys(attribution.groups),CORE_GAME_LABELS);
+ const groups=Object.values(attribution.groups);assert.equal(groups.reduce((n,g)=>n+g.completed_operations,0),snapshot.completed_operations);
+ for(const group of groups)assert.equal(Object.values(group.operations).reduce((n,o)=>n+o.completed,0),group.completed_operations);
+ for(const action of CORE_ACTIONS){
+  const global=snapshot.operations[action],entries=groups.map(g=>g.operations[action]);
+  if(!global){assert(entries.every(e=>e===undefined));continue;}
+  for(const key of ['completed','errors','aborted'])assert.equal(entries.reduce((n,e)=>n+(e?.[key]??0),0),global[key],action+'.'+key);
+  for(const key of Object.keys(global.counters))assert.equal(entries.reduce((n,e)=>n+(e?.counters[key]??0),0),global.counters[key],action+'.'+key);
+  for(const [phase,cell] of Object.entries(global.phases)){
+   const cells=entries.map(e=>e?.phases[phase]);
+   for(const key of ['operations','invocations','total_us'])assert.equal(cells.reduce((n,c)=>n+(c?.[key]??0),0),cell[key],action+'.'+phase+'.'+key);
+   for(const key of ['max_operation_us','max_invocation_us'])assert.equal(Math.max(...cells.map(c=>c?.[key]??0)),cell[key]);
+   for(let i=0;i<cell.buckets.length;i++)assert.equal(cells.reduce((n,c)=>n+(c?.buckets[i]??0),0),cell.buckets[i],action+'.'+phase+'.bucket'+i);
+  }
+ }
+ for(const game of CORE_GAME_LABELS.slice(1))assert.equal(attribution.groups[game].operations.operator,undefined);
+}
 
 test('mixed shared batch attributes each synchronous callback to its captured ALS lease, including an untraced item',async t=>{
  let time=0;const phases=new CorePhases({now:()=>time}),f=database(t);
@@ -25,6 +43,7 @@ test('mixed shared batch attributes each synchronous callback to its captured AL
  const three=phases.run(null,()=>journal.run(()=>{assert.equal(phases.current(),null);time+=50;return 'untraced';}));
  // Flush under A deliberately: B and untraced must not inherit that timer's context.
  phases.run(a,()=>journal.flush());assert.deepEqual(await Promise.all([one,two,three]),['a','b','untraced']);
+ assert.equal(phases.attributeAuthenticatedGame('uno-luck',a),true);assert.equal(phases.attributeAuthenticatedGame('skygate-5000',b),true);
  complete(phases,a);complete(phases,b);const result=phases.snapshot();
  assert.equal(result.operations.engine_status.counters.body_failures,1);assert.equal(result.operations.engine_status.counters.transaction_failures,0);
  assert.equal(result.operations.engine_reserve.counters.body_failures,0);assert.equal(result.operations.engine_reserve.counters.transaction_failures,1);
@@ -32,6 +51,29 @@ test('mixed shared batch attributes each synchronous callback to its captured AL
  assert.equal(result.journal_batches.phases.begin.operations,1);assert.equal(result.journal_batches.phases.begin.total_us,100);
  assert.equal(result.journal_batches.phases.commit.total_us,1000);assert.equal(result.journal_batches.unattributed_items,1);
  assert.equal(result.active_captures,0);assert.equal(result.telemetry_error,false);assert.equal(result.late_observations,0);
+ assertGameConservation(result);assert.equal(result.game_attribution.groups['uno-luck'].operations.engine_status.phases.auth_batch_commit.total_us,1000);assert.equal(result.game_attribution.groups['skygate-5000'].operations.engine_reserve.phases.journal_batch_commit.total_us,1000);
+ assert.equal(result.game_attribution.groups.unattributed.completed_operations,0);assert.equal(result.game_attribution.groups['mahjong-wild'].completed_operations,0);
+ for(const group of Object.values(result.game_attribution.groups)){assert.equal(group.journal_batches,undefined);assert.equal(group.event_loop,undefined);}
+});
+
+test('game attribution accepts only fixed trusted-engine labels and preserves early phases without keeping supplied values',()=>{
+ let now=0;const phases=new CorePhases({now:()=>now}),unattributed=phases.begin('engine_status'),operator=phases.begin('operator'),mahjong=phases.begin('engine_status');
+ const hostile={toString(){assert.fail('untrusted attribution was coerced');}};
+ for(const value of [null,undefined,hostile,{},['uno-luck'],'unattributed','unknown-private-player','__proto__'])assert.equal(phases.attributeAuthenticatedGame(value,unattributed),false);
+ assert.equal(phases.attributeAuthenticatedGame('skygate-5000',operator),false);
+ phases.record(mahjong,'body_read',0,25);phases.record(mahjong,'auth_queue',25,70);phases.increment('auth_failures',unattributed);
+ phases.run(mahjong,()=>assert.equal(phases.attributeAuthenticatedGame('mahjong-wild'),true));assert.equal(phases.attributeAuthenticatedGame('mahjong-wild',mahjong),true);
+ now=100;complete(phases,unattributed,{error:true});complete(phases,operator);complete(phases,mahjong);
+ const snapshot=phases.snapshot();assertGameConservation(snapshot);assert.equal(snapshot.telemetry_error,false);
+ assert.equal(snapshot.game_attribution.groups.unattributed.completed_operations,2);assert.equal(snapshot.game_attribution.groups.unattributed.operations.engine_status.counters.auth_failures,1);
+ assert.equal(snapshot.game_attribution.groups['mahjong-wild'].operations.engine_status.phases.auth_queue.total_us,45);assert.equal(snapshot.game_attribution.groups['mahjong-wild'].operations.engine_status.phases.body_read.total_us,25);
+ assert(!JSON.stringify(snapshot).includes('unknown-private-player'));assert(!JSON.stringify(snapshot).includes('__proto__'));
+});
+
+test('conflicting trusted game assignments keep the first group and make attribution telemetry unusable',()=>{
+ const phases=new CorePhases(),lease=phases.begin('engine_other');assert.equal(phases.attributeAuthenticatedGame('skygate-5000',lease),true);
+ assert.equal(phases.attributeAuthenticatedGame('uno-luck',lease),false);complete(phases,lease);
+ const snapshot=phases.snapshot();assertGameConservation(snapshot);assert.equal(snapshot.telemetry_error,true);assert.equal(snapshot.game_attribution.groups['skygate-5000'].completed_operations,1);assert.equal(snapshot.game_attribution.groups['uno-luck'].completed_operations,0);
 });
 
 test('concurrent rejected operation keeps the original error, rolls back its savepoint and never contaminates a peer capture',async t=>{
@@ -78,6 +120,7 @@ test('response abort retains a capture while financial work continues; late toke
  const lease=phases.begin('engine_reserve'),res=new EventEmitter();res.statusCode=200;phases.attachResponse(res,lease);
  const walletGate=deferred(),entered=deferred();let calls=0,stale;
  const original=phases.run(lease,async()=>{
+  phases.attributeAuthenticatedGame('uno-luck');
   stale=phases.start('engine_action');
   await journal.run(()=>f.db.prepare('INSERT INTO proofs VALUES(?,?)').run('intent','durable'));
   const promise=walletGate.promise;assert.equal(phases.walletCall('debit',()=>{calls++;entered.resolve();return promise;}),promise);
@@ -88,8 +131,8 @@ test('response abort retains a capture while financial work continues; late toke
  await entered.promise;res.emit('close');assert.equal(phases.snapshot().active_captures,1);assert.equal(phases.begin('engine_status'),null);
  walletGate.resolve({secret:'not retained'});await original;assert.equal(calls,1);assert.equal(f.db.prepare('SELECT count(*) n FROM proofs').get().n,2);
  const after=phases.snapshot();assert.equal(after.active_captures,0);assert.equal(after.operations.engine_reserve.aborted,1);assert.equal(after.dropped_captures,1);
- const next=phases.begin('engine_settle');const invalidOld={...stale,done:false};phases.end(invalidOld);complete(phases,next);
- const final=phases.snapshot();assert.equal(final.operations.engine_settle.phases.engine_action,undefined);assert.equal(final.late_observations,1);
+ const next=phases.begin('engine_settle');phases.attributeAuthenticatedGame('skygate-5000',next);const invalidOld={...stale,done:false};phases.end(invalidOld);assert.equal(phases.attributeAuthenticatedGame('uno-luck',lease),false);complete(phases,next);
+ const final=phases.snapshot();assert.equal(final.operations.engine_settle.phases.engine_action,undefined);assert.equal(final.late_observations,2);assertGameConservation(final);assert.equal(final.game_attribution.groups['uno-luck'].operations.engine_reserve.aborted,1);assert.equal(final.game_attribution.groups['skygate-5000'].operations.engine_settle.completed,1);
 });
 
 test('closed journal releases queued auth callers without starting a transaction or inventing batch timing',async t=>{
@@ -139,9 +182,9 @@ test('real event-loop blocking appears in bounded process-wide delay histogram w
 
 test('fixed registry and repeated capture reuse stay bounded after garbage collection',()=>{
  const moduleURL=new URL('../lib/core-phases.mjs',import.meta.url).href;
- const script=`import {CorePhases,CORE_ACTIONS,CORE_PHASES} from ${JSON.stringify(moduleURL)};global.gc();const before=process.memoryUsage();const p=new CorePhases();for(let i=0;i<20000;i++){const l=p.begin(CORE_ACTIONS[i%CORE_ACTIONS.length]);for(const label of CORE_PHASES)p.record(l,label,0,1234);p.handlerDone(l);p.responseDone(l);}global.gc();const after=process.memoryUsage();const json=JSON.stringify(p.snapshot());console.log(JSON.stringify({heap_delta:after.heapUsed-before.heapUsed,array_delta:after.arrayBuffers-before.arrayBuffers,bytes:Buffer.byteLength(json),active:p.snapshot().active_captures,slots:p.slots.length,free:p.free.length,completed:p.snapshot().completed_operations}));`;
+ const script=`import {CorePhases,CORE_ACTIONS,CORE_GAME_LABELS,CORE_PHASES} from ${JSON.stringify(moduleURL)};global.gc();const before=process.memoryUsage();const p=new CorePhases();for(let i=0;i<20000;i++){const l=p.begin(CORE_ACTIONS[i%CORE_ACTIONS.length]);p.attributeAuthenticatedGame(CORE_GAME_LABELS[i%CORE_GAME_LABELS.length],l);for(const label of CORE_PHASES)p.record(l,label,0,1234);p.handlerDone(l);p.responseDone(l);}global.gc();const after=process.memoryUsage();const json=JSON.stringify(p.snapshot());console.log(JSON.stringify({heap_delta:after.heapUsed-before.heapUsed,array_delta:after.arrayBuffers-before.arrayBuffers,bytes:Buffer.byteLength(json),active:p.snapshot().active_captures,slots:p.slots.length,free:p.free.length,completed:p.snapshot().completed_operations,game_labels:Object.keys(p.snapshot().game_attribution.groups)}));`;
  const result=JSON.parse(execFileSync(process.execPath,['--expose-gc','--input-type=module','-e',script],{encoding:'utf8',timeout:30000}));
- assert.equal(result.slots,CORE_CAPTURE_LIMIT);assert.equal(result.free,CORE_CAPTURE_LIMIT);assert.equal(result.active,0);assert.equal(result.completed,20000);assert(result.heap_delta<16*1024*1024);assert(result.array_delta<8*1024*1024);assert(result.bytes<512*1024);
+ assert.equal(result.slots,CORE_CAPTURE_LIMIT);assert.equal(result.free,CORE_CAPTURE_LIMIT);assert.equal(result.active,0);assert.equal(result.completed,20000);assert.deepEqual(result.game_labels,CORE_GAME_LABELS);assert(result.heap_delta<16*1024*1024);assert(result.array_delta<8*1024*1024);assert(result.bytes<240*1024,'full populated phase snapshot must leave space below the unchanged 262144-byte health response cap');
 });
 
 test('observed failed authentication and concurrent same-account charges preserve durable nonce and ledger semantics',async t=>{

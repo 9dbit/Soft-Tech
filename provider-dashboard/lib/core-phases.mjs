@@ -8,6 +8,7 @@ export const CORE_SPAN_LIMIT=4096;
 export const CORE_COUNTER_MAX=Number.MAX_SAFE_INTEGER;
 export const CORE_PHASE_BUCKETS=Object.freeze([250,500,1000,2000,4000,8000,16000,32000,64000,128000,256000,512000,1000000,2000000,4000000,8000000,16000000,30000000,60000000,null]);
 export const CORE_ACTIONS=Object.freeze(['engine_redeem','engine_status','engine_reserve','engine_settle','engine_void','engine_other','operator']);
+export const CORE_GAME_LABELS=Object.freeze(['unattributed','uno-luck','mahjong-wild','skygate-5000']);
 export const CORE_PHASES=Object.freeze([
  'arrival_to_body_complete','body_read','auth_total',
  'auth_queue','auth_batch_begin','auth_entry_to_operation','auth_operation_body','auth_batch_body','auth_batch_commit','auth_commit_to_resolve','auth_resolve_to_resume',
@@ -19,9 +20,11 @@ export const CORE_PHASES=Object.freeze([
 export const CORE_PHASE_COUNTERS=Object.freeze(['body_failures','auth_failures','journal_operations','journal_operation_failures','journal_batch_failures','journal_closed','transaction_failures','invalid_clock','dropped_spans']);
 const BATCH_PHASES=Object.freeze(['begin','body','commit','rollback','resolution']);
 const ACTION_INDEX=new Map(CORE_ACTIONS.map((name,index)=>[name,index]));
+const GAME_INDEX=new Map(CORE_GAME_LABELS.slice(1).map((name,index)=>[name,index+1]));
 const PHASE_INDEX=new Map(CORE_PHASES.map((name,index)=>[name,index]));
 const COUNTER_INDEX=new Map(CORE_PHASE_COUNTERS.map((name,index)=>[name,index]));
 const cell=()=>new Float64Array(5+CORE_PHASE_BUCKETS.length);
+const operation=()=>({completed:0,errors:0,aborted:0,counters:new Float64Array(CORE_PHASE_COUNTERS.length),phases:CORE_PHASES.map(cell)});
 const validNumber=value=>Number.isSafeInteger(value)&&value>=0;
 
 function actionFor(method,rawPath){
@@ -42,9 +45,10 @@ export class CorePhases {
   if(!Number.isInteger(captureLimit)||captureLimit<1||captureLimit>CORE_CAPTURE_LIMIT)throw Error('Invalid telemetry capacity');
   this.now=now;this.captureLimit=captureLimit;this.registryId=randomUUID();this.storage=new AsyncLocalStorage();
   this.generations=new Float64Array(captureLimit);this.free=Array.from({length:captureLimit},(_,i)=>captureLimit-1-i);
-  this.slots=Array.from({length:captureLimit},()=>({live:false,action:0,started:null,handlerDone:false,responseDone:false,errors:false,aborted:false,responseStarted:null,authSequence:0,authResolved:null,spanCount:0,
+  this.slots=Array.from({length:captureLimit},()=>({live:false,action:0,game:0,started:null,handlerDone:false,responseDone:false,errors:false,aborted:false,responseStarted:null,authSequence:0,authResolved:null,spanCount:0,
    sums:new Float64Array(CORE_PHASES.length),invocations:new Float64Array(CORE_PHASES.length),maxima:new Float64Array(CORE_PHASES.length),counters:new Float64Array(CORE_PHASE_COUNTERS.length)}));
-  this.operations=CORE_ACTIONS.map(()=>({completed:0,errors:0,aborted:0,counters:new Float64Array(CORE_PHASE_COUNTERS.length),phases:CORE_PHASES.map(cell)}));
+  this.operations=CORE_ACTIONS.map(operation);
+  this.gameGroups=CORE_GAME_LABELS.map(()=>({completed_operations:0,operations:CORE_ACTIONS.map(operation)}));
   this.active=0;this.completed=0;this.dropped=0;this.invalidClock=0;this.droppedSpans=0;this.late=0;this.saturated=false;this.telemetryError=false;
   this.batch={active:0,completed:0,failed:0,queued_items:0,settled_items:0,unattributed_items:0,phases:BATCH_PHASES.map(cell),queue:cell()};
   this.loop={running:false,interval_ms:100,invalid_clock:0,samples:cell()};this.loopTimer=null;
@@ -66,13 +70,22 @@ export class CorePhases {
   const selected=this.free.pop();if(selected===undefined){this.add(this,'dropped');return null;}
   if(this.generations[selected]>=CORE_COUNTER_MAX-1){this.saturated=true;this.add(this,'dropped');return null;}
   this.generations[selected]++;const slot=this.slots[selected];
-  slot.live=true;slot.action=index;slot.handlerDone=false;slot.responseDone=false;slot.errors=false;slot.aborted=false;
+  slot.live=true;slot.action=index;slot.game=0;slot.handlerDone=false;slot.responseDone=false;slot.errors=false;slot.aborted=false;
   slot.responseStarted=null;slot.authSequence=0;slot.authResolved=null;slot.spanCount=0;
   slot.sums.fill(0);slot.invocations.fill(0);slot.maxima.fill(0);slot.counters.fill(0);
   slot.started=this.time(slot);this.add(this,'active');
   return Object.freeze([selected,this.generations[selected]]);
  });}
  beginHttp(method,path){return this.guard(()=>this.begin(actionFor(method,path)));}
+ // Call only after authenticateDurable succeeds, with its verified engine key.
+ // Classification happens at retirement, so earlier body/auth spans follow the
+ // same trusted group. No body, header, key object or dynamic label is retained.
+ attributeAuthenticatedGame(game,lease=this.current()){return this.guard(()=>{
+  const slot=this.slot(lease,true),index=typeof game==='string'?GAME_INDEX.get(game):undefined;
+  if(!slot||index===undefined||slot.action===ACTION_INDEX.get('operator'))return false;
+  if(slot.game!==0){if(slot.game!==index)this.telemetryError=true;return slot.game===index;}
+  slot.game=index;return true;
+ },false);}
  // Clear context for unattributed items as well: a shared timer belongs to no
  // particular batch item. The original callable runs exactly once.
  run(lease,fn){
@@ -123,12 +136,16 @@ export class CorePhases {
   this.add(target,0);this.add(target,1,invocations);this.add(target,2,sum);target[3]=Math.max(target[3],sum);target[4]=Math.max(target[4],maxInvocation);
   const bucket=CORE_PHASE_BUCKETS.findIndex(upper=>upper===null||sum<=upper);this.add(target,5+bucket);
  }
+ mergeOperation(operation,slot){
+  this.add(operation,'completed');if(slot.errors)this.add(operation,'errors');if(slot.aborted)this.add(operation,'aborted');
+  for(let i=0;i<CORE_PHASE_COUNTERS.length;i++)this.add(operation.counters,i,slot.counters[i]);
+  for(let i=0;i<CORE_PHASES.length;i++)if(slot.invocations[i])this.addCell(operation.phases[i],slot.sums[i],slot.invocations[i],slot.maxima[i]);
+ }
  retire(lease){
   const slot=this.slot(lease);if(!slot||!slot.handlerDone||!slot.responseDone)return;
   try{
-   const operation=this.operations[slot.action];this.add(operation,'completed');if(slot.errors)this.add(operation,'errors');if(slot.aborted)this.add(operation,'aborted');
-   for(let i=0;i<CORE_PHASE_COUNTERS.length;i++)this.add(operation.counters,i,slot.counters[i]);
-   for(let i=0;i<CORE_PHASES.length;i++)if(slot.invocations[i])this.addCell(operation.phases[i],slot.sums[i],slot.invocations[i],slot.maxima[i]);
+   this.mergeOperation(this.operations[slot.action],slot);
+   const group=this.gameGroups[slot.game];this.mergeOperation(group.operations[slot.action],slot);this.add(group,'completed_operations');
    this.add(this,'completed');
   }finally{slot.live=false;this.active--;this.free.push(lease[0]);}
  }
@@ -183,16 +200,22 @@ export class CorePhases {
  });}
  stopLoop(){return this.guard(()=>{this.loop.running=false;clearTimeout(this.loopTimer);this.loopTimer=null;});}
  serializeCell(value){return {operations:value[0],invocations:value[1],total_us:value[2],max_operation_us:value[3],max_invocation_us:value[4],buckets:Array.from(value.subarray(5))};}
- snapshot(){return this.guard(()=>{
+ serializeOperations(entries){
   const operations={};
   for(let i=0;i<CORE_ACTIONS.length;i++){
-   const entry=this.operations[i];if(!entry.completed)continue;
+   const entry=entries[i];if(!entry.completed)continue;
    const phases={};for(let j=0;j<CORE_PHASES.length;j++)if(entry.phases[j][0])phases[CORE_PHASES[j]]=this.serializeCell(entry.phases[j]);
    operations[CORE_ACTIONS[i]]={completed:entry.completed,errors:entry.errors,aborted:entry.aborted,counters:Object.fromEntries(CORE_PHASE_COUNTERS.map((key,j)=>[key,entry.counters[j]])),phases};
   }
+  return operations;
+ }
+ snapshot(){return this.guard(()=>{
+  const operations=this.serializeOperations(this.operations),groups={};
+  for(let i=0;i<CORE_GAME_LABELS.length;i++)groups[CORE_GAME_LABELS[i]]={completed_operations:this.gameGroups[i].completed_operations,operations:this.serializeOperations(this.gameGroups[i].operations)};
   const batchPhases={};for(let i=0;i<BATCH_PHASES.length;i++)if(this.batch.phases[i][0])batchPhases[BATCH_PHASES[i]]=this.serializeCell(this.batch.phases[i]);
   return {schema:CORE_PHASE_SCHEMA,available:true,registry_id:this.registryId,reset_count:0,unit:'microseconds',histogram:'per_request_phase_sum',capture_limit:this.captureLimit,span_limit_per_capture:CORE_SPAN_LIMIT,bucket_upper_us:CORE_PHASE_BUCKETS,
    active_captures:this.active,completed_operations:this.completed,dropped_captures:this.dropped,dropped_spans:this.droppedSpans,invalid_clock:this.invalidClock,late_observations:this.late,telemetry_error:this.telemetryError,saturated:this.saturated,operations,
+   game_attribution:{schema:1,provenance:'authenticated_engine_key',labels:CORE_GAME_LABELS,groups},
    journal_batches:{active_batches:this.batch.active,completed_batches:this.batch.completed,failed_batches:this.batch.failed,queued_items:this.batch.queued_items,settled_items:this.batch.settled_items,unattributed_items:this.batch.unattributed_items,histogram:'one_observation_per_batch_phase',phases:batchPhases,queue_per_item:this.serializeCell(this.batch.queue)},
    event_loop:{interval_ms:this.loop.interval_ms,running:this.loop.running,invalid_clock:this.loop.invalid_clock,histogram:'timer_callback_delay_after_nominal_interval',samples:this.serializeCell(this.loop.samples)}};
   },{schema:CORE_PHASE_SCHEMA,available:false,registry_id:this.registryId,telemetry_error:true});}

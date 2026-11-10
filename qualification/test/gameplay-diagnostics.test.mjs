@@ -31,6 +31,102 @@ test('actual Core and SQLite grouped writes produce comparable additive interval
  assert.equal(JSON.stringify(compared.delta).includes('max_operation_us'),false);assert.equal(JSON.stringify(compared.delta).includes('p95'),false);
 });
 
+test('authenticated game partitions retain early phases across interleaved durable batches and exclude setup',async t=>{
+ let clock=0;const phases=new CorePhases({now:()=>++clock}),db=new DatabaseSync(':memory:');db.exec('CREATE TABLE observations(id INTEGER PRIMARY KEY)');
+ const journal=new DurableWrites(db,{phases});phases.startLoop();t.after(()=>{phases.stopLoop();journal.close();db.close();});
+ const setup=phases.begin('operator');await phases.run(setup,()=>journal.run(()=>db.prepare('INSERT INTO observations VALUES(0)').run()));complete(phases,setup);
+ const before=wrap({...base,core_phases:phases.snapshot()});
+ const labels=['uno-luck','mahjong-wild','skygate-5000'];
+ await Promise.all(labels.map(async(game,index)=>{
+  const lease=phases.begin('engine_status');
+  await phases.run(lease,async()=>{
+   const body=phases.start('body_read');await Promise.resolve();phases.end(body);
+   const auth=phases.authStart();await journal.run(()=>db.prepare('INSERT INTO observations VALUES(?)').run(index+1),'auth');phases.authResume(auth);
+   assert.equal(phases.attributeAuthenticatedGame(game),true);
+   const balance=phases.start('wallet_balance');await Promise.resolve();phases.end(balance);
+   await journal.run(()=>db.prepare('INSERT INTO observations VALUES(?)').run(index+11));
+  });complete(phases,lease);
+ }));
+ const failed=phases.begin('engine_status');phases.increment('auth_failures',failed);phases.requestError(failed);complete(phases,failed);
+ const operator=phases.begin('operator');complete(phases,operator);
+ const after=wrap({...base,core_phases:phases.snapshot()},'core',later),result=compareGameplayBoundaries(before,after).services.core;
+ assert.equal(result.comparable,true,JSON.stringify(result));const attributed=result.game_attribution;
+ assert.equal(attributed.comparable,true,JSON.stringify(attributed));assert.deepEqual(attributed.labels,['unattributed',...labels]);
+ assert.equal(attributed.delta.completed_operations,5);assert.equal(result.delta.journal_batches.completed_batches,2);
+ assert.equal(result.delta.journal_batches.queued_items,6);assert.equal(db.prepare('SELECT count(*) n FROM observations').get().n,7);
+ for(const game of labels){
+  const group=attributed.delta.groups[game];assert.equal(group.completed_operations,1);assert.equal(group.operations.engine_status.completed,1);
+  for(const phase of ['body_read','auth_total','auth_queue','journal_queue','wallet_balance'])assert.equal(group.operations.engine_status.phases[phase].operations,1,game+':'+phase);
+  assert.equal(group.operations.engine_status.counters.journal_operations,2);assert.equal(group.operations.operator,undefined);
+  assert.equal(group.journal_batches,undefined);assert.equal(group.event_loop,undefined);
+ }
+ assert.equal(attributed.delta.groups.unattributed.completed_operations,2);
+ assert.equal(attributed.delta.groups.unattributed.operations.operator.completed,1);
+ assert.equal(attributed.delta.groups.unattributed.operations.engine_status.counters.auth_failures,1);
+ assert.equal(JSON.stringify(attributed.delta).includes('max_operation_us'),false);
+ assert.equal(JSON.stringify(attributed.delta).includes('p95'),false);
+});
+
+test('legacy and malformed game partitions cannot produce attributed deltas or invalidate valid global totals',t=>{
+ let clock=0;const phases=new CorePhases({now:()=>++clock});phases.startLoop();t.after(()=>phases.stopLoop());
+ const beforeHealth={...base,core_phases:phases.snapshot()};
+ let lease=phases.begin('operator');complete(phases,lease);
+ lease=phases.begin('engine_status');phases.attributeAuthenticatedGame('uno-luck',lease);phases.record(lease,'wallet_balance',0,100);complete(phases,lease);
+ const health={...base,core_phases:phases.snapshot()},before=wrap(beforeHealth);
+ const legacyBefore=structuredClone(beforeHealth),legacyAfter=structuredClone(health);delete legacyBefore.core_phases.game_attribution;delete legacyAfter.core_phases.game_attribution;
+ const legacy=compareGameplayBoundaries(wrap(legacyBefore),wrap(legacyAfter,'core',later)).services.core;
+ assert.equal(legacy.comparable,true);assert.equal(legacy.game_attribution.comparable,false);assert.deepEqual(legacy.game_attribution.errors,['GAME_ATTRIBUTION_NOT_EXPOSED']);assert.equal(legacy.game_attribution.delta,undefined);
+ const cases=[
+  ['unsupported schema',v=>v.schema=2],['wrong provenance',v=>v.provenance='request_body'],['wrong labels',v=>v.labels.push('private-game')],
+  ['unknown group',v=>v.groups['private-game']={secret:'private-value'}],['missing group',v=>delete v.groups['skygate-5000']],
+  ['nonobject group',v=>v.groups['mahjong-wild']='private-value'],['count mismatch',v=>v.groups['uno-luck'].completed_operations++],
+  ['operation mismatch',v=>v.groups['uno-luck'].operations.engine_status.errors++],
+  ['counter mismatch',v=>v.groups['uno-luck'].operations.engine_status.counters.journal_operations++],
+  ['phase sum mismatch',v=>v.groups['uno-luck'].operations.engine_status.phases.wallet_balance.total_us++],
+  ['bucket mismatch',v=>{const c=v.groups['uno-luck'].operations.engine_status.phases.wallet_balance;c.buckets[0]--;c.buckets[1]++;}],
+  ['invalid cell',v=>v.groups['uno-luck'].operations.engine_status.phases.wallet_balance.total_us=Infinity],
+  ['operator misclassification',v=>{const u=v.groups.unattributed,g=v.groups['uno-luck'];g.operations.operator=u.operations.operator;delete u.operations.operator;u.completed_operations--;g.completed_operations++;}]
+ ];
+ for(const [name,change]of cases){
+  const corrupted=structuredClone(health);change(corrupted.core_phases.game_attribution);
+  const after=wrap(corrupted,'core',later),result=compareGameplayBoundaries(before,after).services.core;
+  assert.equal(result.comparable,true,name);assert.equal(result.game_attribution.comparable,false,name);assert.equal(result.game_attribution.delta,undefined,name);
+  assert(after.services.core.core_phases.game_attribution.validation_errors.length>0,name);
+ }
+ for(const counter of ['auth_failures','body_failures']){
+  const failedAuth=structuredClone(health);
+  failedAuth.core_phases.operations.engine_status.counters[counter]=1;
+  failedAuth.core_phases.game_attribution.groups['uno-luck'].operations.engine_status.counters[counter]=1;
+  const auth=wrap(failedAuth,'core',later);assert(auth.services.core.core_phases.game_attribution.validation_errors.includes('UNVERIFIED_GAME_ATTRIBUTION'));
+  assert.equal(compareGameplayBoundaries(before,auth).services.core.game_attribution.comparable,false);
+ }
+});
+
+test('conserved game snapshots still reject interval reassignment and histogram decreases',t=>{
+ let clock=0;const phases=new CorePhases({now:()=>++clock});phases.startLoop();t.after(()=>phases.stopLoop());
+ for(const [game,elapsed]of [['uno-luck',2000],['skygate-5000',100]]){const lease=phases.begin('engine_status');phases.attributeAuthenticatedGame(game,lease);phases.record(lease,'wallet_balance',0,elapsed);complete(phases,lease);}
+ const health={...base,core_phases:phases.snapshot()},before=wrap(health),swapped=structuredClone(health),groups=swapped.core_phases.game_attribution.groups;
+ [groups['uno-luck'],groups['skygate-5000']]=[groups['skygate-5000'],groups['uno-luck']];
+ const after=wrap(swapped,'core',later);assert.deepEqual(after.services.core.core_phases.game_attribution.validation_errors,[]);
+ const result=compareGameplayBoundaries(before,after).services.core;assert.equal(result.comparable,true);assert.equal(result.game_attribution.comparable,false);
+ assert(result.game_attribution.errors.includes('COUNTER_DECREASE_OR_INVALID'));assert.equal(result.game_attribution.delta,undefined);
+});
+
+test('game attribution whitelists fixed labels and fields without retaining identifiers or unbounded arrays',t=>{
+ assert.equal(DIAGNOSTIC_LIMITS.response_bytes,262144);
+ const phases=new CorePhases();phases.startLoop();t.after(()=>phases.stopLoop());
+ const lease=phases.begin('engine_status');phases.attributeAuthenticatedGame('uno-luck',lease);phases.record(lease,'wallet_balance',0,10);complete(phases,lease);
+ const health={...base,core_phases:phases.snapshot()},secret='PRIVATE_PLAYER_OR_TOKEN',game=health.core_phases.game_attribution;
+ game.secret=secret;game.players=Array(10000).fill(secret);game.groups[secret]={completed_operations:1,token:secret};
+ const operation=game.groups['uno-luck'].operations.engine_status;operation.session=secret;operation.counters[secret]=7;operation.phases.wallet_balance.token=secret;operation.phases[secret]={secret};
+ const safe=sanitizeDiagnosticHealth(health,'core'),encoded=JSON.stringify(safe);
+ assert(!encoded.includes(secret));assert(encoded.length<30000);assert.equal(safe.core_phases.game_attribution.groups['uno-luck'].operations.engine_status.session,undefined);
+ assert(safe.core_phases.game_attribution.validation_errors.includes('UNSUPPORTED_GAME_LABEL'));assert(safe.core_phases.game_attribution.validation_errors.includes('UNSUPPORTED_PHASE_LABEL'));
+ game.labels=Array(100000).fill(secret);operation.phases.wallet_balance.buckets=Array(100000).fill(1);
+ const huge=sanitizeDiagnosticHealth(health,'core');assert.equal(huge.core_phases.game_attribution.labels,null);assert.equal(huge.core_phases.game_attribution.groups['uno-luck'].operations.engine_status.phases.wallet_balance.buckets,null);
+ assert(JSON.stringify(huge).length<30000);assert(!JSON.stringify(huge).includes(secret));
+});
+
 test('a shorter interval observation does not subtract or relabel the previous lifetime maximum',t=>{
  let now=0;const phases=new CorePhases({now:()=>now});phases.startLoop();t.after(()=>phases.stopLoop());
  let lease=phases.begin('engine_status');phases.record(lease,'wallet_balance',0,8000);now=8000;complete(phases,lease);
@@ -60,7 +156,7 @@ test('changed process, source, deployment, registry, reset, active capture, loss
   ['EVENT_LOOP_INTERVAL_UNVERIFIED',v=>v.core_phases.event_loop.running=false],
   ['COUNTER_DECREASE_OR_INVALID',v=>v.core_phases.completed_operations=-1]
  ];
- for(const [code,change]of changes){const after=structuredClone(validAfter);change(after.services.core);const result=compareGameplayBoundaries(before,after).services.core;assert.equal(result.comparable,false,code);assert(result.errors.includes(code),JSON.stringify(result));assert.equal(result.delta,undefined);}
+ for(const [code,change]of changes){const after=structuredClone(validAfter);change(after.services.core);const result=compareGameplayBoundaries(before,after).services.core;assert.equal(result.comparable,false,code);assert(result.errors.includes(code),JSON.stringify(result));assert.equal(result.delta,undefined);assert.equal(result.game_attribution.comparable,false,code);assert.equal(result.game_attribution.delta,undefined);}
  const activeBefore=structuredClone(before);activeBefore.services.core.core_phases.active_captures=1;assert.equal(compareGameplayBoundaries(activeBefore,validAfter).services.core.comparable,false);
  const lateBefore=structuredClone(before);lateBefore.services.core.finished_at='2026-11-10T11:00:00.000Z';assert(compareGameplayBoundaries(lateBefore,validAfter).services.core.errors.includes('BOUNDARY_ORDER_UNVERIFIED'));
 });
@@ -149,4 +245,10 @@ test('completion log is bounded aggregate-only evidence with exact failure gates
  const aggregate=completionAggregate(report,'load500'),encoded=JSON.stringify(aggregate);
  assert(encoded.length<4096);assert(!encoded.includes(secret));assert.equal(aggregate.round_latency.p95_ms,11136);assert.equal(aggregate.gates.round_latency,false);assert.equal(aggregate.status,'FAIL');assert.equal(aggregate.source_commit,'a'.repeat(40));assert.equal(aggregate.source_commits.core,'b'.repeat(40));assert.deepEqual(aggregate.cleanup,{sessions:500,revoked:500});assert.equal(aggregate.run_id,report.run_id);assert.equal(aggregate.finished_at,later);assert.equal(aggregate.reconciliation_passed,true);
  assert.equal(completionAggregate({...report,run_id:secret.repeat(100),status:secret,started_at:secret,round_latency:{p95_ms:Infinity}},secret).run_id,null);
+ assert.equal(aggregate.core_game_attribution_comparable,false);
+ const diagnostics={comparison:{services:{core:{comparable:true,game_attribution:{comparable:true,secret}}}}};
+ const attributed=completionAggregate({...report,gameplay_diagnostics:diagnostics},'load500');
+ assert.equal(attributed.core_game_attribution_comparable,true);assert.deepEqual(attributed.gates,aggregate.gates);assert(!JSON.stringify(attributed).includes(secret));
+ diagnostics.comparison.services.core.comparable=false;
+ assert.equal(completionAggregate({...report,gameplay_diagnostics:diagnostics},'load500').core_game_attribution_comparable,false);
 });
