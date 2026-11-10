@@ -172,6 +172,60 @@ test('native registry-less versions remain explicit unavailable; a known registr
  assert(compareGameplayBoundaries(wrap(nativeHealth(1),'uno-luck'),lost).services['uno-luck'].errors.includes('INTERVAL_TELEMETRY_LOSS'));
 });
 
+test('UNO admission split retains bounded additive phases without fabricating legacy measurements',()=>{
+ const measured=count=>{
+  const health=nativeHealth(count),phases=health.native_phases.operations.state.phases;
+  for(const [name,us]of Object.entries({dispatch_to_worker:61,dispatch_to_admission:11,admission_wait:20,admission_to_worker:30})){
+   phases[name]={operations:count,invocations:count,total_us:count*us,max_operation_us:us,max_invocation_us:us,buckets:PHASE_BUCKETS.map((_,i)=>i===0?count:0)};
+  }
+  return health;
+ };
+ const result=compareGameplayBoundaries(wrap(measured(1),'uno-luck'),wrap(measured(3),'uno-luck',later)).services['uno-luck'];
+ assert.equal(result.comparable,true,JSON.stringify(result));
+ const phases=result.delta.operations.state.phases;
+ for(const [name,us]of Object.entries({dispatch_to_worker:122,dispatch_to_admission:22,admission_wait:40,admission_to_worker:60})){
+  assert.equal(phases[name].operations,2);assert.equal(phases[name].invocations,2);assert.equal(phases[name].total_us,us);
+  assert.equal(phases[name].max_operation_us,undefined);assert.equal(phases[name].max_invocation_us,undefined);
+ }
+ const legacy=compareGameplayBoundaries(wrap(nativeHealth(1),'uno-luck'),wrap(nativeHealth(3),'uno-luck',later)).services['uno-luck'];
+ assert.equal(legacy.comparable,true);assert.equal(legacy.delta.operations.state.phases.admission_wait,undefined);
+ // Cancellation before token acquisition can complete an operation without a
+ // successful admission or worker entry. Partial phase populations are valid.
+ const cancelled=measured(3);for(const phase of ['admission_wait','admission_to_worker'])delete cancelled.native_phases.operations.state.phases[phase];
+ assert.deepEqual(sanitizeDiagnosticHealth(cancelled,'uno-luck').native_phases.validation_errors,[]);
+ const malformed=measured(3);malformed.native_phases.operations.state.phases.admission_wait.total_us=-1;
+ const bad=compareGameplayBoundaries(wrap(measured(1),'uno-luck'),wrap(malformed,'uno-luck',later)).services['uno-luck'];
+ assert.equal(bad.comparable,false);assert(bad.errors.includes('INVALID_PHASE_SNAPSHOT'));assert.equal(bad.delta,undefined);
+ const secret='DO_NOT_RETAIN_ADMISSION_DETAIL',untrusted=measured(1);
+ untrusted.native_phases.operations.state.phases.admission_wait.borrower=secret;
+ untrusted.native_phases.operations.state.phases[secret]={token:secret};
+ const safe=sanitizeDiagnosticHealth(untrusted,'uno-luck');assert(!JSON.stringify(safe).includes(secret));
+ assert(safe.native_phases.validation_errors.includes('UNSUPPORTED_PHASE_LABEL'));
+});
+
+test('Mahjong registry continuity enables deltas while replacement, reset and unavailable telemetry remain blocked',()=>{
+ const name='mahjong-wild',before=wrap(nativeHealth(1),name),after=wrap(nativeHealth(3),name,later);
+ const valid=compareGameplayBoundaries(before,after).services[name];
+ assert.equal(valid.comparable,true);assert.equal(valid.delta.completed_operations,2);
+ for(const [error,change]of [
+  ['REGISTRY_ID_NOT_EXPOSED',v=>v.native_phases.registry_id=null],
+  ['REGISTRY_ID_CHANGED',v=>v.native_phases.registry_id='ffffffff-ffff-ffff-ffff-ffffffffffff'],
+  ['RESET_IDENTITY_UNVERIFIED',v=>v.native_phases.reset_count=1],
+  ['PROCESS_CHANGED_OR_MISSING',v=>v.process_boot_id='replacement-process'],
+  ['SOURCE_CHANGED_OR_MISSING',v=>v.source_commit='b'.repeat(40)],
+  ['TELEMETRY_ERROR',v=>v.native_phases.telemetry_error=true],
+  ['ACTIVE_CAPTURES_AT_BOUNDARY',v=>v.native_phases.active_captures=1],
+  ['INTERVAL_TELEMETRY_LOSS',v=>v.native_phases.dropped_captures=1],
+ ]){
+  const changed=structuredClone(after);change(changed.services[name]);
+  const result=compareGameplayBoundaries(before,changed).services[name];
+  assert.equal(result.comparable,false,error);assert(result.errors.includes(error),JSON.stringify(result));assert.equal(result.delta,undefined);
+ }
+ const unavailable=nativeHealth(3);unavailable.native_phases.available=false;
+ const result=compareGameplayBoundaries(before,wrap(unavailable,name,later)).services[name];
+ assert.equal(result.comparable,false);assert(result.errors.includes('INVALID_PHASE_SNAPSHOT'));assert.equal(result.delta,undefined);
+});
+
 test('whitelist discards secret values, dynamic labels, huge fields and invalid numbers with fixed output size',()=>{
  const health=nativeHealth(1),secret='DO_NOT_RETAIN_SECRET';
  health.password=secret;health.sessions=Array(10000).fill(secret);health.identity.cookie=secret;
