@@ -7,6 +7,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {persist,request} from './client.mjs';
 import {runNativeLoad} from './native-load.mjs';
+import {completionAggregate} from './gameplay-diagnostics.mjs';
 import {runWalletConformance} from './wallet-conformance.mjs';
 import {runNativeChaos} from './native-chaos.mjs';
 import {runVolumeRecovery} from './volume-recovery.mjs';
@@ -86,7 +87,7 @@ export function createCloudRunner({env=process.env,run=runNativeLoad,snapshot=so
      if(expectedSources)for(const name of ['core','wallet','uno','mahjong','skygate'])need(expectedSources[name]===sources[name]?.source_commit,'EXPECTED_SOURCE_MISMATCH_'+name);
      state.active_step=step.id;step.status='RUNNING';step.started_at=new Date().toISOString();save();
      const options={runId:runId+'-'+step.id,reportFile};const report=step.kind==='volume_recovery'?await volumeRun(config,{...options,restart:(_config,target,origin,restartOptions)=>waitForActualRestart(target,origin,restartOptions)}):step.kind==='wallet_conformance'?await walletRun(config,{...options,restart:()=>waitForActualRestart('wallet',config.wallet_url)}):step.kind==='network_restart'?await chaosRun(config,{...options,restart:(_config,target,origin)=>waitForActualRestart(target,origin)}):await run(config,{...options,concurrency:step.sessions,roundsPerSession:step.rounds,setupConcurrency:40,durationSeconds:step.duration_seconds,minSoakSeconds:step.min_soak_seconds||3600,thinkTimeMs:1000,recoveryRetries:0});
-     report.runner={source_commit:source,plan_hash:planHash,config_fingerprint:configFingerprint,native_transport:config.native_transport,step_id:step.id,deployment_id:deployment,process_boot_id:bootId,location:'dedicated_preproduction_service',source_snapshot:sources};persist(reportFile,report);step.status=report.status;step.finished_at=new Date().toISOString();step.completed_rounds=report.completed_rounds??0;save();need(stepPass(step,report),'QUALIFICATION_STEP_FAILED_'+step.id);
+     report.runner={source_commit:source,plan_hash:planHash,config_fingerprint:configFingerprint,native_transport:config.native_transport,step_id:step.id,deployment_id:deployment,process_boot_id:bootId,location:'dedicated_preproduction_service',source_snapshot:sources};persist(reportFile,report);step.status=report.status;step.finished_at=new Date().toISOString();step.completed_rounds=report.completed_rounds??0;save();if(!step.kind)console.log('qualification.step_summary',JSON.stringify(completionAggregate(report,step.id)));need(stepPass(step,report),'QUALIFICATION_STEP_FAILED_'+step.id);
     }
     state.active_step=null;state.status=state.steps.every(s=>s.status==='PASS')?'PASS':'PARTIAL';state.note=state.steps.some(s=>!s.kind)?'Completed native-session and latency checks; resource gates remain separate until authoritative platform metrics are attached.':'Completed the fixed conformance/restart plan; this remains internal engineering evidence and does not certify an independent external operator.';
    }catch(e){state.status='FAIL';state.error=String(e.message).slice(0,180);}
