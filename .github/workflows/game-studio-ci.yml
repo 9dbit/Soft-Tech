@@ -39,6 +39,8 @@ jobs:
         run: npm run test:unit
       - name: Generate reproducible sandbox-only full-round math receipt
         run: npm run audit:smoke
+      - name: Compare three independent research seed domains
+        run: npm run audit:matrix
       - name: Build isolated Game Studio
         run: npm run build
       - name: Install Chromium for UI testing
