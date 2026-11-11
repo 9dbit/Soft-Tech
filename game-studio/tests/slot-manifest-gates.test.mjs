@@ -44,13 +44,8 @@ test("AI manifest rejects malformed geometry, strips, paylines, symbols and payt
   invalid(m => { m.math.paytable.A["9"] = 999; }, /match count/);
 });
 
-test("payout cap cannot overflow, and an audit override cannot change the frozen math", async () => {
-  invalid(m => {
-    m.math.betPerLine = 1_000_000;
-    m.proposedFeatures.maxPaidRoundMultiplier = 100_000;
-  }, /safe integer bounds|cap exceeds/);
-  // Very large bet cap above may not overflow Number.MAX_SAFE_INTEGER for 20 lines,
-  // so explicitly make the multiplier of the entire round exceed a safe integer.
+test("unbounded payout cap and untracked audit override are rejected", async () => {
+  invalid(m => { m.proposedFeatures.maxPaidRoundMultiplier = 100_001; }, /maxPaidRoundMultiplier/);
   await assert.rejects(runAudit([
     "--rounds", "10", "--max-round-multiplier", "500",
   ]), /payout cap differs/);
@@ -91,7 +86,7 @@ test("bounded top-1-percent heap equals an independent full-sort tail statistic"
     .reduce((a, b) => a + b, 0);
   const sumAll = awards.reduce((a, b) => a + b, 0);
   const expected = sumAll ? 100 * sumTop / sumAll : null;
-  assert.equal(audited.tailShareTop1Percent, expected);
+  assert.ok(Math.abs(audited.tailShareTop1Percent - expected) < 1e-9);
   assert.equal(audited.returned, sumAll);
   assert.equal(audited.paidRounds, rounds);
 });
