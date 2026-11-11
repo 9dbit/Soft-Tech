@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateDraftRules } from "../src/slot/slotCore.js";
+import { validateSlotPilotManifest } from "../src/slot/manifestContract.js";
 import { simulateDraftPaidRounds } from "../src/slot/paidRound.js";
 
 const CURRENT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -17,7 +17,7 @@ const defaults = {
   domain: "softtech-slot-pilot-v1-smoke-A",
   manifest: resolve(GAME_STUDIO, "contracts/slot-pilot-v1.example.json"),
   output: null,
-  maxPaidRoundMultiplier: 1000,
+  maxPaidRoundMultiplier: null,
 };
 function parseArgs(argv) {
   const values = { ...defaults };
@@ -34,7 +34,7 @@ function parseArgs(argv) {
   }
   if (!Number.isSafeInteger(values.rounds) || values.rounds < 1 || values.rounds > 10000000)
     throw new RangeError("rounds must be an integer from 1 to 10,000,000");
-  if (!Number.isSafeInteger(values.maxPaidRoundMultiplier) || values.maxPaidRoundMultiplier < 1 || values.maxPaidRoundMultiplier > 100000)
+  if (values.maxPaidRoundMultiplier !== null && (!Number.isSafeInteger(values.maxPaidRoundMultiplier) || values.maxPaidRoundMultiplier < 1 || values.maxPaidRoundMultiplier > 100000))
     throw new RangeError("max-round-multiplier is out of bounds");
   if (!/^[a-zA-Z0-9_.:-]{8,128}$/.test(values.domain))
     throw new Error("seed-domain must be a stable non-secret ASCII identifier (8 to 128 chars)");
@@ -75,21 +75,20 @@ export async function runAudit(argv = []) {
   const opts = parseArgs(argv);
   const manifestBytes = await readFile(resolve(opts.manifest));
   const manifest = JSON.parse(manifestBytes);
-  if (manifest.schemaVersion !== "softtech.slot-pilot.v1" ||
-      manifest.walletMode !== "demo-only" ||
-      manifest.evaluationMode !== "left-to-right-paylines" ||
-      manifest.creditScale !== 0 ||
-      manifest.status !== "draft" ||
-      manifest.audit?.status !== "NOT_RUN" ||
-      manifest.proposedFeatures?.bonusRetriggerEnabled !== false)
-    throw new Error("manifest is not an approved draft-research input contract");
-  const math = validateDraftRules(manifest.math);
+  validateSlotPilotManifest(manifest);
+  // An audit override must never silently change the game math or payout cap.
+  // To change it, create a new versioned manifest and invalidate older receipts.
+  const manifestCap = manifest.proposedFeatures.maxPaidRoundMultiplier;
+  if (opts.maxPaidRoundMultiplier !== null && opts.maxPaidRoundMultiplier !== manifestCap)
+    throw new Error("audit payout cap differs from the versioned manifest");
+  const math = manifest.math;
   const srcCore = await readFile(resolve(GAME_STUDIO, "src/slot/slotCore.js"));
   const srcPaid = await readFile(resolve(GAME_STUDIO, "src/slot/paidRound.js"));
+  const srcManifestValidator = await readFile(resolve(GAME_STUDIO, "src/slot/manifestContract.js"));
   const srcRunner = await readFile(fileURLToPath(import.meta.url));
   const report = simulateDraftPaidRounds(
     math, opts.rounds, index => createAuditDraw(opts.domain, index),
-    { maxPaidRoundMultiplier: opts.maxPaidRoundMultiplier },
+    { maxPaidRoundMultiplier: manifestCap },
   );
   const receipt = {
     schemaVersion: "softtech.math-audit-report.v1",
@@ -102,10 +101,11 @@ export async function runAudit(argv = []) {
     generatedAt: new Date().toISOString(),
     gitCommitSha: process.env.GITHUB_SHA || null,
     githubRunId: process.env.GITHUB_RUN_ID || null,
-    engineSha256: sha256(Buffer.concat([srcCore, Buffer.from("\n"), srcPaid])),
+    engineSha256: sha256(Buffer.concat([srcCore, Buffer.from("\n"), srcPaid, Buffer.from("\n"), srcManifestValidator])),
     configSha256: sha256(manifestBytes),
     runnerSha256: sha256(srcRunner),
     seedDomains: [opts.domain],
+    effectiveMathOptions: { maxPaidRoundMultiplier: manifestCap, bonusRetriggerEnabled: false },
     paidRoundSamples: report.paidRounds,
     screensIncludingFreeSpins: report.screensPlayed,
     metrics: {
