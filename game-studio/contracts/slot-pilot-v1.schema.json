@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://softtech.example.invalid/contracts/slot-pilot-v1.schema.json",
+  "title": "Soft Tech Slot Pilot V1 draft game-manifest",
+  "description": "Structural validation only. Custom semantic checks verify reel-strip count, payline width, row bounds, and game math.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "gameId",
+    "gameVersion",
+    "status",
+    "walletMode",
+    "evaluationMode",
+    "creditScale",
+    "math",
+    "proposedFeatures",
+    "audit"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "softtech.slot-pilot.v1"
+    },
+    "gameId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+    },
+    "gameVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "status": {
+      "const": "draft"
+    },
+    "walletMode": {
+      "const": "demo-only"
+    },
+    "evaluationMode": {
+      "const": "left-to-right-paylines"
+    },
+    "creditScale": {
+      "const": 0
+    },
+    "math": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "layout",
+        "reelStrips",
+        "paylines",
+        "betPerLine",
+        "wildSymbol",
+        "scatterSymbol",
+        "paytable",
+        "scatterBonus"
+      ],
+      "properties": {
+        "layout": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reels",
+            "rows"
+          ],
+          "properties": {
+            "reels": {
+              "type": "integer",
+              "minimum": 3,
+              "maximum": 8
+            },
+            "rows": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 8
+            }
+          }
+        },
+        "reelStrips": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 8,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 10000,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+            }
+          }
+        },
+        "paylines": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 8,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 7
+            }
+          }
+        },
+        "betPerLine": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "wildSymbol": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+        },
+        "scatterSymbol": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+        },
+        "paytable": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "pattern": "^[A-Z][A-Z0-9_]{0,31}$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": {
+              "pattern": "^[3-8]$"
+            },
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000000
+            }
+          }
+        },
+        "scatterBonus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "minimum",
+            "freeSpins",
+            "totalBetMultiplier"
+          ],
+          "properties": {
+            "minimum": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "freeSpins": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 200
+            },
+            "totalBetMultiplier": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100000
+            }
+          }
+        }
+      }
+    },
+    "proposedFeatures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bonusRetriggerEnabled",
+        "maxPaidRoundMultiplier",
+        "freeSpinsRuntimeImplemented",
+        "paidRoundCapImplemented",
+        "serverAuthoritativeRngImplemented",
+        "serverWalletIntegrationImplemented"
+      ],
+      "properties": {
+        "bonusRetriggerEnabled": {
+          "const": false
+        },
+        "maxPaidRoundMultiplier": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "freeSpinsRuntimeImplemented": {
+          "const": false
+        },
+        "paidRoundCapImplemented": {
+          "const": false
+        },
+        "serverAuthoritativeRngImplemented": {
+          "const": false
+        },
+        "serverWalletIntegrationImplemented": {
+          "const": false
+        }
+      }
+    },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "isCertified",
+        "completePaidRoundRtpPercent",
+        "engineSha256",
+        "configSha256"
+      ],
+      "properties": {
+        "status": {
+          "const": "NOT_RUN"
+        },
+        "isCertified": {
+          "const": false
+        },
+        "completePaidRoundRtpPercent": {
+          "type": "null"
+        },
+        "engineSha256": {
+          "type": "null"
+        },
+        "configSha256": {
+          "type": "null"
+        }
+      }
+    }
+  }
+}
