@@ -74,7 +74,7 @@ input, textarea, select { accent-color: #0d99ff; }
 .reel-cell { display: grid; place-items: center; background: rgba(6,9,22,.54); border: 1px solid rgba(164,149,233,.22); border-radius: 8px; font-size: 42px; }
 .stage-image { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 .preview-spin-overlay { position: absolute; z-index: 999; opacity: .01; border: 0; background: #fff; cursor: pointer; }
-.canvas-corner-note { position: sticky; left: 10px; top: 100%; align-self: flex-end; margin: 0 0 -60px -100%; font-size: 10px; letter-spacing: .07em; color: #b7b7b7; white-space: nowrap; pointer-events: none; }
+.canvas-corner-note { position: absolute; left: 14px; bottom: 10px; margin: 0; font-size: 10px; letter-spacing: .07em; color: #b7b7b7; white-space: nowrap; pointer-events: none; z-index: 2; }
 .timeline { border-top: 1px solid #3a3a3a; background: #242424; height: 124px; flex: none; }
 .timeline-head { display: flex; height: 39px; padding: 0 14px; gap: 14px; align-items: center; border-bottom: 1px solid #383838; font-size: 10px; }
 .timeline-head > span { color: #8d8d8d; font-size: 10px; }
