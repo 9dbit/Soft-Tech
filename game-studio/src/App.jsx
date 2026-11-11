@@ -7,6 +7,7 @@ import {
   FileCode2, ChevronDown, Info, Volume2, VolumeX, Folder,
 } from "lucide-react";
 import { DEFAULT_BRAND, previewBrand, generateBrandZip, buildMetaTags, validateBrand } from "./brandAssets.js";
+import { clampDraftLayout, SLOT_LIMITS } from "./slot/slotCore.js";
 
 const STORAGE_KEY = "softtech-universal-game-studio-v1";
 const INITIAL = {
@@ -36,6 +37,7 @@ const safeLoad = () => {
     if (!raw) return structuredClone(INITIAL);
     const p = JSON.parse(raw);
     if (!p || !Array.isArray(p.layers) || !p.canvas || !p.audio || !p.economy || !p.brand) throw Error("invalid");
+    p.economy = { ...p.economy, ...clampDraftLayout(p.economy) };
     return p;
   } catch { return structuredClone(INITIAL); }
 };
@@ -65,7 +67,7 @@ function getRect(layer, device) {
   if (layer.mobile) return layer.mobile;
   return { x: Math.round(layer.x * .40625), y: Math.round(layer.y * 1.56), width: Math.round(layer.width * .40625), height: Math.round(layer.height * 1.56) };
 }
-function GameLayer({ layer, selected, preview, device, spinIteration, onSelect, onPointerDown, onPointerMove, onPointerUp }) {
+function GameLayer({ layer, selected, preview, device, spinIteration, layout, onSelect, onPointerDown, onPointerMove, onPointerUp }) {
   const rect = getRect(layer, device);
   if (!layer.visible) return null;
   const style = {
@@ -80,8 +82,17 @@ function GameLayer({ layer, selected, preview, device, spinIteration, onSelect, 
   if (layer.type === "background") {
     view = <div style={{ width: "100%", height: "100%", background: "radial-gradient(ellipse at 68% 42%, " + rgba("#925aff", .3) + ", transparent 55%)," + layer.fill }} />;
   } else if (layer.type === "reels") {
-    view = <div className="reel-wrap" style={{ background: layer.fill }}>
-      {Array.from({ length: 15 }, (_, i) => <div key={i} className="reel-cell">{reelSymbols[(i * 7 + (spinIteration ? (spinIteration + i * 3) : 0)) % reelSymbols.length]}</div>)}
+    view = <div className="reel-wrap" data-reels={layout.reels} data-rows={layout.rows} style={{
+      background: layer.fill,
+      gridTemplateColumns: "repeat(" + layout.reels + ", minmax(0,1fr))",
+      gridTemplateRows: "repeat(" + layout.rows + ", minmax(0,1fr))",
+      padding: layout.reels >= 7 || layout.rows >= 6 ? 5 : 11,
+      gap: layout.reels >= 7 || layout.rows >= 6 ? 3 : 6,
+    }}>
+      {Array.from({ length: layout.reels * layout.rows }, (_, i) =>
+        <div key={i} className="reel-cell" style={{ fontSize: Math.max(15, Math.min(42, Math.floor(42 * Math.min(5 / layout.reels, 3 / layout.rows)))) }}>
+          {reelSymbols[(i * 7 + (spinIteration ? (spinIteration + i * 3) : 0)) % reelSymbols.length]}
+        </div>)}
     </div>;
   } else if (layer.type === "button") {
     view = <div className="game-button" style={{ background: layer.fill }}>{layer.text || "BUTTON"}</div>;
@@ -193,6 +204,7 @@ function App() {
   const patchAudio = (id, changes) => commit(prev => ({ ...prev, audio: prev.audio.map(t => t.id === id ? { ...t, ...changes } : t) }));
   const layer = project.layers.find(l => l.id === selection);
   const canvas = project.canvas;
+  const layout = clampDraftLayout(project.economy);
   const device = canvas.device;
   const gridColor = rgba(canvas.background === "#ffffff" || canvas.background === "#f5f5f5" ? "#394151" : "#e2e8f0", canvas.gridOpacity / 100);
   const gridStyle = {
@@ -345,7 +357,7 @@ function App() {
         <div className="canvas-viewport" ref={viewportRef} style={gridStyle}>
           <div className="stage-outer" style={{ width: stageSize.width * canvas.zoom / 100, height: stageSize.height * canvas.zoom / 100 }}>
             <div className="game-stage" style={stageStyle}>
-              {project.layers.map(l => <GameLayer key={l.id} layer={l} selected={selection === l.id} preview={preview} device={device} spinIteration={spinIteration} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>)}
+              {project.layers.map(l => <GameLayer key={l.id} layer={l} selected={selection === l.id} preview={preview} device={device} spinIteration={spinIteration} layout={layout} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>)}
               {preview && <button title="Demonstrate reel visuals only. Not a real spin." className="preview-spin-overlay" style={{ left: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).x, top: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).y, width: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).width, height: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).height }} onClick={() => setSpinIteration(n => n + 1)} /> }
             </div>
           </div>
@@ -393,10 +405,18 @@ function App() {
       <section className="economy-card soft-panel"><GroupTitle>DRAFT GAME CONFIGURATION</GroupTitle><div className="economy-fields">
         <Field label="Minimum bet" type="number" min={1} value={project.economy.minBet} onChange={v => patch("economy", { minBet: v })}/>
         <Field label="Maximum bet" type="number" min={1} value={project.economy.maxBet} onChange={v => patch("economy", { maxBet: v })}/>
-        <Field label="Reels" type="number" min={1} value={project.economy.reels} onChange={v => patch("economy", { reels: v })}/>
-        <Field label="Rows" type="number" min={1} value={project.economy.rows} onChange={v => patch("economy", { rows: v })}/>
+        <Field label="Reels" type="number" min={SLOT_LIMITS.minReels} max={SLOT_LIMITS.maxReels} value={layout.reels} onChange={v => patch("economy", { reels: clampDraftLayout({ ...project.economy, reels: v }).reels })}/>
+        <Field label="Rows" type="number" min={SLOT_LIMITS.minRows} max={SLOT_LIMITS.maxRows} value={layout.rows} onChange={v => patch("economy", { rows: clampDraftLayout({ ...project.economy, rows: v }).rows })}/>
         <Field label="Paylines" type="number" min={1} value={project.economy.paylines} onChange={v => patch("economy", { paylines: v })}/>
         <Field label="Target RTP (%)" type="number" min={0} max={100} step={.1} value={project.economy.targetRtp} onChange={v => patch("economy", { targetRtp: v })}/>
+      </div>
+      <div className="layout-presets" aria-label="Slot layout presets">
+        <strong>Slot grid presets</strong>
+        {[[5, 3], [5, 5], [6, 3], [6, 5]].map(([reels, rows]) =>
+          <button type="button" key={reels + "x" + rows} className={layout.reels === reels && layout.rows === rows ? "chosen" : ""} onClick={() => patch("economy", { reels, rows })}>
+            {reels} × {rows}
+          </button>)}
+        <span>Custom grid: {layout.reels} reels × {layout.rows} rows. Preview is visual only; math and measured RTP are not yet connected.</span>
       </div></section>
       <section className="economy-notice soft-panel"><AlertTriangle size={24}/><div><strong>Simulation not connected</strong><p>Target RTP is a design target, not measured RTP. No math model, RNG audit, or simulated-spin proof exists in this V1 editor. Production approval is blocked until independent math, security, wallet and performance tests pass.</p></div></section>
       <button className="secondary-button" onClick={() => downloadBlob(new Blob([JSON.stringify(project.economy, null, 2)], { type: "application/json" }), "softtech-economy-draft.json")}><Download size={15}/> Export draft configuration</button>
