@@ -21,7 +21,7 @@ function pilotProject() {
       symbolIds:symbols,symbolAssets:Object.fromEntries(symbols.map(x=>[x,asset])),
       mathBinding:"demo-only",releaseDecision:"BLOCKED",
       configuration:{reels:6,rows:5,
-        paylines:Array.from({length:20},(_,i)=>Array.from({length:6},(_,col)=>(i+col)%5)),
+        paylines:Array.from({length:20},(_,i)=>Array.from({length:6},(_,col)=>Math.floor(i / (5**col)) % 5)),
         reelStrips:Array.from({length:6},()=>["A","K","Q","J","WILD","SCATTER","A","K","J"])
       }
     }
