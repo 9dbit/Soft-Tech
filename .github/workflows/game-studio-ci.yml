@@ -1,0 +1,45 @@
+name: Game Studio V1 CI
+
+on:
+  push:
+    branches:
+      - "feat/universal-game-studio-v1-*"
+    paths:
+      - "game-studio/**"
+      - ".github/workflows/game-studio-ci.yml"
+  pull_request:
+    paths:
+      - "game-studio/**"
+      - ".github/workflows/game-studio-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-studio:
+    name: Vite build and asset smoke check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: game-studio
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Check Studio source contract
+        run: node scripts/smoke-check.mjs
+      - name: Build isolated Game Studio
+        run: npm run build
+      - name: Upload static preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-studio-dist
+          path: game-studio/dist/
+          if-no-files-found: error
