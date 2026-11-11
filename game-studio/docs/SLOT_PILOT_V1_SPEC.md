@@ -67,7 +67,7 @@ The report template intentionally uses `NOT_RUN` and `null` for every metric unt
 ## 6. Acceptance sequence
 1. **This PR:** agree exact paylines, Wild best-of semantics, Scatter count and example fixtures; validate machine-readable manifest and all grid variants with unit tests.
 2. **Engine milestone:** pure research complete-paid-round execution, cap, and optional event trace implemented with tests; **still required:** independently written reference evaluator, immutable authoritative round state, wallet settlement, rollback/interrupt recovery and full constraint review.
-3. **Audit milestone:** per-seed reproducible research receipt and SHA-256 source/config fingerprints implemented; **still required:** multiple large independent seeds, independent reference agreement, immutable/signed evidence, tail risk review and human math sign-off.
+3. **Audit milestone:** per-seed reproducible research receipt, SHA-256 source/config fingerprints, and a **three-domain × 1,000 paid-round CI smoke matrix** implemented. **Still required:** millions of complete paid rounds per approved configuration with independently reviewed multiple domains, reference evaluator agreement, immutable/signed evidence, tail risk review and human math sign-off.
 4. **Wallet/integration milestone:** server-issued CSPRNG and result, IDR-scale 0 protocol v2 in isolated sandbox only, once-only atomic ledger, disconnected/restart/load tests.
 5. **Release milestone:** human creative, security, compliance and operator QA approvals; production remains locked unless all gates genuinely pass.
 
