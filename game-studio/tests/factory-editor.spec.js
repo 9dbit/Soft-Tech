@@ -51,6 +51,9 @@ test("Game Factory 6x5 import opens independent symbol SVG assets and keeps math
   await page.reload();
   await expect(page.locator(".reel-cell img.factory-reel-symbol")).toHaveCount(30);
   await expect(page.locator(".reel-wrap")).toHaveAttribute("data-reels","6");
+  await page.getByRole("button",{name:"Restore Draft"}).click();
+  await expect(page.locator(".project-chip")).toContainText("Cyber Punk");
+  await expect(page.locator(".reel-cell img.factory-reel-symbol")).toHaveCount(0);
 });
 
 test("Factory refuses forged release state instead of replacing current draft", async({page})=>{
