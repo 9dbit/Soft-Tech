@@ -37,6 +37,19 @@ jobs:
         run: node scripts/smoke-check.mjs
       - name: Build isolated Game Studio
         run: npm run build
+      - name: Install Chromium for UI testing
+        run: npx playwright install --with-deps chromium
+      - name: Test editor interactions and ZIP export
+        run: npm run test:e2e
+      - name: Upload UI screenshots and browser test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: game-studio-ui-qa
+          path: |
+            game-studio/test-results/
+            game-studio/playwright-report/
+          if-no-files-found: ignore
       - name: Upload static preview artifact
         uses: actions/upload-artifact@v4
         with:
