@@ -55,3 +55,48 @@ test("Brand workspace exports favicon, Apple icon, PWA and Telegram Open Graph a
   expect(meta).toContain("twitter:card");
   expect(meta).toContain("noindex,nofollow");
 });
+
+
+test("Canvas Fit keeps the complete stage visible across device switches", async ({ page }) => {
+  await page.goto("/");
+  const stage = page.locator(".stage-outer");
+  const viewport = page.locator(".canvas-viewport");
+  async function assertFits() {
+    await expect(async () => {
+      const a = await stage.boundingBox();
+      const b = await viewport.boundingBox();
+      expect(a, "Stage must be rendered").not.toBeNull();
+      expect(b, "Canvas viewport must be rendered").not.toBeNull();
+      expect(a.x).toBeGreaterThanOrEqual(b.x - 2);
+      expect(a.y).toBeGreaterThanOrEqual(b.y - 2);
+      expect(a.x + a.width).toBeLessThanOrEqual(b.x + b.width + 2);
+      expect(a.y + a.height).toBeLessThanOrEqual(b.y + b.height + 2);
+    }).toPass({ timeout: 15000 });
+  }
+  await assertFits();
+  await page.getByTitle("Mobile preview").click();
+  await assertFits();
+  await expect(page.getByRole("button", { name: "Fit canvas to view" })).toHaveClass(/active/);
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await expect(page.getByRole("button", { name: "Fit canvas to view" })).not.toHaveClass(/active/);
+  await page.getByRole("button", { name: "Fit canvas to view" }).click();
+  await assertFits();
+});
+
+test("Compact workspace fits the mobile game preview on an actual phone-sized viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.getByTitle("Mobile preview").click();
+  const outer = page.locator(".stage-outer");
+  const editor = page.locator(".canvas-viewport");
+  await expect(async () => {
+    const a = await outer.boundingBox(), b = await editor.boundingBox();
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    expect(a.x).toBeGreaterThanOrEqual(b.x - 2);
+    expect(a.y).toBeGreaterThanOrEqual(b.y - 2);
+    expect(a.x + a.width).toBeLessThanOrEqual(b.x + b.width + 2);
+    expect(a.y + a.height).toBeLessThanOrEqual(b.y + b.height + 2);
+  }).toPass({ timeout: 15000 });
+  await page.screenshot({ path: "test-results/mobile-editor.png", fullPage: true });
+});
