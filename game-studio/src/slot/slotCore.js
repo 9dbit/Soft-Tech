@@ -124,15 +124,29 @@ export function evaluateDraftSpin(rules, grid) {
   for (let i = 0; i < rules.paylines.length; i++) {
     const path = rules.paylines[i];
     const sequence = path.map((row, col) => grid[row][col]);
-    const target = sequence.find(symbol => symbol !== rules.wildSymbol) || rules.wildSymbol;
-    if (target === rules.scatterSymbol) continue;
-    let matches = 0;
-    for (const symbol of sequence) {
-      if (symbol !== target && symbol !== rules.wildSymbol) break;
-      matches++;
+    // Evaluate every eligible target rather than using the first non-Wild symbol.
+    // Leading Wilds can pay on their own even when a later Scatter blocks ordinary wins.
+    // Pay one best outcome per payline: highest payout, then longest match, then
+    // ordinary symbol before all-Wild on exact ties, then stable symbol ID order.
+    const candidates = [];
+    for (const target of Object.keys(rules.paytable)) {
+      if (target === rules.scatterSymbol) continue;
+      let matches = 0;
+      for (const symbol of sequence) {
+        if (symbol !== target && !(target !== rules.wildSymbol && symbol === rules.wildSymbol)) break;
+        matches++;
+      }
+      const multiplier = matches >= 3 ? (rules.paytable[target]?.[matches] || 0) : 0;
+      if (multiplier) {
+        const payout = rules.betPerLine * multiplier;
+        if (!Number.isSafeInteger(payout)) throw new RangeError("line payout exceeds safe demo integer limits");
+        candidates.push({ index: i, symbol: target, matches, multiplier, payout });
+      }
     }
-    const multiplier = matches >= 3 ? (rules.paytable[target]?.[matches] || 0) : 0;
-    if (multiplier) lines.push({ index: i, symbol: target, matches, multiplier, payout: rules.betPerLine * multiplier });
+    candidates.sort((a, b) => b.payout - a.payout || b.matches - a.matches ||
+      Number(a.symbol === rules.wildSymbol) - Number(b.symbol === rules.wildSymbol) ||
+      a.symbol.localeCompare(b.symbol));
+    if (candidates[0]) lines.push(candidates[0]);
   }
   const scatterCount = grid.flat().filter(symbol => symbol === rules.scatterSymbol).length;
   const triggered = scatterCount >= rules.scatterBonus.minimum;
