@@ -235,3 +235,7 @@ input, textarea, select { accent-color: #0d99ff; }
 .factory-import-banner span {font-size:10px;color:#e1b6ff;letter-spacing:.04em}
 .factory-import-banner p {font-size:11px;color:#d4c5e2;line-height:1.6;margin:0}
 @media(max-width:600px){.factory-import-button {padding:6px 7px;font-size:10px}.factory-import-button svg{display:none}}
+
+.factory-restore-button {display:inline-flex;gap:6px;align-items:center;padding:8px 10px;border-radius:7px;border:1px solid #505b65;background:#2b3539;color:#d5e5ee;font-size:11px;white-space:nowrap}
+.factory-restore-button:hover {background:#344d55}
+@media(max-width:600px){.factory-restore-button {font-size:10px;padding:6px}.factory-restore-button svg{display:none}}
