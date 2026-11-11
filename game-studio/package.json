@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test:e2e": "playwright test",
-    "test:unit": "node --test tests/slot-core.test.mjs tests/slot-pilot-contract.test.mjs tests/slot-audit.test.mjs tests/slot-manifest-gates.test.mjs",
+    "test:unit": "node --test tests/slot-core.test.mjs tests/slot-pilot-contract.test.mjs tests/slot-audit.test.mjs tests/slot-manifest-gates.test.mjs tests/slot-release-gate.test.mjs",
     "audit:smoke": "node scripts/run-slot-audit.mjs --rounds 1000 --seed-domain softtech-slot-pilot-ci-A --output test-results/slot-audit-smoke.json"
   },
   "dependencies": {
