@@ -1,0 +1,399 @@
+{
+  "schemaVersion": "softtech.slot-pilot.v1",
+  "gameId": "softtech-slot-pilot-001",
+  "gameVersion": "0.1.0",
+  "status": "draft",
+  "walletMode": "demo-only",
+  "evaluationMode": "left-to-right-paylines",
+  "creditScale": 0,
+  "math": {
+    "layout": {
+      "reels": 5,
+      "rows": 3
+    },
+    "reelStrips": [
+      [
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER"
+      ],
+      [
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K"
+      ],
+      [
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q"
+      ],
+      [
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q"
+      ],
+      [
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER",
+        "A",
+        "Q",
+        "Q",
+        "J",
+        "WILD",
+        "Q",
+        "A",
+        "K",
+        "K",
+        "J",
+        "A",
+        "SCATTER"
+      ]
+    ],
+    "paylines": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      [
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        2,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        2,
+        2,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        2,
+        1,
+        0,
+        0
+      ],
+      [
+        2,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        1,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        2,
+        2,
+        2,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        1,
+        0,
+        0
+      ],
+      [
+        1,
+        2,
+        2,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        0
+      ],
+      [
+        2,
+        1,
+        2,
+        1,
+        0
+      ],
+      [
+        1,
+        1,
+        2,
+        1,
+        0
+      ],
+      [
+        0,
+        1,
+        2,
+        1,
+        0
+      ],
+      [
+        2,
+        2,
+        1,
+        1,
+        0
+      ]
+    ],
+    "betPerLine": 1,
+    "wildSymbol": "WILD",
+    "scatterSymbol": "SCATTER",
+    "paytable": {
+      "A": {
+        "3": 2,
+        "4": 4,
+        "5": 8
+      },
+      "K": {
+        "3": 2,
+        "4": 4,
+        "5": 8
+      },
+      "Q": {
+        "3": 2,
+        "4": 4,
+        "5": 8
+      },
+      "J": {
+        "3": 2,
+        "4": 4,
+        "5": 8
+      },
+      "WILD": {
+        "3": 6,
+        "4": 12,
+        "5": 24
+      }
+    },
+    "scatterBonus": {
+      "minimum": 3,
+      "freeSpins": 8,
+      "totalBetMultiplier": 2
+    }
+  },
+  "proposedFeatures": {
+    "bonusRetriggerEnabled": false,
+    "maxPaidRoundMultiplier": 1000,
+    "freeSpinsRuntimeImplemented": false,
+    "paidRoundCapImplemented": false,
+    "serverAuthoritativeRngImplemented": false,
+    "serverWalletIntegrationImplemented": false
+  },
+  "audit": {
+    "status": "NOT_RUN",
+    "isCertified": false,
+    "completePaidRoundRtpPercent": null,
+    "engineSha256": null,
+    "configSha256": null
+  }
+}
