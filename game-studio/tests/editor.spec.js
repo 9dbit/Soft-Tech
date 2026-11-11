@@ -100,3 +100,10 @@ test("Compact workspace fits the mobile game preview on an actual phone-sized vi
   }).toPass({ timeout: 15000 });
   await page.screenshot({ path: "test-results/mobile-editor.png", fullPage: true });
 });
+
+
+test("Studio staging serves its own browser favicon", async ({ request }) => {
+  const icon = await request.get("/favicon.svg");
+  expect(icon.status()).toBe(200);
+  expect(await icon.text()).toContain("<svg");
+});
