@@ -104,7 +104,35 @@ export function simulateDraftPaidRounds(rules, numberOfPaidRounds, createDrawFor
   let staked = 0, returned = 0, baseReturned = 0, bonusReturned = 0, screensPlayed = 0;
   let hitRounds = 0, profitRounds = 0, triggeredRounds = 0, freeSpinsPlayed = 0, capHitRounds = 0;
   let maxObservedAward = 0, n = 0, meanReturnX = 0, m2ReturnX = 0;
-  const payoutMultiples = options.includeTail === false ? null : [];
+  // Track only the largest 1% using a bounded min-heap.
+  // Sorting every round would allocate millions of values for a full audit.
+  const topLimit = Math.max(1, Math.ceil(numberOfPaidRounds * 0.01));
+  const topAwards = options.includeTail === false ? null : [];
+  const recordTopAward = value => {
+    if (!topAwards) return;
+    if (topAwards.length < topLimit) {
+      topAwards.push(value);
+      let i = topAwards.length - 1;
+      while (i > 0) {
+        const parent = Math.floor((i - 1) / 2);
+        if (topAwards[parent] <= value) break;
+        topAwards[i] = topAwards[parent];
+        i = parent;
+      }
+      topAwards[i] = value;
+    } else if (value > topAwards[0]) {
+      let i = 0;
+      while (true) {
+        const left = 2 * i + 1, right = left + 1;
+        if (left >= topAwards.length) break;
+        const child = right < topAwards.length && topAwards[right] < topAwards[left] ? right : left;
+        if (topAwards[child] >= value) break;
+        topAwards[i] = topAwards[child];
+        i = child;
+      }
+      topAwards[i] = value;
+    }
+  };
   for (let index = 0; index < numberOfPaidRounds; index++) {
     const draw = createDrawForRound(index);
     const r = playDraftPaidRound(rules, draw, options);
@@ -124,15 +152,13 @@ export function simulateDraftPaidRounds(rules, numberOfPaidRounds, createDrawFor
     const delta = x - meanReturnX;
     meanReturnX += delta / n;
     m2ReturnX += delta * (x - meanReturnX);
-    if (payoutMultiples) payoutMultiples.push(x);
+    recordTopAward(x);
   }
   const sdX = n > 1 ? Math.sqrt(m2ReturnX / (n - 1)) : 0;
   const ciMargin = n > 1 ? 1.959963984540054 * sdX / Math.sqrt(n) * 100 : null;
   let tailShare = null;
-  if (payoutMultiples) {
-    payoutMultiples.sort((a, b) => b - a);
-    const topCount = Math.max(1, Math.ceil(n * 0.01));
-    const topTotal = payoutMultiples.slice(0, topCount).reduce((sum, x) => sum + x, 0);
+  if (topAwards) {
+    const topTotal = topAwards.reduce((sum, x) => sum + x, 0);
     tailShare = returned > 0 ? 100 * topTotal / (returned / paidRoundBet) : null;
   }
   const rtpPercent = 100 * returned / staked;
