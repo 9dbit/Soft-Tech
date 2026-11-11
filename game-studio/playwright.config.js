@@ -7,6 +7,8 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   use: {
     ...devices["Desktop Chrome"],
+    // GitHub-hosted Ubuntu ships stable Chrome. Use it in CI to avoid apt mirror DNS outages.
+    channel: process.env.CI ? "chrome" : undefined,
     baseURL: "http://127.0.0.1:4173",
     trace: "retain-on-failure",
   },
