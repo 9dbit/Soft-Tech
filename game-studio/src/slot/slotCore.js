@@ -71,10 +71,14 @@ export function validateDraftRules(rules) {
   }
   if (!Array.isArray(rules.paylines) || !rules.paylines.length || rules.paylines.length > SLOT_LIMITS.maxPaylines)
     throw new Error("paylines must contain 1 to 50 paths");
+  const seenPaylines = new Set();
   for (const line of rules.paylines) {
     if (!Array.isArray(line) || line.length !== layout.reels ||
         line.some(row => !Number.isInteger(row) || row < 0 || row >= layout.rows))
       throw new Error("each payline must provide one valid row index per reel");
+    const key = line.join(",");
+    if (seenPaylines.has(key)) throw new Error("duplicate payline");
+    seenPaylines.add(key);
   }
   if (!Number.isSafeInteger(rules.betPerLine) || rules.betPerLine <= 0)
     throw new Error("betPerLine must be a positive integer number of demo credits");
@@ -83,6 +87,8 @@ export function validateDraftRules(rules) {
   const scatter = rules.scatterSymbol;
   if (typeof wild !== "string" || !symbols.has(wild) || typeof scatter !== "string" || !symbols.has(scatter) || wild === scatter)
     throw new Error("wild and scatter must be distinct symbols present on the strips");
+  if (!Number.isSafeInteger(rules.betPerLine * rules.paylines.length))
+    throw new Error("total demo wager exceeds safe integer limits");
   if (!rules.paytable || typeof rules.paytable !== "object") throw new Error("paytable is required");
   for (const [symbol, multipliers] of Object.entries(rules.paytable)) {
     if (!symbols.has(symbol) || !multipliers || typeof multipliers !== "object")
@@ -120,6 +126,9 @@ export function evaluateDraftSpin(rules, grid) {
   const { reels, rows } = validateDraftRules(rules).layout;
   if (!Array.isArray(grid) || grid.length !== rows || grid.some(line => !Array.isArray(line) || line.length !== reels))
     throw new Error("spin grid dimensions do not match the selected layout");
+  const eligible = new Set(rules.reelStrips.flat());
+  if (grid.some(line => line.some(symbol => !eligible.has(symbol))))
+    throw new Error("spin grid includes a symbol absent from the configured strips");
   const lines = [];
   for (let i = 0; i < rules.paylines.length; i++) {
     const path = rules.paylines[i];
@@ -153,6 +162,8 @@ export function evaluateDraftSpin(rules, grid) {
   const totalBet = rules.betPerLine * rules.paylines.length;
   const scatterPayout = triggered ? rules.scatterBonus.totalBetMultiplier * totalBet : 0;
   const linePayout = lines.reduce((sum, item) => sum + item.payout, 0);
+  if (![totalBet, scatterPayout, linePayout, linePayout + scatterPayout].every(Number.isSafeInteger))
+    throw new RangeError("draft payout exceeds safe integer limits");
   return {
     contract: SLOT_CONTRACT_VERSION,
     layout: { reels, rows },
