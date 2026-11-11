@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { DEFAULT_BRAND, previewBrand, generateBrandZip, buildMetaTags, validateBrand } from "./brandAssets.js";
 import { clampDraftLayout, SLOT_LIMITS } from "./slot/slotCore.js";
+import { validateFactoryImport } from "./factoryImport.js";
 
 const STORAGE_KEY = "softtech-universal-game-studio-v1";
 const INITIAL = {
@@ -56,8 +57,8 @@ const downloadBlob = (blob, filename) => {
 function Button({ children, onClick, active = false, title, disabled = false, className = "" }) {
   return <button type="button" title={title} className={"tool-button " + (active ? "active " : "") + className} onClick={onClick} disabled={disabled}>{children}</button>;
 }
-function Field({ label, value, onChange, type = "text", min, max, step = 1, placeholder }) {
-  return <label className="field"><span>{label}</span><input type={type} value={value ?? ""} min={min} max={max} step={step} placeholder={placeholder} onChange={e => onChange(type === "number" || type === "range" ? int(e.target.value) : e.target.value)} /></label>;
+function Field({ label, value, onChange, type = "text", min, max, step = 1, placeholder, disabled = false }) {
+  return <label className="field"><span>{label}</span><input type={type} value={value ?? ""} min={min} max={max} step={step} placeholder={placeholder} disabled={disabled} onChange={e => onChange(type === "number" || type === "range" ? int(e.target.value) : e.target.value)} /></label>;
 }
 function GroupTitle({ children, accessory }) {
   return <div className="group-title"><b>{children}</b>{accessory}</div>;
@@ -67,7 +68,7 @@ function getRect(layer, device) {
   if (layer.mobile) return layer.mobile;
   return { x: Math.round(layer.x * .40625), y: Math.round(layer.y * 1.56), width: Math.round(layer.width * .40625), height: Math.round(layer.height * 1.56) };
 }
-function GameLayer({ layer, selected, preview, device, spinIteration, layout, onSelect, onPointerDown, onPointerMove, onPointerUp }) {
+function GameLayer({ layer, selected, preview, device, spinIteration, layout, factory, onSelect, onPointerDown, onPointerMove, onPointerUp }) {
   const rect = getRect(layer, device);
   if (!layer.visible) return null;
   const style = {
@@ -89,10 +90,17 @@ function GameLayer({ layer, selected, preview, device, spinIteration, layout, on
       padding: layout.reels >= 7 || layout.rows >= 6 ? 5 : 11,
       gap: layout.reels >= 7 || layout.rows >= 6 ? 3 : 6,
     }}>
-      {Array.from({ length: layout.reels * layout.rows }, (_, i) =>
-        <div key={i} className="reel-cell" style={{ fontSize: Math.max(15, Math.min(42, Math.floor(42 * Math.min(5 / layout.reels, 3 / layout.rows)))) }}>
-          {reelSymbols[(i * 7 + (spinIteration ? (spinIteration + i * 3) : 0)) % reelSymbols.length]}
-        </div>)}
+      {Array.from({ length: layout.reels * layout.rows }, (_, i) => {
+        const reel = i % layout.reels;
+        const row = Math.floor(i / layout.reels);
+        const strip = factory?.configuration?.reelStrips?.[reel];
+        const symbolId = strip?.[(row + reel * 3 + spinIteration) % strip.length];
+        return <div key={i} className="reel-cell" style={{ fontSize: Math.max(15, Math.min(42, Math.floor(42 * Math.min(5 / layout.reels, 3 / layout.rows)))) }}>
+          {factory?.symbolAssets?.[symbolId] ?
+            <img alt={symbolId} draggable={false} className="factory-reel-symbol" src={factory.symbolAssets[symbolId]}/> :
+            reelSymbols[(i * 7 + (spinIteration ? (spinIteration + i * 3) : 0)) % reelSymbols.length]}
+        </div>;
+      })}
     </div>;
   } else if (layer.type === "button") {
     view = <div className="game-button" style={{ background: layer.fill }}>{layer.text || "BUTTON"}</div>;
@@ -158,6 +166,7 @@ function App() {
   const [preview, setPreview] = useState(false);
   const [spinIteration, setSpinIteration] = useState(0);
   const [assetInfo, setAssetInfo] = useState("");
+  const [factoryMessage, setFactoryMessage] = useState("");
   const [audioFiles, setAudioFiles] = useState({});
   const [timelineOpen, setTimelineOpen] = useState(true);
   const [fitToView, setFitToView] = useState(true);
@@ -166,6 +175,7 @@ function App() {
   const redoStack = useRef([]);
   const drag = useRef(null);
   const imagePicker = useRef(null);
+  const factoryPicker = useRef(null);
   const audioRefs = useRef({});
   const viewportRef = useRef(null);
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(project)); } catch { /* local draft may exceed storage limit */ } }, [project]);
@@ -202,6 +212,26 @@ function App() {
   const patch = (section, changes) => commit(prev => ({ ...prev, [section]: { ...prev[section], ...changes } }));
   const patchLayer = (id, changes) => commit(prev => ({ ...prev, layers: prev.layers.map(l => l.id === id ? { ...l, ...changes } : l) }));
   const patchAudio = (id, changes) => commit(prev => ({ ...prev, audio: prev.audio.map(t => t.id === id ? { ...t, ...changes } : t) }));
+  const importFactoryProject = async file => {
+    if (!file) return;
+    try {
+      if (file.size > 1024 * 1024) throw new Error("Factory project JSON must be smaller than 1 MB");
+      const incoming = validateFactoryImport(await file.text());
+      if (!window.confirm("Import " + incoming.name + "? Existing local draft will be backed up and replaced. Undo is available.")) return;
+      // Save the prior draft locally before replacement, without mutating other games.
+      const backupKey = STORAGE_KEY + ":backup:" + Date.now();
+      localStorage.setItem(backupKey, JSON.stringify(project));
+      const backups = Object.keys(localStorage).filter(key => key.startsWith(STORAGE_KEY + ":backup:")).sort();
+      for (const key of backups.slice(0, -3)) localStorage.removeItem(key);
+      commit(incoming);
+      setSelection("reels");
+      setPreview(false);
+      setSpinIteration(0);
+      setTab("visual");
+      setSidebar("layers");
+      setFactoryMessage("Imported " + incoming.name + " as an editable demo draft. Mathematical release remains BLOCKED.");
+    } catch (error) { setFactoryMessage("Import rejected: " + error.message); }
+  };
   const layer = project.layers.find(l => l.id === selection);
   const canvas = project.canvas;
   const layout = clampDraftLayout(project.economy);
@@ -319,10 +349,13 @@ function App() {
       <div className="top-right"><span className="draft-pill"><Check size={13} />Local draft</span>
         <Button title="Undo" disabled={!undoStack.current.length} onClick={undo}><Undo2 size={17}/></Button>
         <Button title="Redo" disabled={!redoStack.current.length} onClick={redo}><Redo2 size={17}/></Button>
+        <input ref={factoryPicker} type="file" accept=".json,application/json" hidden aria-label="Factory project JSON" onChange={e => { importFactoryProject(e.target.files?.[0]); e.target.value = ""; }}/>
+        <button className="factory-import-button" onClick={() => factoryPicker.current?.click()} title="Import a versioned, demo-only Game Factory project"><Upload size={14}/> Import Game Factory</button>
         <Button title="Export project JSON" onClick={exportProject}><Save size={17}/></Button>
         <button className={"preview-toggle " + (preview ? "playing" : "")} onClick={() => setPreview(v => !v)}>{preview ? <Square size={14}/> : <Play size={14}/>} {preview ? "Edit" : "Preview"}</button>
       </div>
     </header>
+    {factoryMessage && <div role="status" className="factory-import-message">{factoryMessage}<button title="Dismiss import notice" onClick={() => setFactoryMessage("")}>×</button></div>}
     <nav className="workspace-tabs" aria-label="Studio sections">
       {[["visual", Layers3], ["audio", Music2], ["economy", ChartNoAxesCombined], ["brand", Share2]].map(([id, Icon]) => <button key={id} className={tab === id ? "selected" : ""} onClick={() => setTab(id)}><Icon size={16}/>{names[id]}</button>)}
       <div className="workspace-tabs-note">V1 SANDBOX · NO LIVE GAME</div>
@@ -341,6 +374,28 @@ function App() {
           <div className="subtle-label">Every UI element is independent; edit visuals without changing game mathematics.</div>
         </> : <>
           <GroupTitle>ASSET LIBRARY</GroupTitle>
+          {project.factory && <section className="factory-assets"><b>GAME FACTORY SYMBOLS</b>
+            <p>{project.factory.gameId} · source v{project.factory.sourceGameVersion}</p>
+            <div className="factory-symbols">{project.factory.symbolIds.map(symbol => <label key={symbol} className="factory-symbol-card" title={"Replace " + symbol + " (SVG)">
+              <img alt={"Factory asset " + symbol} src={project.factory.symbolAssets[symbol]}/>
+              <span>{symbol}</span>
+              <input aria-label={"Replace " + symbol + " symbol SVG"} type="file" accept=".svg,image/svg+xml" hidden onChange={async e => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                try {
+                  if (file.size > 12000) throw new Error("SVG exceeds 12 KB");
+                  const svg = await file.text();
+                  const data = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+                  const fresh = { ...project, factory: { ...project.factory, symbolAssets: { ...project.factory.symbolAssets, [symbol]: data } } };
+                  validateFactoryImport(fresh);
+                  commit(fresh);
+                  setAssetInfo(symbol + " replaced for the visual draft. Source math stays unchanged.");
+                } catch (error) { setAssetInfo("SVG replacement blocked: " + error.message); }
+              }}/>
+            </label>)}</div>
+            <p>Each symbol is an independently replaceable SVG. Math stays locked to the versioned manifest.</p>
+          </section>}
           <div className="asset-actions"><button onClick={() => addLayer("text")}><FileCode2 size={17}/> Text</button><button onClick={() => addLayer("button")}><Plus size={17}/> Button</button><button onClick={() => imagePicker.current?.click()}><Upload size={17}/> Image</button></div>
           <input ref={imagePicker} hidden type="file" accept="image/*" onChange={e => { importImage(e.target.files?.[0]); e.target.value = ""; }}/>
           <div className="asset-placeholder"><Folder size={27} /><b>Local asset collection</b><span>Import a PNG, SVG, JPG or WebP. A server asset library will come in a later phase.</span></div>
@@ -357,7 +412,7 @@ function App() {
         <div className="canvas-viewport" ref={viewportRef} style={gridStyle}>
           <div className="stage-outer" style={{ width: stageSize.width * canvas.zoom / 100, height: stageSize.height * canvas.zoom / 100 }}>
             <div className="game-stage" style={stageStyle}>
-              {project.layers.map(l => <GameLayer key={l.id} layer={l} selected={selection === l.id} preview={preview} device={device} spinIteration={spinIteration} layout={layout} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>)}
+              {project.layers.map(l => <GameLayer key={l.id} layer={l} selected={selection === l.id} preview={preview} device={device} spinIteration={spinIteration} layout={layout} factory={project.factory} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>)}
               {preview && <button title="Demonstrate reel visuals only. Not a real spin." className="preview-spin-overlay" style={{ left: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).x, top: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).y, width: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).width, height: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).height }} onClick={() => setSpinIteration(n => n + 1)} /> }
             </div>
           </div>
@@ -402,18 +457,19 @@ function App() {
     </div>}
     {tab === "economy" && <div className="simple-workspace economy-workspace">
       <div className="workspace-intro"><div><h2>Economy & Math Lab</h2><p>Keep draft game parameters separate from visuals. These are not certified mathematical outcomes.</p></div><span className="soft-tag danger"><AlertTriangle size={14}/> NOT VERIFIED</span></div>
+      {project.factory && <section className="factory-import-banner"><b>Game Factory: {project.factory.gameId}</b><span>Version {project.factory.sourceGameVersion} · {project.factory.mathBinding} · RELEASE BLOCKED</span><p>Layout/payline math is sourced from the generated manifest and locked here. To change game math, regenerate through Game Factory; visuals and sound remain editable.</p></section>}
       <section className="economy-card soft-panel"><GroupTitle>DRAFT GAME CONFIGURATION</GroupTitle><div className="economy-fields">
         <Field label="Minimum bet" type="number" min={1} value={project.economy.minBet} onChange={v => patch("economy", { minBet: v })}/>
         <Field label="Maximum bet" type="number" min={1} value={project.economy.maxBet} onChange={v => patch("economy", { maxBet: v })}/>
-        <Field label="Reels" type="number" min={SLOT_LIMITS.minReels} max={SLOT_LIMITS.maxReels} value={layout.reels} onChange={v => patch("economy", { reels: clampDraftLayout({ ...project.economy, reels: v }).reels })}/>
-        <Field label="Rows" type="number" min={SLOT_LIMITS.minRows} max={SLOT_LIMITS.maxRows} value={layout.rows} onChange={v => patch("economy", { rows: clampDraftLayout({ ...project.economy, rows: v }).rows })}/>
-        <Field label="Paylines" type="number" min={1} value={project.economy.paylines} onChange={v => patch("economy", { paylines: v })}/>
-        <Field label="Target RTP (%)" type="number" min={0} max={100} step={.1} value={project.economy.targetRtp} onChange={v => patch("economy", { targetRtp: v })}/>
+        <Field label="Reels" type="number" disabled={!!project.factory} min={SLOT_LIMITS.minReels} max={SLOT_LIMITS.maxReels} value={layout.reels} onChange={v => patch("economy", { reels: clampDraftLayout({ ...project.economy, reels: v }).reels })}/>
+        <Field label="Rows" type="number" disabled={!!project.factory} min={SLOT_LIMITS.minRows} max={SLOT_LIMITS.maxRows} value={layout.rows} onChange={v => patch("economy", { rows: clampDraftLayout({ ...project.economy, rows: v }).rows })}/>
+        <Field label="Paylines" type="number" disabled={!!project.factory} min={1} value={project.economy.paylines} onChange={v => patch("economy", { paylines: v })}/>
+        <Field label="Target RTP (%) · unverified" type="number" disabled={!!project.factory} min={0} max={100} step={.1} value={project.economy.targetRtp} onChange={v => patch("economy", { targetRtp: v })}/>
       </div>
       <div className="layout-presets" aria-label="Slot layout presets">
         <strong>Slot grid presets</strong>
         {[[5, 3], [5, 5], [6, 3], [6, 5]].map(([reels, rows]) =>
-          <button type="button" key={reels + "x" + rows} className={layout.reels === reels && layout.rows === rows ? "chosen" : ""} onClick={() => patch("economy", { reels, rows })}>
+          <button type="button" disabled={!!project.factory} key={reels + "x" + rows} className={layout.reels === reels && layout.rows === rows ? "chosen" : ""} onClick={() => patch("economy", { reels, rows })}>
             {reels} × {rows}
           </button>)}
         <span>Custom grid: {layout.reels} reels × {layout.rows} rows. Preview is visual only; math and measured RTP are not yet connected.</span>
