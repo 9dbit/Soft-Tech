@@ -1,5 +1,5 @@
 # Soft Tech Slot Pilot V1: Win Rules and Mathematical Data Contract
-**Status:** PROPOSED FOR CREATIVE/MATH REVIEW · 2026-11-11 · isolated browser-only sandbox.
+**Status:** PROPOSED FOR CREATIVE/MATH REVIEW · 2026-11-11 · isolated demo-only research. Not a licensed or server-authoritative game.
 **Engineering playbook:** [GAME_FACTORY_ENGINEERING_STANDARDS.md](GAME_FACTORY_ENGINEERING_STANDARDS.md).  
 **Machine-readable:** [pilot manifest](../contracts/slot-pilot-v1.example.json), [manifest schema](../contracts/slot-pilot-v1.schema.json), [audit-report template](../contracts/math-audit-report-v1.template.json).
 
@@ -18,9 +18,9 @@ This is **not** a live gambling game or a certified math model. All numbers and 
 | Symbol set | A, K, Q, J, WILD, SCATTER. Fixed reel strips in the example, not inferred from visuals. **Scatter cannot be substituted by Wild** and must never pay via normal paylines | Draft evaluator |
 | Wild | Replaces A/K/Q/J. Leading Wilds may form a Wild-only 3+ win or form a longer substituted ordinary win. **Choose the single highest payable outcome per line**, do not double count; stable tie-break per contract | Requires best-of evaluator fixtures; see release gates |
 | Paytable | Multipliers expressed **per winning line wager**, not as percent of total stake; three or more consecutive matches; see versioned example JSON | Draft evaluator |
-| Scatter | At least **3 Scatter anywhere** in visible grid triggers an award of **8 free spins** and an example scatter prize of **2× base total bet**, independent of paylines | Trigger and prize drafted; free-spin execution not implemented |
-| Bonus rounds | A bonus round must include *all* awarded free spins in the original **paid-round** settlement; inherited line bet and paytable; **no retrigger in V1**; all proceeds credited once, at paid-round completion | **NOT IMPLEMENTED**: currently only awards a count of free spins |
-| Maximum award | Proposed **1,000× original paid-round stake** across base and all free spins, applied once to complete-round payout; no silently truncated outcomes | **NOT IMPLEMENTED**; requires cap + invariant tests |
+| Scatter | At least **3 Scatter anywhere** in visible grid triggers **8 free spins** and example **2× base total bet** scatter prize independent of paylines | Trigger plus bonus-screen research simulation implemented, no wallet |
+| Bonus rounds | A simulated paid round includes its base screen and awarded free-spin screens, with **no retrigger in Pilot V1**. A future authoritative wallet may credit once only after atomic settlement | **Implemented in pure research simulator**, not implemented in live game/session/wallet |
+| Maximum award | Proposed **1,000× original paid-round stake** across base and bonus screens; transparent cap clipping and early bonus stop on cap | Research cap and regression tests implemented; **no production settlement** |
 | UI vs math | Turbo, animations, sound, mobile portrait, page refresh, reduced-motion and network retries must not change the committed result | Server-authoritative lifecycle and recovery **NOT IMPLEMENTED** |
 
 ### Example paytable (design placeholders)
@@ -47,7 +47,7 @@ Input shape is `grid[row][reel]`. In these fixtures, `betPerLine = 1`.
 | J, J, K, J, J | 0 line credits (only 2 contiguous J) |
 | Any 3 visible Scatter across rows/columns | 8 bonus spins awarded + 2× **total base bet** scatter prize, not 2× individual line bet |
 
-For the last row, bonus-spin **award count is not equivalent to executing and settling free spins**. All full-round RTP statements remain blocked until that engine stage exists.
+For the last row, the screen-level evaluator awards a count only. The separate **pure research paid-round simulator** now executes the awarded bonus screens and includes their demo payouts. This is not server-side settlement, RNG certification or a published RTP guarantee.
 
 ## 4. Mandatory manifest fields
 Use `slot-pilot-v1.example.json` as the versioned game manifest: `schemaVersion`, `gameId`, `gameVersion`, `status`, `walletMode`, `evaluationMode`, `creditScale`, `math` (layout, strips, explicit paylines, stake, paytable, Wild/Scatter, bonus trigger), `proposedFeatures`, and `audit`. The example is **not** a certified source of truth; it is an input contract for reproducible experimentation.
@@ -62,13 +62,16 @@ The report template intentionally uses `NOT_RUN` and `null` for every metric unt
 - RTP estimate and uncertainty interval, hit frequency, bonus-entry frequency, max observed payout, cap-hit count, tail concentration, volatility, base/bonus return breakdown, reproducible failing-round trace.
 - Separate stress results (500 and 1,000 sessions), crash and network-retry tests, wallet isolation/idempotency, browser/PWA QA, security/independent review and human release approval.
 
-**Hard block:** `completePaidRoundRtpPercent` is **null** until bonus settlement is implemented. The existing base-screen simulator cannot be called a full-game RTP audit. A 96% target is not evidence of achieved 96% RTP.
+**Hard block:** the versioned **input manifest** deliberately retains `audit.completePaidRoundRtpPercent: null` and `audit.status: NOT_RUN`; research receipts may contain a measured **simulated full-round** figure, but they are labeled `RESEARCH_SAMPLE_ONLY`, `NOT_CERTIFIED`, and `releaseDecision: BLOCKED`. Do not confuse base-screen-only sampling with paid-round statistics. A 96% target is not evidence of achieved 96% RTP. Audit overrides cannot silently change the manifest's cap.
 
 ## 6. Acceptance sequence
 1. **This PR:** agree exact paylines, Wild best-of semantics, Scatter count and example fixtures; validate machine-readable manifest and all grid variants with unit tests.
-2. **Engine milestone:** implement complete paid round (bonus execution, caps, event log) + deterministic replay + independent reference evaluator; correct bound and overflow behavior.
-3. **Audit milestone:** generate signed/fingerprinted, independently reproduced multi-seed report with full-round Monte Carlo and confidence intervals; no math certification claim.
+2. **Engine milestone:** pure research complete-paid-round execution, cap, and optional event trace implemented with tests; **still required:** independently written reference evaluator, immutable authoritative round state, wallet settlement, rollback/interrupt recovery and full constraint review.
+3. **Audit milestone:** per-seed reproducible research receipt and SHA-256 source/config fingerprints implemented; **still required:** multiple large independent seeds, independent reference agreement, immutable/signed evidence, tail risk review and human math sign-off.
 4. **Wallet/integration milestone:** server-issued CSPRNG and result, IDR-scale 0 protocol v2 in isolated sandbox only, once-only atomic ledger, disconnected/restart/load tests.
 5. **Release milestone:** human creative, security, compliance and operator QA approvals; production remains locked unless all gates genuinely pass.
 
 This document reflects a **proposal**, not final approved operator odds or a statement of production readiness. The goal is to review concrete behavior before expensive reruns.
+
+## 7. Game Factory knowledge retention
+Every future AI-generated slot game must use the strict manifest validator `src/slot/manifestContract.js` before audit. Unknown fields, hidden live-wallet flags, arbitrary RTP claims, malformed strips/paths or untracked payout cap changes are rejected. Lessons from fixes are registered in [REGRESSION_KNOWLEDGE_BASE.md](REGRESSION_KNOWLEDGE_BASE.md) with a machine-enforced regression test.
