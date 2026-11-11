@@ -376,7 +376,7 @@ function App() {
           <GroupTitle>ASSET LIBRARY</GroupTitle>
           {project.factory && <section className="factory-assets"><b>GAME FACTORY SYMBOLS</b>
             <p>{project.factory.gameId} · source v{project.factory.sourceGameVersion}</p>
-            <div className="factory-symbols">{project.factory.symbolIds.map(symbol => <label key={symbol} className="factory-symbol-card" title={"Replace " + symbol + " (SVG)">
+            <div className="factory-symbols">{project.factory.symbolIds.map(symbol => <label key={symbol} className="factory-symbol-card" title={"Replace " + symbol + " (SVG)"}>
               <img alt={"Factory asset " + symbol} src={project.factory.symbolAssets[symbol]}/>
               <span>{symbol}</span>
               <input aria-label={"Replace " + symbol + " symbol SVG"} type="file" accept=".svg,image/svg+xml" hidden onChange={async e => {
