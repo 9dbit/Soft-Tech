@@ -167,6 +167,9 @@ function App() {
   const [spinIteration, setSpinIteration] = useState(0);
   const [assetInfo, setAssetInfo] = useState("");
   const [factoryMessage, setFactoryMessage] = useState("");
+  const [hasFactoryBackup, setHasFactoryBackup] = useState(() =>
+    Object.keys(localStorage).some(key => key.startsWith(STORAGE_KEY + ":backup:"))
+  );
   const [audioFiles, setAudioFiles] = useState({});
   const [timelineOpen, setTimelineOpen] = useState(true);
   const [fitToView, setFitToView] = useState(true);
@@ -223,6 +226,7 @@ function App() {
       localStorage.setItem(backupKey, JSON.stringify(project));
       const backups = Object.keys(localStorage).filter(key => key.startsWith(STORAGE_KEY + ":backup:")).sort();
       for (const key of backups.slice(0, -3)) localStorage.removeItem(key);
+      setHasFactoryBackup(true);
       commit(incoming);
       setSelection("reels");
       setPreview(false);
@@ -231,6 +235,22 @@ function App() {
       setSidebar("layers");
       setFactoryMessage("Imported " + incoming.name + " as an editable demo draft. Mathematical release remains BLOCKED.");
     } catch (error) { setFactoryMessage("Import rejected: " + error.message); }
+  };
+  const restoreFactoryBackup = () => {
+    const keys = Object.keys(localStorage).filter(key => key.startsWith(STORAGE_KEY + ":backup:")).sort();
+    if (!keys.length) { setHasFactoryBackup(false); return; }
+    if (!window.confirm("Restore the last local Studio draft? Current changes can be undone in this session.")) return;
+    try {
+      const previous = JSON.parse(localStorage.getItem(keys[keys.length - 1]));
+      if (!previous || !Array.isArray(previous.layers) || !previous.canvas || !previous.economy || !previous.brand) throw new Error("Backup is damaged");
+      commit(previous);
+      localStorage.removeItem(keys[keys.length - 1]);
+      setHasFactoryBackup(keys.length > 1);
+      setSelection(previous.layers.find(l => l.type === "reels")?.id || previous.layers[0].id);
+      setPreview(false);
+      setTab("visual");
+      setFactoryMessage("Previous Studio draft restored; no operator or production data changed.");
+    } catch(error) { setFactoryMessage("Restore failed: " + error.message); }
   };
   const layer = project.layers.find(l => l.id === selection);
   const canvas = project.canvas;
@@ -350,6 +370,7 @@ function App() {
         <Button title="Undo" disabled={!undoStack.current.length} onClick={undo}><Undo2 size={17}/></Button>
         <Button title="Redo" disabled={!redoStack.current.length} onClick={redo}><Redo2 size={17}/></Button>
         <input ref={factoryPicker} type="file" accept=".json,application/json" hidden aria-label="Factory project JSON" onChange={e => { importFactoryProject(e.target.files?.[0]); e.target.value = ""; }}/>
+        {hasFactoryBackup && <button className="factory-restore-button" title="Restore the most recent Studio draft backup" onClick={restoreFactoryBackup}><RotateCcw size={14}/> Restore Draft</button>}
         <button className="factory-import-button" onClick={() => factoryPicker.current?.click()} title="Import a versioned, demo-only Game Factory project"><Upload size={14}/> Import Game Factory</button>
         <Button title="Export project JSON" onClick={exportProject}><Save size={17}/></Button>
         <button className={"preview-toggle " + (preview ? "playing" : "")} onClick={() => setPreview(v => !v)}>{preview ? <Square size={14}/> : <Play size={14}/>} {preview ? "Edit" : "Preview"}</button>
