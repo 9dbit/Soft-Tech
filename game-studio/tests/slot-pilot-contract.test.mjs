@@ -152,6 +152,6 @@ test("unsafe credits, duplicate lines, invalid grid symbol and malformed cap fai
   assert.throws(() => validateDraftRules({ ...math, paylines: [math.paylines[0], math.paylines[0]] }), /duplicate payline/);
   assert.throws(() => evaluateDraftSpin(rules, gridWithFirstRow(["A", "A", "A", "UNKNOWN", "K"])), /symbol absent/);
   const overflow = { ...rules, betPerLine: Number.MAX_SAFE_INTEGER };
-  assert.throws(() => evaluateDraftSpin(overflow, gridWithFirstRow(["A", "A", "A", "K", "J"])), /safe integer/);
+  assert.throws(() => evaluateDraftSpin(overflow, gridWithFirstRow(["A", "A", "A", "K", "J"])), /safe (demo )?integer/);
   assert.throws(() => playDraftPaidRound(rules, () => 0, { maxPaidRoundMultiplier: 0 }), /maxPaidRoundMultiplier/);
 });
