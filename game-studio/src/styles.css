@@ -200,3 +200,18 @@ input, textarea, select { accent-color: #0d99ff; }
   .audio-list, .economy-fields, .preview-row { grid-template-columns: 1fr; }
   .app-status { flex-wrap: wrap; justify-content: center; gap: 4px 20px; padding: 5px; }
 }
+
+/* Configurable slot grid: avoid clipping 6x5 and dense 8x8 drafts on narrow devices. */
+.reel-wrap { min-width: 0; min-height: 0; overflow: hidden; }
+.reel-cell { min-width: 0; min-height: 0; overflow: hidden; line-height: 1; }
+.layout-presets {
+  padding: 14px 0 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 9px;
+}
+.layout-presets strong { flex-basis: 100%; font-size: 12px; color: #ddd; }
+.layout-presets button {
+  border: 1px solid #555; background: #303030; color: #ddd; border-radius: 7px;
+  padding: 8px 13px; font-size: 12px; cursor: pointer;
+}
+.layout-presets button.chosen { border-color: #a782ff; background: #514078; color: #fff; }
+.layout-presets button:focus-visible { outline: 2px solid #b494ff; outline-offset: 2px; }
+.layout-presets span { flex-basis: 100%; font-size: 11px; line-height: 1.5; color: #aaa; }
