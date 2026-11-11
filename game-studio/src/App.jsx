@@ -149,12 +149,14 @@ function App() {
   const [assetInfo, setAssetInfo] = useState("");
   const [audioFiles, setAudioFiles] = useState({});
   const [timelineOpen, setTimelineOpen] = useState(true);
+  const [fitToView, setFitToView] = useState(true);
   const [historyState, forceHistory] = useState(0);
   const undoStack = useRef([]);
   const redoStack = useRef([]);
   const drag = useRef(null);
   const imagePicker = useRef(null);
   const audioRefs = useRef({});
+  const viewportRef = useRef(null);
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(project)); } catch { /* local draft may exceed storage limit */ } }, [project]);
   const commit = (makeNext) => setProject(prev => {
     const next = typeof makeNext === "function" ? makeNext(prev) : makeNext;
@@ -201,6 +203,42 @@ function App() {
   };
   const stageSize = device === "desktop" ? { width: 960, height: 540 } : { width: 390, height: 844 };
   const stageStyle = { width: stageSize.width, height: stageSize.height, transform: "scale(" + (canvas.zoom / 100) + ")", transformOrigin: "top left" };
+  const fitZoomFor = (el, mode) => {
+    if (!el) return null;
+    const dimensions = mode === "desktop" ? { width: 960, height: 540 } : { width: 390, height: 844 };
+    const ratio = Math.min(
+      Math.max(1, el.clientWidth - 70) / dimensions.width,
+      Math.max(1, el.clientHeight - 72) / dimensions.height
+    );
+    return Math.max(25, Math.min(125, Math.floor(ratio * 100)));
+  };
+  useEffect(() => {
+    if (tab !== "visual" || !fitToView || !viewportRef.current) return;
+    const el = viewportRef.current;
+    const update = () => {
+      const zoom = fitZoomFor(el, project.canvas.device);
+      if (zoom !== null) setProject(prev => prev.canvas.zoom === zoom ? prev : {
+        ...prev, canvas: { ...prev.canvas, zoom }
+      });
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [tab, fitToView, project.canvas.device, timelineOpen]);
+  const switchDevice = nextDevice => {
+    setFitToView(true);
+    patch("canvas", { device: nextDevice });
+  };
+  const fitCanvas = () => {
+    setFitToView(true);
+    const zoom = fitZoomFor(viewportRef.current, device);
+    if (zoom !== null) patch("canvas", { zoom });
+  };
+  const manualZoom = nextZoom => {
+    setFitToView(false);
+    patch("canvas", { zoom: Math.max(25, Math.min(160, nextZoom)) });
+  };
   const addLayer = (type) => {
     const id = "layer-" + Math.random().toString(36).slice(2, 10);
     const fresh = { id, type, name: type === "button" ? "New Button" : type === "image" ? "New Image" : "New Text", x: 315, y: 220, width: type === "text" ? 240 : 180, height: 60,
@@ -300,11 +338,11 @@ function App() {
       <main className="editor-main">
         <div className="canvas-toolbar">
           <div className="toolbar-group"><MousePointer2 size={16}/><span>Move tool</span></div>
-          <div className="toolbar-group device-toggle"><Button active={device === "desktop"} title="Desktop preview" onClick={() => patch("canvas", { device: "desktop" })}><Monitor size={16}/></Button><Button active={device === "mobile"} title="Mobile preview" onClick={() => patch("canvas", { device: "mobile", zoom: 60 })}><Smartphone size={16}/></Button></div>
+          <div className="toolbar-group device-toggle"><Button active={device === "desktop"} title="Desktop preview" onClick={() => switchDevice("desktop")}><Monitor size={16}/></Button><Button active={device === "mobile"} title="Mobile preview" onClick={() => switchDevice("mobile")}><Smartphone size={16}/></Button></div>
           <div className="toolbar-group"><Grid2X2 size={14}/><select aria-label="Canvas grid pattern" value={canvas.grid} onChange={e => patch("canvas", { grid: e.target.value })}><option value="dots">Dot grid</option><option value="squares">Square grid</option><option value="clean">Clean</option></select></div>
-          <div className="toolbar-group zoom-control"><button onClick={() => patch("canvas", { zoom: Math.max(25, canvas.zoom - 10) })}>−</button><span>{canvas.zoom}%</span><button onClick={() => patch("canvas", { zoom: Math.min(160, canvas.zoom + 10) })}>+</button></div>
+          <div className="toolbar-group zoom-control"><button title="Zoom out" aria-label="Zoom out" onClick={() => manualZoom(canvas.zoom - 10)}>−</button><span>{canvas.zoom}%</span><button title="Zoom in" aria-label="Zoom in" onClick={() => manualZoom(canvas.zoom + 10)}>+</button><button title="Fit canvas to view" aria-label="Fit canvas to view" className={fitToView ? "zoom-fit active" : "zoom-fit"} onClick={fitCanvas}>Fit</button></div>
         </div>
-        <div className="canvas-viewport" style={gridStyle}>
+        <div className="canvas-viewport" ref={viewportRef} style={gridStyle}>
           <div className="stage-outer" style={{ width: stageSize.width * canvas.zoom / 100, height: stageSize.height * canvas.zoom / 100 }}>
             <div className="game-stage" style={stageStyle}>
               {project.layers.map(l => <GameLayer key={l.id} layer={l} selected={selection === l.id} preview={preview} device={device} spinIteration={spinIteration} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>)}
@@ -364,7 +402,7 @@ function App() {
       <button className="secondary-button" onClick={() => downloadBlob(new Blob([JSON.stringify(project.economy, null, 2)], { type: "application/json" }), "softtech-economy-draft.json")}><Download size={15}/> Export draft configuration</button>
     </div>}
     {tab === "brand" && <BrandPage brand={project.brand} updateBrand={(key, v) => patch("brand", { [key]: v })}/>}
-    <footer className="app-status"><span><span className="status-dot"/> Studio V1 · isolated branch</span><span>{tab === "visual" ? device + " canvas · " + canvas.zoom + "% zoom" : names[tab]} </span><span>Local autosave only · Not deployed</span></footer>
+    <footer className="app-status"><span><span className="status-dot"/> Studio V1 · isolated branch</span><span>{tab === "visual" ? device + " canvas · " + canvas.zoom + "% zoom" : names[tab]} </span><span>Browser-local draft · {window.location.hostname.endsWith(".up.railway.app") ? "Railway staging" : "Local preview"}</span></footer>
   </div>;
 }
 export default App;
