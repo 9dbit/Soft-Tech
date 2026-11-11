@@ -215,3 +215,23 @@ input, textarea, select { accent-color: #0d99ff; }
 .layout-presets button.chosen { border-color: #a782ff; background: #514078; color: #fff; }
 .layout-presets button:focus-visible { outline: 2px solid #b494ff; outline-offset: 2px; }
 .layout-presets span { flex-basis: 100%; font-size: 11px; line-height: 1.5; color: #aaa; }
+
+/* Factory import UX: independent vector assets, no flattening into one background. */
+.factory-import-button {display:inline-flex;align-items:center;gap:7px;padding:8px 10px;border-radius:7px;border:1px solid #755d9f;background:#31233e;color:#eee1ff;font-weight:700;font-size:11px;white-space:nowrap}
+.factory-import-button:hover {background:#48305d}
+.factory-import-message {background:#2c2639;border-bottom:1px solid #604d7c;color:#dcc9f7;font-size:11px;padding:8px 18px;display:flex;justify-content:space-between;gap:14px;align-items:center}
+.factory-import-message button {border:0;background:transparent;color:#fff;font-size:17px}
+.factory-assets {padding:12px;border-bottom:1px solid #424050;background:#292533}
+.factory-assets>b {font-size:10px;letter-spacing:.07em;color:#d9bffc}
+.factory-assets p {font-size:10px;line-height:1.5;color:#b4a9c5}
+.factory-symbols {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:12px 0}
+.factory-symbol-card {border:1px solid #4d4661;border-radius:7px;cursor:pointer;display:flex;flex-direction:column;gap:4px;align-items:center;padding:7px 3px;background:#211d2b;min-width:0}
+.factory-symbol-card img {height:45px;max-width:100%;aspect-ratio:1;object-fit:contain}
+.factory-symbol-card span {font-size:9px;font-weight:700;color:#e2d2fa;max-width:100%;overflow:hidden}
+.factory-symbol-card:hover {border-color:#a88bd7;background:#3b2d48}
+.factory-reel-symbol {max-width:95%;width:auto;height:85%;aspect-ratio:1;object-fit:contain;display:block;pointer-events:none}
+.factory-import-banner {display:flex;flex-direction:column;gap:7px;background:#342543;border:1px solid #825cab;padding:16px;border-radius:10px;margin-bottom:15px}
+.factory-import-banner b {font-size:15px;color:#f5deff}
+.factory-import-banner span {font-size:10px;color:#e1b6ff;letter-spacing:.04em}
+.factory-import-banner p {font-size:11px;color:#d4c5e2;line-height:1.6;margin:0}
+@media(max-width:600px){.factory-import-button {padding:6px 7px;font-size:10px}.factory-import-button svg{display:none}}
