@@ -75,7 +75,7 @@ async function sampleZip({ tampered = false } = {}) {
     const bytes = png128(id==="background",index);
     const path="assets/"+id+".png";
     zip.file(path,bytes);
-    items.push({id,role:id==="background"?"background":"symbol",expectedAlpha:id!=="background",
+    items.push({id,role:id==="background"?"background":id==="hero-dragon"?"layer":"symbol",expectedAlpha:id!=="background",
       path,sha256:tampered && id==="A" ? "f".repeat(64):sha(bytes),
       dimensions:[128,128],sizeBytes:bytes.length});
   }
