@@ -51,6 +51,8 @@ export function validateRasterManifest(manifest, gameId) {
     throw new Error("Visual pack is missing one of six independent symbols");
   if (manifest.assets.filter(x => x.role === "symbol").length !== 6)
     throw new Error("Exactly six primary symbol bindings required for this V1 pilot");
+  if (!manifest.assets.some(x => x.role === "background"))
+    throw new Error("Art ZIP requires a separate clean scene background");
   return manifest;
 }
 
