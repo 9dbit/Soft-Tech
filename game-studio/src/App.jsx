@@ -452,8 +452,10 @@ function App() {
         <Button title="Undo" disabled={!undoStack.current.length} onClick={undo}><Undo2 size={17}/></Button>
         <Button title="Redo" disabled={!redoStack.current.length} onClick={redo}><Redo2 size={17}/></Button>
         <input ref={factoryPicker} type="file" accept=".json,application/json" hidden aria-label="Factory project JSON" onChange={e => { importFactoryProject(e.target.files?.[0]); e.target.value = ""; }}/>
+        <input ref={rasterPicker} type="file" accept=".zip,application/zip" hidden aria-label="Game Factory raster artwork ZIP" onChange={e => { importRasterArt(e.target.files?.[0]); e.target.value = ""; }}/>
         {hasFactoryBackup && <button className="factory-restore-button" title="Restore the most recent Studio draft backup" onClick={restoreFactoryBackup}><RotateCcw size={14}/> Restore Draft</button>}
         <button className="factory-import-button" onClick={() => factoryPicker.current?.click()} title="Import a versioned, demo-only Game Factory project"><Upload size={14}/> Import Game Factory</button>
+        <button className="factory-import-button raster-import" onClick={() => rasterPicker.current?.click()} title="Import an art ZIP with PNG/WebP alpha assets"><ImageIcon size={14}/> Import Art ZIP</button>
         <Button title="Export project JSON" onClick={exportProject}><Save size={17}/></Button>
         <button className={"preview-toggle " + (preview ? "playing" : "")} onClick={() => setPreview(v => !v)}>{preview ? <Square size={14}/> : <Play size={14}/>} {preview ? "Edit" : "Preview"}</button>
       </div>
@@ -461,7 +463,7 @@ function App() {
     {factoryMessage && <div role="status" className="factory-import-message">{factoryMessage}<button title="Dismiss import notice" onClick={() => setFactoryMessage("")}>×</button></div>}
     <nav className="workspace-tabs" aria-label="Studio sections">
       {[["visual", Layers3], ["audio", Music2], ["economy", ChartNoAxesCombined], ["brand", Share2]].map(([id, Icon]) => <button key={id} className={tab === id ? "selected" : ""} onClick={() => setTab(id)}><Icon size={16}/>{names[id]}</button>)}
-      <div className="workspace-tabs-note">V1 SANDBOX · NO LIVE GAME</div>
+      <div className="workspace-tabs-note">V1 ART CANDIDATE · NO LIVE GAME</div>
     </nav>
     {tab === "visual" && <div className="editor-grid">
       <aside className="editor-panel left-panel">
@@ -499,6 +501,18 @@ function App() {
             </label>)}</div>
             <p>Each symbol is an independently replaceable SVG. Math stays locked to the versioned manifest.</p>
           </section>}
+          {project.raster?.refs && <section className="factory-assets raster-library"><b>INDEPENDENT RASTER ART · NOT APPROVED</b>
+            <p>{project.factory?.gameId} · {Object.keys(project.raster.refs).length} PNG/WebP assets · production BLOCKED</p>
+            <div className="factory-symbols raster-thumbnails">{Object.keys(project.raster.refs).map(id => <div className="raster-card" key={id}>
+              {rasterUrls[id] ? <img src={rasterUrls[id]} alt={"Raster art " + id} draggable={false}/> : <span>Loading</span>}
+              <small title={id}>{id}</small>
+              <div className="raster-card-actions">
+                <button type="button" title={"Add " + id + " to canvas"} aria-label={"Add layer " + id} onClick={() => addRasterLayer(id)}>Add</button>
+                <label title={"Replace " + id + " only"}>Replace<input type="file" accept=".webp,.png,image/webp,image/png" hidden aria-label={"Replace raster " + id} onChange={e => { replaceRaster(id, e.target.files?.[0]); e.target.value = ""; }}/></label>
+              </div>
+            </div>)}</div>
+            <p>Art is stored locally in IndexedDB. Replace components individually; the imported design and original math remain separate.</p>
+          </section>}
           <div className="asset-actions"><button onClick={() => addLayer("text")}><FileCode2 size={17}/> Text</button><button onClick={() => addLayer("button")}><Plus size={17}/> Button</button><button onClick={() => imagePicker.current?.click()}><Upload size={17}/> Image</button></div>
           <input ref={imagePicker} hidden type="file" accept="image/*" onChange={e => { importImage(e.target.files?.[0]); e.target.value = ""; }}/>
           <div className="asset-placeholder"><Folder size={27} /><b>Local asset collection</b><span>Import a PNG, SVG, JPG or WebP. A server asset library will come in a later phase.</span></div>
@@ -515,7 +529,7 @@ function App() {
         <div className="canvas-viewport" ref={viewportRef} style={gridStyle}>
           <div className="stage-outer" style={{ width: stageSize.width * canvas.zoom / 100, height: stageSize.height * canvas.zoom / 100 }}>
             <div className="game-stage" style={stageStyle}>
-              {project.layers.map(l => <GameLayer key={l.id} layer={l} selected={selection === l.id} preview={preview} device={device} spinIteration={spinIteration} layout={layout} factory={project.factory} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>)}
+              {project.layers.map(l => <GameLayer key={l.id} layer={l} selected={selection === l.id} preview={preview} device={device} spinIteration={spinIteration} layout={layout} factory={project.factory} rasterUrls={rasterUrls} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>)}
               {preview && <button title="Demonstrate reel visuals only. Not a real spin." className="preview-spin-overlay" style={{ left: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).x, top: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).y, width: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).width, height: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).height }} onClick={() => setSpinIteration(n => n + 1)} /> }
             </div>
           </div>
