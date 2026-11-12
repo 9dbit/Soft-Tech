@@ -9,6 +9,8 @@ import {
 import { DEFAULT_BRAND, previewBrand, generateBrandZip, buildMetaTags, validateBrand } from "./brandAssets.js";
 import { clampDraftLayout, SLOT_LIMITS } from "./slot/slotCore.js";
 import { validateFactoryImport } from "./factoryImport.js";
+import { importRasterPack, loadRasterUrls, revokeRasterUrls, replaceRasterAsset } from "./rasterAssets.js";
+import JSZip from "jszip";
 
 const STORAGE_KEY = "softtech-universal-game-studio-v1";
 const INITIAL = {
@@ -68,7 +70,7 @@ function getRect(layer, device) {
   if (layer.mobile) return layer.mobile;
   return { x: Math.round(layer.x * .40625), y: Math.round(layer.y * 1.56), width: Math.round(layer.width * .40625), height: Math.round(layer.height * 1.56) };
 }
-function GameLayer({ layer, selected, preview, device, spinIteration, layout, factory, onSelect, onPointerDown, onPointerMove, onPointerUp }) {
+function GameLayer({ layer, selected, preview, device, spinIteration, layout, factory, rasterUrls, onSelect, onPointerDown, onPointerMove, onPointerUp }) {
   const rect = getRect(layer, device);
   if (!layer.visible) return null;
   const style = {
@@ -81,7 +83,9 @@ function GameLayer({ layer, selected, preview, device, spinIteration, layout, fa
   };
   let view;
   if (layer.type === "background") {
-    view = <div style={{ width: "100%", height: "100%", background: "radial-gradient(ellipse at 68% 42%, " + rgba("#925aff", .3) + ", transparent 55%)," + layer.fill }} />;
+    view = rasterUrls?.background ?
+      <img alt="Separate scene background" draggable={false} className="stage-image" src={rasterUrls.background} style={{objectFit:"cover"}} /> :
+      <div style={{ width: "100%", height: "100%", background: "radial-gradient(ellipse at 68% 42%, " + rgba("#925aff", .3) + ", transparent 55%)," + layer.fill }} />;
   } else if (layer.type === "reels") {
     view = <div className="reel-wrap" data-reels={layout.reels} data-rows={layout.rows} style={{
       background: layer.fill,
@@ -96,8 +100,8 @@ function GameLayer({ layer, selected, preview, device, spinIteration, layout, fa
         const strip = factory?.configuration?.reelStrips?.[reel];
         const symbolId = strip?.[(row + reel * 3 + spinIteration) % strip.length];
         return <div key={i} className="reel-cell" style={{ fontSize: Math.max(15, Math.min(42, Math.floor(42 * Math.min(5 / layout.reels, 3 / layout.rows)))) }}>
-          {factory?.symbolAssets?.[symbolId] ?
-            <img alt={symbolId} draggable={false} className="factory-reel-symbol" src={factory.symbolAssets[symbolId]}/> :
+          {(rasterUrls?.[symbolId] || factory?.symbolAssets?.[symbolId]) ?
+            <img alt={symbolId} draggable={false} className="factory-reel-symbol" src={rasterUrls?.[symbolId] || factory.symbolAssets[symbolId]}/> :
             reelSymbols[(i * 7 + (spinIteration ? (spinIteration + i * 3) : 0)) % reelSymbols.length]}
         </div>;
       })}
@@ -105,7 +109,7 @@ function GameLayer({ layer, selected, preview, device, spinIteration, layout, fa
   } else if (layer.type === "button") {
     view = <div className="game-button" style={{ background: layer.fill }}>{layer.text || "BUTTON"}</div>;
   } else if (layer.type === "image") {
-    view = <img alt={layer.name} draggable={false} className="stage-image" src={layer.src} />;
+    view = <img alt={layer.name} draggable={false} className="stage-image" src={layer.rasterAssetId ? rasterUrls?.[layer.rasterAssetId] : layer.src} />;
   } else {
     view = <div className={"game-text " + (layer.id === "heading" ? "game-heading" : "")} style={{ color: layer.fill }}>{layer.text || layer.name}</div>;
   }
@@ -166,6 +170,7 @@ function App() {
   const [preview, setPreview] = useState(false);
   const [spinIteration, setSpinIteration] = useState(0);
   const [assetInfo, setAssetInfo] = useState("");
+  const [rasterUrls, setRasterUrls] = useState({});
   const [factoryMessage, setFactoryMessage] = useState("");
   const [hasFactoryBackup, setHasFactoryBackup] = useState(() =>
     Object.keys(localStorage).some(key => key.startsWith(STORAGE_KEY + ":backup:"))
@@ -179,9 +184,24 @@ function App() {
   const drag = useRef(null);
   const imagePicker = useRef(null);
   const factoryPicker = useRef(null);
+  const rasterPicker = useRef(null);
   const audioRefs = useRef({});
   const viewportRef = useRef(null);
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(project)); } catch { /* local draft may exceed storage limit */ } }, [project]);
+  useEffect(() => {
+    let cancelled = false;
+    let ownedUrls = {};
+    const refs = project.raster?.refs;
+    const gameId = project.factory?.gameId;
+    if (refs && gameId) loadRasterUrls(refs, gameId).then(urls => {
+      if (cancelled) revokeRasterUrls(urls);
+      else { ownedUrls = urls; setRasterUrls(urls); }
+    }).catch(error => {
+      if (!cancelled) setAssetInfo("Raster assets unavailable: " + error.message);
+    });
+    else setRasterUrls({});
+    return () => { cancelled = true; revokeRasterUrls(ownedUrls); };
+  }, [project.raster?.refs, project.factory?.gameId]);
   const commit = (makeNext) => setProject(prev => {
     const next = typeof makeNext === "function" ? makeNext(prev) : makeNext;
     if (JSON.stringify(next) === JSON.stringify(prev)) return prev;
