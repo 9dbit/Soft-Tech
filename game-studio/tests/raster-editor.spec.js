@@ -71,7 +71,7 @@ function project() {
 async function sampleZip({ tampered = false } = {}) {
   const zip = new JSZip();
   const items = [];
-  for (const [index,id] of [...symbolNames,"background"].entries()) {
+  for (const [index,id] of [...symbolNames,"background","hero-dragon"].entries()) {
     const bytes = png128(id==="background",index);
     const path="assets/"+id+".png";
     zip.file(path,bytes);
@@ -97,16 +97,16 @@ test("Studio imports PNG/WebP candidate ZIP with real alpha and independently st
   });
   await expect(page.getByText(/Original WebP\/PNG candidate assets imported/)).toBeVisible({timeout:30000});
   await page.getByRole("button",{name:"Assets"}).click();
-  await expect(page.locator(".raster-card")).toHaveCount(7);
+  await expect(page.locator(".raster-card")).toHaveCount(8);
   await expect(page.getByRole("img",{name:"Raster art WILD"})).toBeVisible();
   await page.getByRole("button",{name:"Visual Editor"}).click();
   await expect(page.locator(".reel-wrap")).toHaveAttribute("data-reels","6");
   await expect(page.locator(".reel-cell img.factory-reel-symbol")).toHaveCount(30);
   await expect(page.locator(".reel-cell img.factory-reel-symbol").first()).toHaveAttribute("src",/^blob:/);
   await page.getByRole("button",{name:"Assets"}).click();
-  await page.getByRole("button",{name:"Add layer background"}).click();
-  await expect(page.locator(".layer-row").filter({hasText:"Art: background"})).toHaveCount(1);
-  await expect(page.getByRole("img",{name:"Art: background"})).toBeVisible();
+  await page.getByRole("button",{name:"Add layer hero-dragon"}).click();
+  await expect(page.locator(".layer-row").filter({hasText:"Art: hero-dragon"})).toHaveCount(1);
+  await expect(page.getByRole("img",{name:"Art: hero-dragon"})).toBeVisible();
   await page.reload();
   await expect(page.locator(".reel-cell img.factory-reel-symbol").first()).toHaveAttribute("src",/^blob:/,{timeout:15000});
   await page.getByRole("button",{name:"Economy Lab"}).click();
