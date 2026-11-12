@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "softtech.math-audit-report.v1",
+  "gameId": "softtech-slot-pilot-001",
+  "gameVersion": "0.1.0",
+  "reportStatus": "NOT_RUN",
+  "evidenceType": "NOT_RUN",
+  "scope": "complete-paid-round-including-all-bonuses",
+  "environment": "isolated-sandbox",
+  "generatedAt": null,
+  "gitCommitSha": null,
+  "engineSha256": null,
+  "configSha256": null,
+  "runnerSha256": null,
+  "seedDomains": [],
+  "paidRoundSamples": null,
+  "screensIncludingFreeSpins": null,
+  "metrics": {
+    "completePaidRoundRtpPercent": null,
+    "confidenceInterval95Percent": null,
+    "volatilityStandardDeviationX": null,
+    "hitFrequencyPercent": null,
+    "profitFrequencyPercent": null,
+    "bonusEntryFrequencyPercent": null,
+    "freeSpinsPlayed": null,
+    "maxObservedPaidRoundWinX": null,
+    "payoutCapHits": null,
+    "tailShareTop1Percent": null,
+    "baseReturnPercent": null,
+    "bonusReturnPercent": null
+  },
+  "evidence": {
+    "reproducibleSeedReceipts": [],
+    "transcriptDigestSha256": null,
+    "referenceEvaluatorAgreement": null,
+    "invalidConfigurationsRejected": null,
+    "testedGridLayouts": [],
+    "physicalDeviceAcceptance": null,
+    "reviewerIdentity": null
+  },
+  "gates": {
+    "completeRoundEngine": "BLOCKED",
+    "independentMathValidation": "BLOCKED",
+    "rngReview": "BLOCKED",
+    "walletIdempotencyAndIsolation": "BLOCKED",
+    "concurrentSessions500": "BLOCKED",
+    "concurrentSessions1000": "BLOCKED",
+    "crashRecovery": "BLOCKED",
+    "browserPwaAndAccessibility": "BLOCKED",
+    "securityIpAndComplianceReview": "BLOCKED",
+    "independentHumanApproval": "BLOCKED"
+  },
+  "releaseDecision": "BLOCKED",
+  "certificationStatus": "NOT_CERTIFIED",
+  "notes": [
+    "No complete paid-round simulation has been run or independently approved.",
+    "Base-only/preview result must never populate completePaidRoundRtpPercent.",
+    "This template records missing evidence explicitly instead of inventing pass metrics."
+  ]
+}

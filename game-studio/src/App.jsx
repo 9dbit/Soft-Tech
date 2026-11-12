@@ -7,6 +7,10 @@ import {
   FileCode2, ChevronDown, Info, Volume2, VolumeX, Folder,
 } from "lucide-react";
 import { DEFAULT_BRAND, previewBrand, generateBrandZip, buildMetaTags, validateBrand } from "./brandAssets.js";
+import { clampDraftLayout, SLOT_LIMITS } from "./slot/slotCore.js";
+import { validateFactoryImport } from "./factoryImport.js";
+import { importRasterPack, loadRasterUrls, revokeRasterUrls, replaceRasterAsset } from "./rasterAssets.js";
+import JSZip from "jszip";
 
 const STORAGE_KEY = "softtech-universal-game-studio-v1";
 const INITIAL = {
@@ -36,6 +40,7 @@ const safeLoad = () => {
     if (!raw) return structuredClone(INITIAL);
     const p = JSON.parse(raw);
     if (!p || !Array.isArray(p.layers) || !p.canvas || !p.audio || !p.economy || !p.brand) throw Error("invalid");
+    p.economy = { ...p.economy, ...clampDraftLayout(p.economy) };
     return p;
   } catch { return structuredClone(INITIAL); }
 };
@@ -54,8 +59,8 @@ const downloadBlob = (blob, filename) => {
 function Button({ children, onClick, active = false, title, disabled = false, className = "" }) {
   return <button type="button" title={title} className={"tool-button " + (active ? "active " : "") + className} onClick={onClick} disabled={disabled}>{children}</button>;
 }
-function Field({ label, value, onChange, type = "text", min, max, step = 1, placeholder }) {
-  return <label className="field"><span>{label}</span><input type={type} value={value ?? ""} min={min} max={max} step={step} placeholder={placeholder} onChange={e => onChange(type === "number" || type === "range" ? int(e.target.value) : e.target.value)} /></label>;
+function Field({ label, value, onChange, type = "text", min, max, step = 1, placeholder, disabled = false }) {
+  return <label className="field"><span>{label}</span><input type={type} value={value ?? ""} min={min} max={max} step={step} placeholder={placeholder} disabled={disabled} onChange={e => onChange(type === "number" || type === "range" ? int(e.target.value) : e.target.value)} /></label>;
 }
 function GroupTitle({ children, accessory }) {
   return <div className="group-title"><b>{children}</b>{accessory}</div>;
@@ -65,7 +70,7 @@ function getRect(layer, device) {
   if (layer.mobile) return layer.mobile;
   return { x: Math.round(layer.x * .40625), y: Math.round(layer.y * 1.56), width: Math.round(layer.width * .40625), height: Math.round(layer.height * 1.56) };
 }
-function GameLayer({ layer, selected, preview, device, spinIteration, onSelect, onPointerDown, onPointerMove, onPointerUp }) {
+function GameLayer({ layer, selected, preview, device, spinIteration, layout, factory, rasterUrls, onSelect, onPointerDown, onPointerMove, onPointerUp }) {
   const rect = getRect(layer, device);
   if (!layer.visible) return null;
   const style = {
@@ -78,15 +83,33 @@ function GameLayer({ layer, selected, preview, device, spinIteration, onSelect, 
   };
   let view;
   if (layer.type === "background") {
-    view = <div style={{ width: "100%", height: "100%", background: "radial-gradient(ellipse at 68% 42%, " + rgba("#925aff", .3) + ", transparent 55%)," + layer.fill }} />;
+    view = rasterUrls?.background ?
+      <img alt="Separate scene background" draggable={false} className="stage-image" src={rasterUrls.background} style={{objectFit:"cover"}} /> :
+      <div style={{ width: "100%", height: "100%", background: "radial-gradient(ellipse at 68% 42%, " + rgba("#925aff", .3) + ", transparent 55%)," + layer.fill }} />;
   } else if (layer.type === "reels") {
-    view = <div className="reel-wrap" style={{ background: layer.fill }}>
-      {Array.from({ length: 15 }, (_, i) => <div key={i} className="reel-cell">{reelSymbols[(i * 7 + (spinIteration ? (spinIteration + i * 3) : 0)) % reelSymbols.length]}</div>)}
+    view = <div className="reel-wrap" data-reels={layout.reels} data-rows={layout.rows} style={{
+      background: layer.fill,
+      gridTemplateColumns: "repeat(" + layout.reels + ", minmax(0,1fr))",
+      gridTemplateRows: "repeat(" + layout.rows + ", minmax(0,1fr))",
+      padding: layout.reels >= 7 || layout.rows >= 6 ? 5 : 11,
+      gap: layout.reels >= 7 || layout.rows >= 6 ? 3 : 6,
+    }}>
+      {Array.from({ length: layout.reels * layout.rows }, (_, i) => {
+        const reel = i % layout.reels;
+        const row = Math.floor(i / layout.reels);
+        const strip = factory?.configuration?.reelStrips?.[reel];
+        const symbolId = strip?.[(row + reel * 3 + spinIteration) % strip.length];
+        return <div key={i} className="reel-cell" style={{ fontSize: Math.max(15, Math.min(42, Math.floor(42 * Math.min(5 / layout.reels, 3 / layout.rows)))) }}>
+          {(rasterUrls?.[symbolId] || factory?.symbolAssets?.[symbolId]) ?
+            <img alt={symbolId} draggable={false} className="factory-reel-symbol" src={rasterUrls?.[symbolId] || factory.symbolAssets[symbolId]}/> :
+            reelSymbols[(i * 7 + (spinIteration ? (spinIteration + i * 3) : 0)) % reelSymbols.length]}
+        </div>;
+      })}
     </div>;
   } else if (layer.type === "button") {
     view = <div className="game-button" style={{ background: layer.fill }}>{layer.text || "BUTTON"}</div>;
   } else if (layer.type === "image") {
-    view = <img alt={layer.name} draggable={false} className="stage-image" src={layer.src} />;
+    view = <img alt={layer.name} draggable={false} className="stage-image" src={layer.rasterAssetId ? rasterUrls?.[layer.rasterAssetId] : layer.src} />;
   } else {
     view = <div className={"game-text " + (layer.id === "heading" ? "game-heading" : "")} style={{ color: layer.fill }}>{layer.text || layer.name}</div>;
   }
@@ -147,6 +170,11 @@ function App() {
   const [preview, setPreview] = useState(false);
   const [spinIteration, setSpinIteration] = useState(0);
   const [assetInfo, setAssetInfo] = useState("");
+  const [rasterUrls, setRasterUrls] = useState({});
+  const [factoryMessage, setFactoryMessage] = useState("");
+  const [hasFactoryBackup, setHasFactoryBackup] = useState(() =>
+    Object.keys(localStorage).some(key => key.startsWith(STORAGE_KEY + ":backup:"))
+  );
   const [audioFiles, setAudioFiles] = useState({});
   const [timelineOpen, setTimelineOpen] = useState(true);
   const [fitToView, setFitToView] = useState(true);
@@ -155,9 +183,25 @@ function App() {
   const redoStack = useRef([]);
   const drag = useRef(null);
   const imagePicker = useRef(null);
+  const factoryPicker = useRef(null);
+  const rasterPicker = useRef(null);
   const audioRefs = useRef({});
   const viewportRef = useRef(null);
   useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(project)); } catch { /* local draft may exceed storage limit */ } }, [project]);
+  useEffect(() => {
+    let cancelled = false;
+    let ownedUrls = {};
+    const refs = project.raster?.refs;
+    const gameId = project.factory?.gameId;
+    if (refs && gameId) loadRasterUrls(refs, gameId).then(urls => {
+      if (cancelled) revokeRasterUrls(urls);
+      else { ownedUrls = urls; setRasterUrls(urls); }
+    }).catch(error => {
+      if (!cancelled) setAssetInfo("Raster assets unavailable: " + error.message);
+    });
+    else setRasterUrls({});
+    return () => { cancelled = true; revokeRasterUrls(ownedUrls); };
+  }, [project.raster?.refs, project.factory?.gameId]);
   const commit = (makeNext) => setProject(prev => {
     const next = typeof makeNext === "function" ? makeNext(prev) : makeNext;
     if (JSON.stringify(next) === JSON.stringify(prev)) return prev;
@@ -191,8 +235,108 @@ function App() {
   const patch = (section, changes) => commit(prev => ({ ...prev, [section]: { ...prev[section], ...changes } }));
   const patchLayer = (id, changes) => commit(prev => ({ ...prev, layers: prev.layers.map(l => l.id === id ? { ...l, ...changes } : l) }));
   const patchAudio = (id, changes) => commit(prev => ({ ...prev, audio: prev.audio.map(t => t.id === id ? { ...t, ...changes } : t) }));
+  const importFactoryProject = async file => {
+    if (!file) return;
+    try {
+      if (file.size > 1024 * 1024) throw new Error("Factory project JSON must be smaller than 1 MB");
+      const incoming = validateFactoryImport(await file.text());
+      if (!window.confirm("Import " + incoming.name + "? Existing local draft will be backed up and replaced. Undo is available.")) return;
+      // Save the prior draft locally before replacement, without mutating other games.
+      const backupKey = STORAGE_KEY + ":backup:" + Date.now();
+      localStorage.setItem(backupKey, JSON.stringify(project));
+      const backups = Object.keys(localStorage).filter(key => key.startsWith(STORAGE_KEY + ":backup:")).sort();
+      for (const key of backups.slice(0, -3)) localStorage.removeItem(key);
+      setHasFactoryBackup(true);
+      commit(incoming);
+      setSelection("reels");
+      setPreview(false);
+      setSpinIteration(0);
+      setTab("visual");
+      setSidebar("layers");
+      setFactoryMessage("Imported " + incoming.name + " as an editable demo draft. Mathematical release remains BLOCKED.");
+    } catch (error) { setFactoryMessage("Import rejected: " + error.message); }
+  };
+  const importRasterArt = async file => {
+    if (!file) return;
+    try {
+      if (file.size > 20 * 1024 * 1024) throw new Error("Art ZIP exceeds 20 MB");
+      const zip = await JSZip.loadAsync(await file.arrayBuffer());
+      const projectEntry = zip.file("studio.project.json");
+      if (!projectEntry) throw new Error("Art ZIP needs a studio.project.json source");
+      const draftJson = await projectEntry.async("string");
+      const incoming = validateFactoryImport(draftJson);
+      const isSameGame = project.factory?.gameId === incoming.factory.gameId;
+      if (!window.confirm(isSameGame
+        ? "Import new artwork for " + incoming.name + " and keep the existing Studio layout?"
+        : "Import " + incoming.name + " with independent WebP artwork? Your current draft will be backed up.")) return;
+      const imported = await importRasterPack(file, incoming.factory.gameId);
+      const raster = { packId: imported.packId, refs: imported.refs,
+        visualTier: imported.visualTier, humanApproved: false, productionAllowed: false };
+      if (isSameGame) {
+        commit(previous => ({ ...previous, raster }));
+      } else {
+        const backupKey = STORAGE_KEY + ":backup:" + Date.now();
+        localStorage.setItem(backupKey, JSON.stringify(project));
+        const backups = Object.keys(localStorage).filter(key => key.startsWith(STORAGE_KEY + ":backup:")).sort();
+        for (const key of backups.slice(0, -3)) localStorage.removeItem(key);
+        setHasFactoryBackup(true);
+        commit({ ...incoming, raster });
+      }
+      setSelection("reels");
+      setPreview(false);
+      setTab("visual");
+      setSidebar("assets");
+      setAssetInfo(imported.count + " separate raster assets loaded. Visual approval and production release remain BLOCKED.");
+      setFactoryMessage("Original WebP/PNG candidate assets imported for " + incoming.name + ". Math rules unchanged.");
+    } catch (error) { setFactoryMessage("Raster ZIP rejected: " + error.message); }
+  };
+  const addRasterLayer = assetId => {
+    if (!project.raster?.refs?.[assetId]) return;
+    const presets = {
+      "hero-dragon": { x: 4, y: 30, width: 255, height: 290 },
+      "dragon-head": { x: 35, y: 12, width: 210, height: 180 },
+      "control-banner": { x: 295, y: 448, width: 370, height: 88 },
+      "effect-burst": { x: 370, y: 18, width: 190, height: 130 },
+    };
+    const rect = presets[assetId] || { x: 230, y: 140, width: 215, height: 220 };
+    const id = "art-" + assetId + "-" + Date.now();
+    const mobile = { x: Math.round(rect.x * .40625), y: Math.round(rect.y * 1.35),
+      width: Math.round(rect.width * .40625), height: Math.round(rect.height * 1.35) };
+    commit(previous => ({ ...previous, layers: [...previous.layers,
+      { id, name: "Art: " + assetId, type: "image", rasterAssetId: assetId,
+        ...rect, mobile, opacity: 100, visible: true, locked: false, fill: "#ffffff" }] }));
+    setSelection(id);
+    setSidebar("layers");
+    setAssetInfo("Added " + assetId + " as a separate draggable scene layer.");
+  };
+  const replaceRaster = async (assetId, file) => {
+    if (!file) return;
+    try {
+      const refs = await replaceRasterAsset(project.raster?.refs, project.raster?.packId, assetId, file);
+      commit(prev => ({ ...prev, raster: { ...prev.raster, refs, humanApproved: false,
+        visualTier: "ART_CANDIDATE_UNAPPROVED", productionAllowed: false } }));
+      setAssetInfo("Updated " + assetId + " without changing the math configuration or other asset masters.");
+    } catch (error) { setAssetInfo("Raster replacement blocked: " + error.message); }
+  };
+  const restoreFactoryBackup = () => {
+    const keys = Object.keys(localStorage).filter(key => key.startsWith(STORAGE_KEY + ":backup:")).sort();
+    if (!keys.length) { setHasFactoryBackup(false); return; }
+    if (!window.confirm("Restore the last local Studio draft? Current changes can be undone in this session.")) return;
+    try {
+      const previous = JSON.parse(localStorage.getItem(keys[keys.length - 1]));
+      if (!previous || !Array.isArray(previous.layers) || !previous.canvas || !previous.economy || !previous.brand) throw new Error("Backup is damaged");
+      commit(previous);
+      localStorage.removeItem(keys[keys.length - 1]);
+      setHasFactoryBackup(keys.length > 1);
+      setSelection(previous.layers.find(l => l.type === "reels")?.id || previous.layers[0].id);
+      setPreview(false);
+      setTab("visual");
+      setFactoryMessage("Previous Studio draft restored; no operator or production data changed.");
+    } catch(error) { setFactoryMessage("Restore failed: " + error.message); }
+  };
   const layer = project.layers.find(l => l.id === selection);
   const canvas = project.canvas;
+  const layout = clampDraftLayout(project.economy);
   const device = canvas.device;
   const gridColor = rgba(canvas.background === "#ffffff" || canvas.background === "#f5f5f5" ? "#394151" : "#e2e8f0", canvas.gridOpacity / 100);
   const gridStyle = {
@@ -307,13 +451,19 @@ function App() {
       <div className="top-right"><span className="draft-pill"><Check size={13} />Local draft</span>
         <Button title="Undo" disabled={!undoStack.current.length} onClick={undo}><Undo2 size={17}/></Button>
         <Button title="Redo" disabled={!redoStack.current.length} onClick={redo}><Redo2 size={17}/></Button>
+        <input ref={factoryPicker} type="file" accept=".json,application/json" hidden aria-label="Factory project JSON" onChange={e => { importFactoryProject(e.target.files?.[0]); e.target.value = ""; }}/>
+        <input ref={rasterPicker} type="file" accept=".zip,application/zip" hidden aria-label="Game Factory raster artwork ZIP" onChange={e => { importRasterArt(e.target.files?.[0]); e.target.value = ""; }}/>
+        {hasFactoryBackup && <button className="factory-restore-button" title="Restore the most recent Studio draft backup" onClick={restoreFactoryBackup}><RotateCcw size={14}/> Restore Draft</button>}
+        <button className="factory-import-button" onClick={() => factoryPicker.current?.click()} title="Import a versioned, demo-only Game Factory project"><Upload size={14}/> Import Game Factory</button>
+        <button className="factory-import-button raster-import" onClick={() => rasterPicker.current?.click()} title="Import an art ZIP with PNG/WebP alpha assets"><ImageIcon size={14}/> Import Art ZIP</button>
         <Button title="Export project JSON" onClick={exportProject}><Save size={17}/></Button>
         <button className={"preview-toggle " + (preview ? "playing" : "")} onClick={() => setPreview(v => !v)}>{preview ? <Square size={14}/> : <Play size={14}/>} {preview ? "Edit" : "Preview"}</button>
       </div>
     </header>
+    {factoryMessage && <div role="status" className="factory-import-message">{factoryMessage}<button title="Dismiss import notice" onClick={() => setFactoryMessage("")}>×</button></div>}
     <nav className="workspace-tabs" aria-label="Studio sections">
       {[["visual", Layers3], ["audio", Music2], ["economy", ChartNoAxesCombined], ["brand", Share2]].map(([id, Icon]) => <button key={id} className={tab === id ? "selected" : ""} onClick={() => setTab(id)}><Icon size={16}/>{names[id]}</button>)}
-      <div className="workspace-tabs-note">V1 SANDBOX · NO LIVE GAME</div>
+      <div className="workspace-tabs-note">V1 ART CANDIDATE · NO LIVE GAME</div>
     </nav>
     {tab === "visual" && <div className="editor-grid">
       <aside className="editor-panel left-panel">
@@ -329,6 +479,40 @@ function App() {
           <div className="subtle-label">Every UI element is independent; edit visuals without changing game mathematics.</div>
         </> : <>
           <GroupTitle>ASSET LIBRARY</GroupTitle>
+          {project.factory && <section className="factory-assets"><b>GAME FACTORY SYMBOLS</b>
+            <p>{project.factory.gameId} · source v{project.factory.sourceGameVersion}</p>
+            <div className="factory-symbols">{project.factory.symbolIds.map(symbol => <label key={symbol} className="factory-symbol-card" title={"Replace " + symbol + " (SVG)"}>
+              <img alt={"Factory asset " + symbol} src={project.factory.symbolAssets[symbol]}/>
+              <span>{symbol}</span>
+              <input aria-label={"Replace " + symbol + " symbol SVG"} type="file" accept=".svg,image/svg+xml" hidden onChange={async e => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                try {
+                  if (file.size > 12000) throw new Error("SVG exceeds 12 KB");
+                  const svg = await file.text();
+                  const data = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+                  const fresh = { ...project, factory: { ...project.factory, symbolAssets: { ...project.factory.symbolAssets, [symbol]: data } } };
+                  validateFactoryImport(fresh);
+                  commit(fresh);
+                  setAssetInfo(symbol + " replaced for the visual draft. Source math stays unchanged.");
+                } catch (error) { setAssetInfo("SVG replacement blocked: " + error.message); }
+              }}/>
+            </label>)}</div>
+            <p>Each symbol is an independently replaceable SVG. Math stays locked to the versioned manifest.</p>
+          </section>}
+          {project.raster?.refs && <section className="factory-assets raster-library"><b>INDEPENDENT RASTER ART · NOT APPROVED</b>
+            <p>{project.factory?.gameId} · {Object.keys(project.raster.refs).length} PNG/WebP assets · production BLOCKED</p>
+            <div className="factory-symbols raster-thumbnails">{Object.keys(project.raster.refs).map(id => <div className="raster-card" key={id}>
+              {rasterUrls[id] ? <img src={rasterUrls[id]} alt={"Raster art " + id} draggable={false}/> : <span>Loading</span>}
+              <small title={id}>{id}</small>
+              <div className="raster-card-actions">
+                <button type="button" title={"Add " + id + " to canvas"} aria-label={"Add layer " + id} onClick={() => addRasterLayer(id)}>Add</button>
+                <label title={"Replace " + id + " only"}>Replace<input type="file" accept=".webp,.png,image/webp,image/png" hidden aria-label={"Replace raster " + id} onChange={e => { replaceRaster(id, e.target.files?.[0]); e.target.value = ""; }}/></label>
+              </div>
+            </div>)}</div>
+            <p>Art is stored locally in IndexedDB. Replace components individually; the imported design and original math remain separate.</p>
+          </section>}
           <div className="asset-actions"><button onClick={() => addLayer("text")}><FileCode2 size={17}/> Text</button><button onClick={() => addLayer("button")}><Plus size={17}/> Button</button><button onClick={() => imagePicker.current?.click()}><Upload size={17}/> Image</button></div>
           <input ref={imagePicker} hidden type="file" accept="image/*" onChange={e => { importImage(e.target.files?.[0]); e.target.value = ""; }}/>
           <div className="asset-placeholder"><Folder size={27} /><b>Local asset collection</b><span>Import a PNG, SVG, JPG or WebP. A server asset library will come in a later phase.</span></div>
@@ -345,7 +529,7 @@ function App() {
         <div className="canvas-viewport" ref={viewportRef} style={gridStyle}>
           <div className="stage-outer" style={{ width: stageSize.width * canvas.zoom / 100, height: stageSize.height * canvas.zoom / 100 }}>
             <div className="game-stage" style={stageStyle}>
-              {project.layers.map(l => <GameLayer key={l.id} layer={l} selected={selection === l.id} preview={preview} device={device} spinIteration={spinIteration} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>)}
+              {project.layers.map(l => <GameLayer key={l.id} layer={l} selected={selection === l.id} preview={preview} device={device} spinIteration={spinIteration} layout={layout} factory={project.factory} rasterUrls={rasterUrls} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>)}
               {preview && <button title="Demonstrate reel visuals only. Not a real spin." className="preview-spin-overlay" style={{ left: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).x, top: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).y, width: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).width, height: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).height }} onClick={() => setSpinIteration(n => n + 1)} /> }
             </div>
           </div>
@@ -390,13 +574,22 @@ function App() {
     </div>}
     {tab === "economy" && <div className="simple-workspace economy-workspace">
       <div className="workspace-intro"><div><h2>Economy & Math Lab</h2><p>Keep draft game parameters separate from visuals. These are not certified mathematical outcomes.</p></div><span className="soft-tag danger"><AlertTriangle size={14}/> NOT VERIFIED</span></div>
+      {project.factory && <section className="factory-import-banner"><b>Game Factory: {project.factory.gameId}</b><span>Version {project.factory.sourceGameVersion} · {project.factory.mathBinding} · RELEASE BLOCKED</span><p>Layout/payline math is sourced from the generated manifest and locked here. To change game math, regenerate through Game Factory; visuals and sound remain editable.</p></section>}
       <section className="economy-card soft-panel"><GroupTitle>DRAFT GAME CONFIGURATION</GroupTitle><div className="economy-fields">
         <Field label="Minimum bet" type="number" min={1} value={project.economy.minBet} onChange={v => patch("economy", { minBet: v })}/>
         <Field label="Maximum bet" type="number" min={1} value={project.economy.maxBet} onChange={v => patch("economy", { maxBet: v })}/>
-        <Field label="Reels" type="number" min={1} value={project.economy.reels} onChange={v => patch("economy", { reels: v })}/>
-        <Field label="Rows" type="number" min={1} value={project.economy.rows} onChange={v => patch("economy", { rows: v })}/>
-        <Field label="Paylines" type="number" min={1} value={project.economy.paylines} onChange={v => patch("economy", { paylines: v })}/>
-        <Field label="Target RTP (%)" type="number" min={0} max={100} step={.1} value={project.economy.targetRtp} onChange={v => patch("economy", { targetRtp: v })}/>
+        <Field label="Reels" type="number" disabled={!!project.factory} min={SLOT_LIMITS.minReels} max={SLOT_LIMITS.maxReels} value={layout.reels} onChange={v => patch("economy", { reels: clampDraftLayout({ ...project.economy, reels: v }).reels })}/>
+        <Field label="Rows" type="number" disabled={!!project.factory} min={SLOT_LIMITS.minRows} max={SLOT_LIMITS.maxRows} value={layout.rows} onChange={v => patch("economy", { rows: clampDraftLayout({ ...project.economy, rows: v }).rows })}/>
+        <Field label="Paylines" type="number" disabled={!!project.factory} min={1} value={project.economy.paylines} onChange={v => patch("economy", { paylines: v })}/>
+        <Field label="Target RTP (%) · unverified" type="number" disabled={!!project.factory} min={0} max={100} step={.1} value={project.economy.targetRtp} onChange={v => patch("economy", { targetRtp: v })}/>
+      </div>
+      <div className="layout-presets" aria-label="Slot layout presets">
+        <strong>Slot grid presets</strong>
+        {[[5, 3], [5, 5], [6, 3], [6, 5]].map(([reels, rows]) =>
+          <button type="button" disabled={!!project.factory} key={reels + "x" + rows} className={layout.reels === reels && layout.rows === rows ? "chosen" : ""} onClick={() => patch("economy", { reels, rows })}>
+            {reels} × {rows}
+          </button>)}
+        <span>Custom grid: {layout.reels} reels × {layout.rows} rows. Preview is visual only; math and measured RTP are not yet connected.</span>
       </div></section>
       <section className="economy-notice soft-panel"><AlertTriangle size={24}/><div><strong>Simulation not connected</strong><p>Target RTP is a design target, not measured RTP. No math model, RNG audit, or simulated-spin proof exists in this V1 editor. Production approval is blocked until independent math, security, wallet and performance tests pass.</p></div></section>
       <button className="secondary-button" onClick={() => downloadBlob(new Blob([JSON.stringify(project.economy, null, 2)], { type: "application/json" }), "softtech-economy-draft.json")}><Download size={15}/> Export draft configuration</button>

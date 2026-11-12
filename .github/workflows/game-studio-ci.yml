@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: game-studio-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-studio:
     name: Vite build and asset smoke check
@@ -35,10 +39,18 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Check Studio source contract
         run: node scripts/smoke-check.mjs
+      - name: Verify reusable slot layout and payout invariants
+        run: npm run test:unit
+      - name: Generate reproducible sandbox-only full-round math receipt
+        run: npm run audit:smoke
+      - name: Compare three independent research seed domains
+        run: npm run audit:matrix
       - name: Build isolated Game Studio
         run: npm run build
-      - name: Install Chromium for UI testing
-        run: npx playwright install --with-deps chromium
+      - name: Verify hosted Chrome browser for UI testing
+        run: |
+          command -v google-chrome || command -v google-chrome-stable
+          google-chrome --version || google-chrome-stable --version
       - name: Test editor interactions and ZIP export
         run: npm run test:e2e
       - name: Upload UI screenshots and browser test report

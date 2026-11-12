@@ -107,3 +107,47 @@ test("Studio staging serves its own browser favicon", async ({ request }) => {
   expect(icon.status()).toBe(200);
   expect(await icon.text()).toContain("<svg");
 });
+
+test("Slot size presets edit the real preview, persist across reload, and support custom grids", async ({ page }) => {
+  await page.goto("/");
+  const grid = page.locator(".reel-wrap");
+  await expect(grid).toHaveAttribute("data-reels", "5");
+  await expect(grid).toHaveAttribute("data-rows", "3");
+  await expect(page.locator(".reel-cell")).toHaveCount(15);
+
+  for (const [reels, rows] of [[5, 5], [6, 3], [6, 5], [5, 3]]) {
+    await page.getByRole("button", { name: "Economy Lab" }).click();
+    await page.getByRole("button", { name: reels + " × " + rows, exact: true }).click();
+    await page.getByRole("button", { name: "Visual Editor" }).click();
+    await expect(grid).toHaveAttribute("data-reels", String(reels));
+    await expect(grid).toHaveAttribute("data-rows", String(rows));
+    await expect(page.locator(".reel-cell")).toHaveCount(reels * rows);
+  }
+
+  await page.getByRole("button", { name: "Economy Lab" }).click();
+  await page.getByRole("spinbutton", { name: "Reels" }).fill("7");
+  await page.getByRole("spinbutton", { name: "Rows" }).fill("4");
+  await expect(page.getByText("Custom grid: 7 reels × 4 rows", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Visual Editor" }).click();
+  await expect(page.locator(".reel-cell")).toHaveCount(28);
+  await page.getByTitle("Mobile preview").click();
+  await expect(grid).toHaveAttribute("data-reels", "7");
+  await expect(grid).toHaveAttribute("data-rows", "4");
+  await page.reload();
+  await expect(page.locator(".reel-cell")).toHaveCount(28);
+});
+
+test("Old imported draft cannot produce unbounded slot layouts", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() => {
+    const key = "softtech-universal-game-studio-v1";
+    const draft = JSON.parse(localStorage.getItem(key));
+    draft.economy.reels = 500;
+    draft.economy.rows = -20;
+    localStorage.setItem(key, JSON.stringify(draft));
+  });
+  await page.reload();
+  await expect(page.locator(".reel-wrap")).toHaveAttribute("data-reels", "8");
+  await expect(page.locator(".reel-wrap")).toHaveAttribute("data-rows", "2");
+  await expect(page.locator(".reel-cell")).toHaveCount(16);
+});
