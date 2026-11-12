@@ -29,7 +29,8 @@ test("art candidate manifest carries 6 independent symbol IDs and blocked releas
 
 test("raster intake rejects duplicate/missing symbols, fake opacity and unsafe paths", () => {
   rejects(m => {m.assets[0].id="K"}, /metadata/);
-  rejects(m => {m.assets.pop()}, /six independent symbols/);
+  rejects(m => {m.assets.pop()}, /background/);
+  rejects(m => {m.assets.splice(0,1)}, /six independent symbols/);
   rejects(m => {m.assets[0].expectedAlpha=false}, /missing alpha/);
   rejects(m => {m.assets[6].expectedAlpha=true}, /masquerade/);
   rejects(m => {m.assets[1].path="../../private.png"}, /metadata/);
