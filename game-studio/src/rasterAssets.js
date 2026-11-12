@@ -112,12 +112,15 @@ async function saveBlobs(entries) {
   } finally { db.close(); }
 }
 
-export async function loadRasterUrls(refs) {
+export async function loadRasterUrls(refs, gameId) {
   if (!refs || typeof refs !== "object") return {};
+  if (typeof gameId !== "string" || !/^[a-z0-9][a-z0-9-]{2,63}$/.test(gameId))
+    throw new Error("Missing trusted Game Factory asset namespace");
   const ids = Object.keys(refs);
   if (!ids.length) return {};
-  if (ids.length > 35 || ids.some(id => !ID.test(id) || typeof refs[id] !== "string" || refs[id].length > 220))
-    throw new Error("Unsafe saved raster reference");
+  if (ids.length > 35 || ids.some(id => !ID.test(id) || typeof refs[id] !== "string" ||
+      refs[id].length > 220 || !refs[id].startsWith(gameId + ":")))
+    throw new Error("Unsafe or cross-game raster reference");
   const db = await database();
   try {
     const blobs = await Promise.all(ids.map(id => new Promise((resolve, reject) => {
