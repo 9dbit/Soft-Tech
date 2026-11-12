@@ -10,7 +10,7 @@ const glyphs = {
 };
 export function wordmarkSvg(){
  const rects=[...'XDPLAY'].flatMap((c,i)=>glyphs[c].flatMap((row,y)=>[...row].flatMap((v,x)=>v==='1'?[`<rect x="${(i*6+x)*10+12}" y="${y*10+14}" width="10" height="10"/>`]:[]))).join('');
- return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 374 98" role="img" aria-label="XDPLAY"><title>XDPLAY</title><g fill="#d7ff38">${rects}</g></svg>\n`;
+ return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 374 98" role="img" aria-label="XDPLAY"><title>XDPLAY</title><g fill="#9b2fe4">${rects}</g></svg>\n`;
 }
 function crc32(data){let crc=0xffffffff;for(const byte of data){crc^=byte;for(let j=0;j<8;j++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}return(crc^0xffffffff)>>>0;}
 function chunk(type,data){const name=Buffer.from(type),length=Buffer.alloc(4),crc=Buffer.alloc(4);length.writeUInt32BE(data.length);crc.writeUInt32BE(crc32(Buffer.concat([name,data])));return Buffer.concat([length,name,data,crc]);}
@@ -20,7 +20,7 @@ export function wordmarkPng(width=1200,height=630,text='XDPLAY',transparent=fals
  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
   const gx=Math.floor((x-offsetX)/scale),gy=Math.floor((y-offsetY)/scale),i=Math.floor(gx/6),col=gx%6;
   const lit=gx>=0&&gy>=0&&gy<7&&i<text.length&&col<5&&glyphs[text[i]]?.[gy][col]==='1',p=y*(1+width*4)+1+x*4;
-  scan[p]=lit?215:10;scan[p+1]=lit?255:10;scan[p+2]=lit?56:15;scan[p+3]=lit||!transparent?255:0;
+  scan[p]=lit?195:10;scan[p+1]=lit?105:10;scan[p+2]=lit?255:15;scan[p+3]=lit||!transparent?255:0;
  }
  const ihdr=Buffer.alloc(13);ihdr.writeUInt32BE(width);ihdr.writeUInt32BE(height,4);ihdr[8]=8;ihdr[9]=6;
  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',ihdr),chunk('IDAT',deflateSync(scan)),chunk('IEND',Buffer.alloc(0))]);
