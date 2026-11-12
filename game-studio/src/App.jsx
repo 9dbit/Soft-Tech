@@ -256,6 +256,68 @@ function App() {
       setFactoryMessage("Imported " + incoming.name + " as an editable demo draft. Mathematical release remains BLOCKED.");
     } catch (error) { setFactoryMessage("Import rejected: " + error.message); }
   };
+  const importRasterArt = async file => {
+    if (!file) return;
+    try {
+      if (file.size > 20 * 1024 * 1024) throw new Error("Art ZIP exceeds 20 MB");
+      const zip = await JSZip.loadAsync(await file.arrayBuffer());
+      const projectEntry = zip.file("studio.project.json");
+      if (!projectEntry) throw new Error("Art ZIP needs a studio.project.json source");
+      const draftJson = await projectEntry.async("string");
+      const incoming = validateFactoryImport(draftJson);
+      const isSameGame = project.factory?.gameId === incoming.factory.gameId;
+      if (!window.confirm(isSameGame
+        ? "Import new artwork for " + incoming.name + " and keep the existing Studio layout?"
+        : "Import " + incoming.name + " with independent WebP artwork? Your current draft will be backed up.")) return;
+      const imported = await importRasterPack(file, incoming.factory.gameId);
+      const raster = { packId: imported.packId, refs: imported.refs,
+        visualTier: imported.visualTier, humanApproved: false, productionAllowed: false };
+      if (isSameGame) {
+        commit(previous => ({ ...previous, raster }));
+      } else {
+        const backupKey = STORAGE_KEY + ":backup:" + Date.now();
+        localStorage.setItem(backupKey, JSON.stringify(project));
+        const backups = Object.keys(localStorage).filter(key => key.startsWith(STORAGE_KEY + ":backup:")).sort();
+        for (const key of backups.slice(0, -3)) localStorage.removeItem(key);
+        setHasFactoryBackup(true);
+        commit({ ...incoming, raster });
+      }
+      setSelection("reels");
+      setPreview(false);
+      setTab("visual");
+      setSidebar("assets");
+      setAssetInfo(imported.count + " separate raster assets loaded. Visual approval and production release remain BLOCKED.");
+      setFactoryMessage("Original WebP/PNG candidate assets imported for " + incoming.name + ". Math rules unchanged.");
+    } catch (error) { setFactoryMessage("Raster ZIP rejected: " + error.message); }
+  };
+  const addRasterLayer = assetId => {
+    if (!project.raster?.refs?.[assetId]) return;
+    const presets = {
+      "hero-dragon": { x: 4, y: 30, width: 255, height: 290 },
+      "dragon-head": { x: 35, y: 12, width: 210, height: 180 },
+      "control-banner": { x: 295, y: 448, width: 370, height: 88 },
+      "effect-burst": { x: 370, y: 18, width: 190, height: 130 },
+    };
+    const rect = presets[assetId] || { x: 230, y: 140, width: 215, height: 220 };
+    const id = "art-" + assetId + "-" + Date.now();
+    const mobile = { x: Math.round(rect.x * .40625), y: Math.round(rect.y * 1.35),
+      width: Math.round(rect.width * .40625), height: Math.round(rect.height * 1.35) };
+    commit(previous => ({ ...previous, layers: [...previous.layers,
+      { id, name: "Art: " + assetId, type: "image", rasterAssetId: assetId,
+        ...rect, mobile, opacity: 100, visible: true, locked: false, fill: "#ffffff" }] }));
+    setSelection(id);
+    setSidebar("layers");
+    setAssetInfo("Added " + assetId + " as a separate draggable scene layer.");
+  };
+  const replaceRaster = async (assetId, file) => {
+    if (!file) return;
+    try {
+      const refs = await replaceRasterAsset(project.raster?.refs, project.raster?.packId, assetId, file);
+      commit(prev => ({ ...prev, raster: { ...prev.raster, refs, humanApproved: false,
+        visualTier: "ART_CANDIDATE_UNAPPROVED", productionAllowed: false } }));
+      setAssetInfo("Updated " + assetId + " without changing the math configuration or other asset masters.");
+    } catch (error) { setAssetInfo("Raster replacement blocked: " + error.message); }
+  };
   const restoreFactoryBackup = () => {
     const keys = Object.keys(localStorage).filter(key => key.startsWith(STORAGE_KEY + ":backup:")).sort();
     if (!keys.length) { setHasFactoryBackup(false); return; }
