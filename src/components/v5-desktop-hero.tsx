@@ -107,11 +107,11 @@ export default function V5DesktopHero({ navigate, lang }: {
   }, []);
   const t = (english: string, indonesian: string) => language === "EN" ? english : indonesian;
   return (
-    <section className="v5-hero" aria-label="SOFT TECH digital game studio">
+    <section className="v5-hero" aria-label="XDPLAY digital game studio">
       <div className="v5-stage" ref={stageRef} onPointerMove={handlePointer} onPointerLeave={handleLeave}>
         <header className="v5-header">
-          <button className="v5-brand" onClick={() => navigate("/")} aria-label="Soft Tech homepage">
-            <img src="/assets/v5/soft-tech-neon-header.webp" alt="Soft Tech official neon logo" />
+          <button className="v5-brand" onClick={() => navigate("/")} aria-label="XDPLAY homepage">
+            <img src="/assets/xdplay-logo.svg" alt="XDPLAY official neon logo" />
           </button>
           <nav className="v5-navigation" aria-label="Main navigation">
             <button className="v5-current" onClick={() => navigate("/")}>{t("Home","Beranda")}</button>
@@ -138,8 +138,8 @@ export default function V5DesktopHero({ navigate, lang }: {
             "Game kami menghadirkan pengalaman imersif yang menghubungkan pemain dan menciptakan komunitas.")}</p>
         </aside>
 
-        <span className="v5-back-word v5-soft" aria-hidden="true">SOFT</span>
-        <span className="v5-back-word v5-tech" aria-hidden="true">TECH</span>
+        <span className="v5-back-word v5-soft" aria-hidden="true">XD</span>
+        <span className="v5-back-word v5-tech" aria-hidden="true">PLAY</span>
 
         <div className={"v5-art-layer" + (loadedParts === PARTS_TOTAL ? " v5-layers-ready" : "")}
           role="img" aria-label="Orange retro computer, mechanical keyboard, miniature printer and separate floating technological accessories">
@@ -202,7 +202,7 @@ export default function V5DesktopHero({ navigate, lang }: {
             onClick={e => e.stopPropagation()}>
             <button className="v5-dialog-close" aria-label="Close" onClick={() => setShowPartnerNotice(false)}><X size={20}/></button>
             <LockKeyhole size={27}/>
-            <h2>SOFT TECH PARTNER ACCESS</h2>
+            <h2>XDPLAY PARTNER ACCESS</h2>
             <p>Partner accounts are not enabled yet. Contact our studio to discuss distribution or collaboration.</p>
             <button onClick={() => {setShowPartnerNotice(false);navigate("/contact");}}>PARTNER ENQUIRY <Mail size={16}/></button>
           </div>

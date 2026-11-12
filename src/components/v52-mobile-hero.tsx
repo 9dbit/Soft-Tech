@@ -63,10 +63,10 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
 
 
  return <div className="v52-mobile-home">
-   <section ref={sectionRef} className="v52-hero-surface" aria-label="Soft Tech mobile game studio">
+   <section ref={sectionRef} className="v52-hero-surface" aria-label="XDPLAY mobile game studio">
      <header className="v52-header">
-       <button className="v52-logo-button" onClick={()=>navigate("/")} aria-label="Soft Tech homepage">
-         <img src="/assets/v5/soft-tech-header-cropped.png" alt="Soft Tech" width={440} height={232}/>
+       <button className="v52-logo-button" onClick={()=>navigate("/")} aria-label="XDPLAY homepage">
+         <img src="/assets/xdplay-logo.svg" alt="XDPLAY" width={440} height={232}/>
        </button>
        <div className="v52-header-controls">
          <button className="v52-language-button" onClick={toggleLanguage} aria-label={t("Switch language","Ganti bahasa")}><Globe2 size={16}/>{lang}</button>
@@ -85,8 +85,8 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
 
      <div className="v52-art-scene" ref={sceneRef} aria-label="Orange retro computer with keyboard, printer and floating accessories">
        <div className="v52-art-glow" aria-hidden="true"/>
-       <span className="v52-pixel-word v52-soft-word" aria-hidden="true">SOFT</span>
-       <span className="v52-pixel-word v52-tech-word" aria-hidden="true">TECH</span>
+       <span className="v52-pixel-word v52-soft-word" aria-hidden="true">XD</span>
+       <span className="v52-pixel-word v52-tech-word" aria-hidden="true">PLAY</span>
        <div className="v52-model" aria-hidden="true">
          {hasFullAsset&&!ready&&<img src="/assets/v5/orange-computer-cutout.webp" alt="" className="v52-full-art" onError={()=>setHasFullAsset(false)}/>}
          <div className={"v52-layered-art"+(ready?" v52-art-ready":"")}>
@@ -137,7 +137,7 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
    </section>
 
    <section className="v52-studio-summary">
-     <span className="v52-studio-label">[ SOFT TECH / INDEPENDENT STUDIO ]</span>
+     <span className="v52-studio-label">[ XDPLAY / INDEPENDENT STUDIO ]</span>
      <h2>TURN IDEAS<br/>INTO <em>PLAYABLE</em><br/>WORLDS.</h2>
      <p>{t("From concept to interactive worlds, we create experiences that inspire, entertain and last.",
        "Dari ide menjadi dunia interaktif. Kami membuat pengalaman yang inspiratif, menyenangkan, dan berkesan.")}</p>

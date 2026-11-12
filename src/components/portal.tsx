@@ -36,7 +36,7 @@ function GameCard({ game, navigate, index }: {
       <div className="game-card-media">
         <img src={game.cover} alt={game.name + " official artwork"} loading="lazy" />
         <span className="game-card-shine" aria-hidden="true" />
-        <div className="card-top"><span>SOFT TECH ORIGINAL</span><span>0{index + 1} / 03</span></div>
+        <div className="card-top"><span>XDPLAY ORIGINAL</span><span>0{index + 1} / 03</span></div>
         <button className="card-image-link" onClick={() => navigate("/games/" + game.id)}
           aria-label={"View " + game.name + " game details"} />
         <div className="card-cover-name">
@@ -93,7 +93,7 @@ function HeroShowcase({
       <div className="stage-ring ring-one" aria-hidden="true" />
       <div className="stage-ring ring-two" aria-hidden="true" />
       <div className="stage-ring ring-three" aria-hidden="true" />
-      <div className="stage-grid-marker stage-grid-top">ST_ / INTERACTIVE SHOWCASE</div>
+      <div className="stage-grid-marker stage-grid-top">XD_ / INTERACTIVE SHOWCASE</div>
       <div className="stage-grid-marker stage-grid-right">EST. IN THE IMAGINATION</div>
 
       <div className="poster-stack" onPointerEnter={() => setPaused(true)} onPointerLeave={() => setPaused(false)}>
@@ -109,7 +109,7 @@ function HeroShowcase({
               aria-current={slot === "center" ? "true" : undefined}>
               <img src={item.cover} alt={item.name + " featured cover"} draggable={false} />
               <span className="poster-lens" aria-hidden="true" />
-              <span className="poster-topline"><span>SOFT TECH</span><span>VOL. 0{index + 1}</span></span>
+              <span className="poster-topline"><span>XDPLAY</span><span>VOL. 0{index + 1}</span></span>
               <span className="poster-bottomline"><strong>{item.name}</strong><small>{item.genre.toUpperCase()}</small></span>
               <span className="poster-edge" aria-hidden="true" />
             </button>
@@ -167,10 +167,10 @@ function SiteFooter({ navigate }: { navigate: (href: string) => void }) {
         <button className="footer-cta" onClick={() => navigate("/contact")}>START A CONVERSATION <ArrowUpRight size={21}/></button>
       </div>
       <div className="footer-baseline">
-        <div className="footer-brand"><img src={logo} alt="Soft Tech"/><span>Creative worlds.<br/>Intelligent technology.</span></div>
+        <div className="footer-brand"><img src={logo} alt="XDPLAY"/><span>Creative worlds.<br/>Intelligent technology.</span></div>
         <div className="footer-nav">{links.map(link => <button key={link.path} onClick={() => navigate(link.path)}>{link.label}</button>)}</div>
       </div>
-      <div className="footer-legal"><span>© 2026 SOFT TECH. ALL RIGHTS RESERVED.</span><span>BUILT FOR IMAGINATION · MADE FOR PLAY.</span></div>
+      <div className="footer-legal"><span>© 2026 XDPLAY. ALL RIGHTS RESERVED.</span><span>BUILT FOR IMAGINATION · MADE FOR PLAY.</span></div>
     </footer>
   );
 }
@@ -191,15 +191,15 @@ function Corporate({ section, lang, navigate }: {
   const [message, setMessage] = useState("");
   const [showDraft, setShowDraft] = useState(false);
   const [copied, setCopied] = useState(false);
-  const draft = "Soft Tech collaboration enquiry\nFrom: " + (name.trim() || "(Your name)") + "\n\n" + (message.trim() || "(Your project introduction)");
+  const draft = "XDPLAY collaboration enquiry\nFrom: " + (name.trim() || "(Your name)") + "\n\n" + (message.trim() || "(Your project introduction)");
   return (
     <div className="inner-page corporate-page">
-      <Reveal className="page-head"><span className="eyebrow"><span className="blink-dot"/> SOFT TECH / {header.over}</span>
+      <Reveal className="page-head"><span className="eyebrow"><span className="blink-dot"/> XDPLAY / {header.over}</span>
         <h1>{header.first}<br/><em>{header.second}</em></h1><p>{header.sub}</p></Reveal>
       {section === "company" && <>
         <div className="corp-two">
           <Reveal><span className="section-tag">01 — OUR STORY</span><h2>NOT JUST<br/>GAMES. <em>NEW WORLDS.</em></h2>
-            <p>SOFT TECH is a creative game technology studio focused on building distinctive digital entertainment. We combine original art direction, interactive design and contemporary technology to make every world immersive, intuitive and unmistakably its own.</p>
+            <p>XDPLAY is a creative game technology studio focused on building distinctive digital entertainment. We combine original art direction, interactive design and contemporary technology to make every world immersive, intuitive and unmistakably its own.</p>
             <p>From cinematic fantasy to luminous arcade experiences, every title starts with an idea worth exploring.</p>
             <button className="btn btn-outline" onClick={() => navigate("/games")}>OUR GAME PORTFOLIO <ArrowUpRight size={17}/></button>
           </Reveal>
@@ -235,7 +235,7 @@ function Corporate({ section, lang, navigate }: {
           </Reveal><Reveal delay={120}><StudioArt/></Reveal>
         </div>
         <div className="values-grid">{[
-          ["PUBLISHING", "Explore distribution opportunities for original Soft Tech titles."],
+          ["PUBLISHING", "Explore distribution opportunities for original XDPLAY titles."],
           ["CREATIVE", "Create worlds, narratives and visual experiences together."],
           ["PRODUCT", "Discuss demonstrations and game presentation opportunities."]
         ].map((x, i) => <Reveal key={x[0]} delay={i * 60}><div className="value-box"><span>OPPORTUNITY / 0{i + 1}</span><h3>{x[0]}</h3><p>{x[1]}</p><ArrowUpRight size={19}/></div></Reveal>)}</div>
@@ -246,12 +246,12 @@ function Corporate({ section, lang, navigate }: {
           <label htmlFor="contact-message">YOUR IDEA<textarea id="contact-message" rows={5} value={message} onChange={event => setMessage(event.target.value)} placeholder="Tell us what you're imagining..." /></label>
           <button className="btn btn-light" onClick={() => { setCopied(false); setShowDraft(true); }}>PREPARE ENQUIRY <ArrowUpRight size={17}/></button>
         </div></Reveal>
-        <Reveal delay={100}><div className="contact-art"><Mail size={65}/><strong>YOUR NEXT<br/>BIG IDEA<br/><em>STARTS HERE.</em></strong><small>SOFT TECH / BEYOND PLAY</small></div></Reveal>
+        <Reveal delay={100}><div className="contact-art"><Mail size={65}/><strong>YOUR NEXT<br/>BIG IDEA<br/><em>STARTS HERE.</em></strong><small>XDPLAY / BEYOND PLAY</small></div></Reveal>
       </div>}
       {showDraft && <div className="dialog-scrim" onClick={() => setShowDraft(false)} role="presentation"><div className="dialog-panel" role="dialog" aria-modal="true" aria-label="Enquiry draft" onClick={event => event.stopPropagation()}>
         <button className="dialog-close" aria-label="Close" onClick={() => setShowDraft(false)}><X size={22}/></button>
         <span className="eyebrow">YOUR ENQUIRY</span><h2>READY TO SHARE.</h2>
-        <p>Copy the message below. Send it to a confirmed Soft Tech business contact once available.</p>
+        <p>Copy the message below. Send it to a confirmed XDPLAY business contact once available.</p>
         <textarea aria-label="Your enquiry draft" readOnly value={draft} rows={7}/>
         <button className="btn btn-light" onClick={async () => {
           try { await navigator.clipboard.writeText(draft); setCopied(true); }
@@ -276,7 +276,7 @@ function GameDetails({ game, lang, navigate }: {
           <div className="detail-bg" style={{ backgroundImage: "url('" + game.cover + "')" }}/>
           <div className="detail-wash"/>
           <div className="detail-copy">
-            <span className="eyebrow"><span className="blink-dot"/> SOFT TECH ORIGINAL / 0{index + 1}</span>
+            <span className="eyebrow"><span className="blink-dot"/> XDPLAY ORIGINAL / 0{index + 1}</span>
             <h1>{game.name}</h1><p>{game.slogan}</p>
             <div className="detail-actions"><a href={game.url} {...externalProps} className="btn btn-light"><Play size={16} fill="currentColor"/> PLAY DEMO <ArrowUpRight size={17}/></a><button className="btn btn-glass" onClick={() => navigate("/games")}>ALL GAMES <ArrowRight size={17}/></button></div>
           </div>
@@ -287,7 +287,7 @@ function GameDetails({ game, lang, navigate }: {
       <div className="detail-description">
         <Reveal><div><span className="section-tag">DISCOVER THE WORLD / 01</span><h2>THE EXPERIENCE<br/><em>BEHIND THE ART.</em></h2><p>{lang === "EN" ? game.description : game.idDescription}</p></div></Reveal>
         <Reveal delay={100}><div className="detail-facts">
-          {[["THE GENRE", game.genre], ["DESIGNED BY", "SOFT TECH"], ["PLAY FORMAT", "WEB DEMO"], ["GAME MODE", "VIRTUAL CREDITS"]].map(([key, val]) => <div key={key}><span>{key}</span><strong>{val}</strong></div>)}
+          {[["THE GENRE", game.genre], ["DESIGNED BY", "XDPLAY"], ["PLAY FORMAT", "WEB DEMO"], ["GAME MODE", "VIRTUAL CREDITS"]].map(([key, val]) => <div key={key}><span>{key}</span><strong>{val}</strong></div>)}
         </div></Reveal>
       </div>
       <Reveal><div className="demo-disclaimer"><ShieldCheck size={22}/> Game demos open on their official standalone websites. This showcase does not process deposits, payments, or withdrawals.</div></Reveal>
@@ -338,8 +338,8 @@ export default function Portal() {
       <a className="skip-link" href="#main-content">SKIP TO CONTENT</a>
       {mobileMenu && <button className="mobile-backdrop" aria-label="Close navigation" onClick={() => setMobileMenu(false)}/>}
       <aside id="v52-site-navigation" className={"side-panel " + (mobileMenu ? "side-open" : "")}>
-        <button className="brand-logo" onClick={() => navigate("/")} aria-label="Soft Tech homepage">
-          <img src="/assets/v5/soft-tech-header-cropped.png" alt="SOFT TECH"/><span>INDEPENDENT GAME STUDIO</span>
+        <button className="brand-logo" onClick={() => navigate("/")} aria-label="XDPLAY homepage">
+          <img src="/assets/xdplay-logo.svg" alt="XDPLAY"/><span>INDEPENDENT GAME STUDIO</span>
         </button>
         <div className="side-divider"/>
         <div className="side-navigation"><span className="side-caption">NAVIGATION / 001</span>
@@ -350,7 +350,7 @@ export default function Portal() {
               <ArrowUpRight size={15}/></button>
           ))}
         </div>
-        <div className="side-card"><div className="side-card-stars"><Sparkles size={21}/><span>SOFT TECH / 2026</span></div><strong>PLAY THE<br/>UNEXPECTED.</strong><div className="side-card-bottom">CREATIVE WORLD BUILDERS <ArrowUpRight size={15}/></div></div>
+        <div className="side-card"><div className="side-card-stars"><Sparkles size={21}/><span>XDPLAY / 2026</span></div><strong>PLAY THE<br/>UNEXPECTED.</strong><div className="side-card-bottom">CREATIVE WORLD BUILDERS <ArrowUpRight size={15}/></div></div>
         <div className="side-bottom"><span><span className="online-pulse"/> 03 WORLDS ONLINE</span><span>ST / 001</span></div>
       </aside>
 
@@ -358,7 +358,7 @@ export default function Portal() {
         <header className="top-header">
           <div className="header-left">
             
-            <button className="top-brand" onClick={() => navigate("/")} aria-label="Soft Tech homepage"><img src="/assets/v5/soft-tech-header-cropped.png" alt="Soft Tech" /></button>
+            <button className="top-brand" onClick={() => navigate("/")} aria-label="XDPLAY homepage"><img src="/assets/xdplay-logo.svg" alt="XDPLAY" /></button>
             <div className="header-breadcrumb"><span>STUDIO</span><ChevronRight size={13}/><strong>{game?.name || ({home:"DISCOVER",games:"OUR GAMES",company:"COMPANY",technology:"TECHNOLOGY",partners:"PARTNERSHIPS",contact:"CONTACT"} as Record<string,string>)[section] || "DISCOVER"}</strong></div>
           </div>
           <nav className="desktop-nav" aria-label="Main navigation">
@@ -389,7 +389,7 @@ export default function Portal() {
 
             <section className="home-collection" id="collection">
               <Reveal><div className="section-header"><div><span className="section-index">02</span><span className="section-slash">/</span><span>THE COLLECTION</span></div><button className="section-action" onClick={() => navigate("/games")}>VIEW ALL GAMES <ArrowUpRight size={17}/></button></div></Reveal>
-              <Reveal><div className="collection-heading"><div><span className="eyebrow">HANDCRAFTED ORIGINAL EXPERIENCES</span><h2>THREE WORLDS.<br/><em>ENDLESS WONDER.</em></h2><p>Every world plays by its own rules. Find one that speaks to you.</p></div><div className="collection-count"><strong>03</strong><span>SOFT TECH<br/>ORIGINALS</span></div></div></Reveal>
+              <Reveal><div className="collection-heading"><div><span className="eyebrow">HANDCRAFTED ORIGINAL EXPERIENCES</span><h2>THREE WORLDS.<br/><em>ENDLESS WONDER.</em></h2><p>Every world plays by its own rules. Find one that speaks to you.</p></div><div className="collection-count"><strong>03</strong><span>XDPLAY<br/>ORIGINALS</span></div></div></Reveal>
               <div className="game-grid">{games.map((item, index) =>
                 <Reveal key={item.id} delay={index * 95}><GameCard game={item} navigate={navigate} index={index}/></Reveal>)}</div>
             </section>
@@ -398,7 +398,7 @@ export default function Portal() {
 
             <section className="studio-section">
               <Reveal><div className="section-header"><div><span className="section-index">03</span><span className="section-slash">/</span><span>THE STUDIO</span></div><span className="header-note">THE CREATIVE ENGINE BEHIND THE WORLDS.</span></div></Reveal>
-              <div className="studio-panel"><Reveal className="studio-copy"><span className="eyebrow">OUR PHILOSOPHY / BEYOND PLAY</span><h2>WE MAKE<br/>THE <em>UNREAL</em><br/>FEEL REAL.</h2><p>Original ideas. Thoughtful mechanics. Atmospheres that stay with you. At Soft Tech, art, interaction and technology come together to make unforgettable play.</p>
+              <div className="studio-panel"><Reveal className="studio-copy"><span className="eyebrow">OUR PHILOSOPHY / BEYOND PLAY</span><h2>WE MAKE<br/>THE <em>UNREAL</em><br/>FEEL REAL.</h2><p>Original ideas. Thoughtful mechanics. Atmospheres that stay with you. At XDPLAY, art, interaction and technology come together to make unforgettable play.</p>
                 <button className="btn btn-outline" onClick={() => navigate("/company")}>ENTER THE STUDIO <ArrowUpRight size={17}/></button></Reveal>
                 <Reveal delay={100}><StudioArt/></Reveal>
               </div>

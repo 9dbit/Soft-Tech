@@ -27,10 +27,10 @@ const locked = {
   "src/app/v57-unified-ui.css": "fb9eb8fb6fd082c66764974844c9c539092d490e",
   "src/app/v58-landscape-games.css": "e6bc61d924c87d917a61c8931d9d58e659d0f83e",
   "src/components/motion.tsx": "6eb8e5bb0e5fac653d31a8fcbd7fa4a3e09de5d1",
-  "src/components/portal.tsx": "48b84b937d47a38f53963ee8be62b2a04569e465",
-  "src/components/v5-desktop-hero.tsx": "d29e87bf3488a38f339f270a4c50fbd237320024",
-  "src/components/v52-mobile-hero.tsx": "41132c84cf553c4585b8f1a6f2c304af2d4c445e",
-  "src/data/games.ts": "a345d5d185f5ec7f682b24ab44507f6c0a83c476",
+  "src/components/portal.tsx": "2768e7b06f5191b4490798ac81755ca9d3ff57ee",
+  "src/components/v5-desktop-hero.tsx": "7d18d6aa0fc5fc6bf201d0454357dc8692a6e3bb",
+  "src/components/v52-mobile-hero.tsx": "948ab0371454d75673585392435cc606ff56ae2d",
+  "src/data/games.ts": "a67131b146637c0ea041c1f83dd78c2196e9ae0c",
   "public/fonts/Minecraft.woff2": "24a32947adfdc19d2bc5745ae99cb6a8b5375f95"
 };
 const failures=[];

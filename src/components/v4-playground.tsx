@@ -149,7 +149,7 @@ export function V4Playground({ active, setActive, lang, navigate }: Props) {
     setActive((active + (dx < 0 ? 1 : games.length - 1)) % games.length);
   };
   return (
-    <section id="featured" aria-label="Soft Tech featured worlds" tabIndex={0}
+    <section id="featured" aria-label="XDPLAY featured worlds" tabIndex={0}
       className="v4-playground" ref={stage}
       onPointerMove={move} onPointerEnter={(event) => { if (event.pointerType === "mouse") setHover(true); }}
       onPointerLeave={leave} onBlur={() => setHover(false)}
@@ -175,7 +175,7 @@ export function V4Playground({ active, setActive, lang, navigate }: Props) {
           <div className="v4-art-foil" aria-hidden="true"/>
           <img className={"v4-main-image v4-art-"+game.id} src={game.cover}
             alt={game.name + " official artwork"} fetchPriority={active === 0 ? "high" : "auto"}/>
-          <div className="v4-art-bottom"><span className="v4-pixel">SOFT TECH / VOL. 0{active + 1}</span><b>{game.name}</b></div>
+          <div className="v4-art-bottom"><span className="v4-pixel">XDPLAY / VOL. 0{active + 1}</span><b>{game.name}</b></div>
         </div>
         <FloatingAsset key={game.id+"-asset"} game={game}/>
         <div className="v4-float-stamp v4-stamp-one" aria-hidden="true"><span>✳</span><b>PIXEL<br/>PERFECT</b></div>
@@ -223,7 +223,7 @@ export function V4Playground({ active, setActive, lang, navigate }: Props) {
 
 export function V4WorldStory({ lang, navigate }: { lang: "EN"|"ID"; navigate: (path:string)=>void }) {
   return (
-    <section className="v4-story" aria-label="Explore Soft Tech game worlds">
+    <section className="v4-story" aria-label="Explore XDPLAY game worlds">
       <div className="v4-story-left">
         <Reveal>
           <span className="v4-spec-label">[ 04 / EVERY WORLD HAS A STORY ]</span>
@@ -242,7 +242,7 @@ export function V4WorldStory({ lang, navigate }: { lang: "EN"|"ID"; navigate: (p
               <div className="v4-story-art"><img src={game.cover} loading="lazy" alt={game.name+" original game art"}/></div>
               <span className="v4-story-serial v4-pixel">0{i+1}</span>
               <div className="v4-story-card-content">
-                <span>{game.tag} / SOFT TECH</span>
+                <span>{game.tag} / XDPLAY</span>
                 <h3>{game.name}</h3>
                 <p>{game.slogan}</p>
                 <button onClick={()=>navigate("/games/"+game.id)}>{lang==="ID"?"TELUSURI DUNIA":"ENTER WORLD"} <MoveUpRight size={17}/></button>

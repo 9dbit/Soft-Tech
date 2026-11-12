@@ -9,15 +9,15 @@ import "./v52-mobile.css";
 import "./v57-unified-ui.css";
 import "./v58-landscape-games.css";
 import "./v61-locked-typography.css";
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://soft-tech-web-production.up.railway.app";
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://xd-play.com";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: { default: "SOFT TECH | Beyond Play", template: "%s | SOFT TECH" },
+  title: { default: "XDPLAY | Beyond Play", template: "%s | XDPLAY" },
   description: "Creative worlds. Intelligent technology. Extraordinary experiences. Explore Skygate 5000, UNO LUCK and Mahjong Wild.",
-  keywords: ["Soft Tech", "game development studio", "interactive entertainment", "Skygate 5000", "UNO LUCK", "Mahjong Wild"],
-  applicationName: "Soft Tech",
-  icons: { icon: "/assets/soft-tech-logo.png", apple: "/assets/soft-tech-logo.png" },
-  openGraph: { type: "website", title: "SOFT TECH | Beyond Play", description: "Explore original interactive games from Soft Tech.", images: ["/assets/soft-tech-logo.png"] },
+  keywords: ["XDPLAY", "game development studio", "interactive entertainment", "Skygate 5000", "UNO LUCK", "Mahjong Wild"],
+  applicationName: "XDPLAY",
+  icons: { icon: "/assets/xdplay-icon.png", apple: "/assets/xdplay-icon.png" },
+  openGraph: { type: "website", title: "XDPLAY | Beyond Play", description: "Explore original interactive games from XDPLAY.", siteName: "XDPLAY", images: ["/assets/xdplay-social.png"] },
   robots: { index: true, follow: true }
 };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
