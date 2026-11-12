@@ -1,0 +1,108 @@
+name: XDPLAY public rebrand and acceptance
+on:
+  push:
+    branches: [rebrand/xdplay-public-20261112]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: xdplay-public-rebrand
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify original layout and branding migration
+        run: |
+          node scripts/verify-ui-lock.mjs
+          node --test scripts/rebrand-xdplay.test.mjs
+          node scripts/rebrand-xdplay.mjs
+          node scripts/verify-ui-lock.mjs
+      - name: Commit only approved public branding files
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git add src package.json scripts/verify-ui-lock.mjs public/assets/xdplay-logo.svg public/assets/xdplay-icon.png public/assets/xdplay-social.png
+          if ! git diff --cached --quiet; then
+            git diff --cached --name-only | while IFS= read -r path; do
+              case "$path" in
+                src/app/api/*|*.css) echo "Unexpected protected change: $path"; exit 1;;
+                src/*|package.json|scripts/verify-ui-lock.mjs|public/assets/xdplay-*) ;;
+                *) echo "Unexpected change: $path"; exit 1;;
+              esac
+            done
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'brand: apply approved XDPLAY identity to public site'
+            git push origin HEAD:rebrand/xdplay-public-20261112
+          fi
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+  acceptance:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Source checks and production build
+        run: |
+          node scripts/verify-ui-lock.mjs
+          node --test scripts/rebrand-xdplay.test.mjs
+          npm install --no-audit --no-fund
+          npm run build
+      - name: Install acceptance browser
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Production HTTP and desktop/mobile acceptance
+        run: |
+          npm run start -- -p 3000 > /tmp/xdplay-next.log 2>&1 &
+          ready=0
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:3000/api/health >/dev/null; then ready=1; break; fi
+            sleep 2
+          done
+          test "$ready" = 1 || { cat /tmp/xdplay-next.log; exit 1; }
+          node scripts/xdplay-public-qa.mjs
+      - name: Preserve screenshots and tested source identity
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xdplay-public-acceptance
+          path: qa-artifacts/xdplay/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Record result on the exact tested commit
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner, repo: context.repo.repo,
+              sha: '${{ needs.prepare.outputs.commit }}',
+              state: '${{ job.status }}' === 'success' ? 'success' : 'failure',
+              context: 'XDPLAY public acceptance',
+              description: 'Production build, locked layout, branding and desktop/mobile checks',
+              target_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`
+            });
