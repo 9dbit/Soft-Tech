@@ -1,0 +1,56 @@
+name: XDPLAY hosted deployment verification
+on:
+  push:
+    branches: [verify/xdplay-hosted-20261112]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  hosted:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 3efa1471dc48407b8d3eb6d031b64b851f2a7894
+          path: website-source
+      - uses: actions/checkout@v4
+        with:
+          ref: 5f4a2fba4fc4cdc61c71c3b37fea736e43af25a3
+          path: core-source
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Public read-only HTTP, asset hashes and DNS
+        run: |
+          mkdir -p qa-artifacts
+          node --input-type=module <<'NODE'
+          import {readFile,writeFile} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          import {resolveNs,resolve4,resolveCname,resolveTxt} from 'node:dns/promises';
+          import assert from 'node:assert/strict';
+          const site='https://soft-tech-web-production.up.railway.app',core='https://softtech-preprod-core-preproduction.up.railway.app';
+          const stamp=Date.now(),report={observed_at:new Date().toISOString(),scope:'Read-only hosted checks; no login, game launch or transaction',deployment_checks:[],dns:{},custom_domains:[],errors:[]};
+          const digest=b=>createHash('sha256').update(b).digest('hex');
+          async function get(url){const r=await fetch(url,{signal:AbortSignal.timeout(12000),redirect:'manual',cache:'no-store'});return {status:r.status,headers:Object.fromEntries(r.headers),body:Buffer.from(await r.arrayBuffer())};}
+          async function check(name,fn){try{report.deployment_checks.push({name,status:'PASS',...await fn()});}catch(e){report.deployment_checks.push({name,status:'FAIL'});report.errors.push({name,message:e.message});}}
+          await check('production website HTML',async()=>{const r=await get(site+'/?xdplay_check='+stamp),s=r.body.toString();assert.equal(r.status,200);assert.match(s,/<title>XDPLAY/);assert.match(s,/rel="canonical" href="https:\/\/xd-play\.com"/);return {http_status:r.status};});
+          await check('production website health',async()=>{const r=await get(site+'/api/health?xdplay_check='+stamp),j=JSON.parse(r.body);assert.equal(r.status,200);assert.equal(j.status,'ok');return {http_status:r.status,technical_service_id:j.service};});
+          await check('production website logo matches tested source',async()=>{const r=await get(site+'/assets/xdplay-logo.svg?xdplay_check='+stamp),expected=await readFile('website-source/public/assets/xdplay-logo.svg');assert.equal(r.status,200);assert.equal(digest(r.body),digest(expected));return {sha256:digest(r.body)};});
+          await check('provider master panel HTML',async()=>{const r=await get(core+'/?xdplay_check='+stamp);assert.equal(r.status,200);assert.match(r.body.toString(),/<title>XDPLAY/);assert.doesNotMatch(r.body.toString(),/\bSoft Tech\b/);return {http_status:r.status};});
+          await check('provider health, source identity and production lock',async()=>{const r=await get(core+'/health?xdplay_check='+stamp),j=JSON.parse(r.body);assert.equal(r.status,200);assert.equal(j.source_commit,'5f4a2fba4fc4cdc61c71c3b37fea736e43af25a3');assert.equal(j.environment,'preproduction');assert.equal(j.production_enabled,false);return {http_status:r.status,source_commit:j.source_commit,environment:j.environment,production_enabled:j.production_enabled};});
+          await check('provider logo matches tested source',async()=>{const r=await get(core+'/logo.png?xdplay_check='+stamp),expected=await readFile('core-source/provider-dashboard/public/logo.png');assert.equal(r.status,200);assert.equal(digest(r.body),digest(expected));return {sha256:digest(r.body)};});
+          for(const [key,fn] of Object.entries({nameservers:()=>resolveNs('xd-play.com'),apex_a:()=>resolve4('xd-play.com'),www_cname:()=>resolveCname('www.xd-play.com'),apex_verification:()=>resolveTxt('_railway-verify.xd-play.com'),www_verification:()=>resolveTxt('_railway-verify.www.xd-play.com')})){try{report.dns[key]=await fn();}catch(e){report.dns[key]={error:e.code};}}
+          for(const host of ['xd-play.com','www.xd-play.com']){try{const r=await get('https://'+host+'/?xdplay_check='+stamp);report.custom_domains.push({host,http_status:r.status,location:r.headers.location||null,xdplay_title:/<title>XDPLAY/.test(r.body.toString())});}catch(e){report.custom_domains.push({host,status:'UNREACHABLE',error:e.cause?.code||e.code||e.name});}}
+          report.deployed_application_status=report.errors.length?'FAIL':'PASS';
+          report.domain_activation_claimed=false;
+          await writeFile('qa-artifacts/xdplay-hosted.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));if(report.errors.length)process.exitCode=1;
+          NODE
+      - name: Preserve hosted verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xdplay-hosted-verification
+          path: qa-artifacts/xdplay-hosted.json
+          if-no-files-found: error
+          retention-days: 14
