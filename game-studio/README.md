@@ -38,3 +38,20 @@ Plan: validate UI and asset export in an isolated staging environment, then impl
 ## Safety constraints for future Game Factory Skill
 
 A future Game Factory Skill may propose UI and generate the icon/metadata pack through the Studio's assets service. Its instructions must require a human creative review, a valid public URL, and preview/quality checks. Publishing to production, changing game mathematics, or integrating financial wallets must use independent, explicit approval gates.
+
+### Legend Ball V12 visual draft
+
+The linked Legend editor now opens the V12 media catalog and uses a separate
+V12 local draft key. Loading an older live snapshot preserves its math, audio,
+credit and bet settings while applying the new visual layers to the draft;
+loading does not publish or mutate that live snapshot. An empty release is valid.
+
+Moving or resizing the Total Bet frame also transforms its minus button,
+amount and plus button. The individual controls start locked. Native export
+preserves these coordinates and the existing engine settings. Sound and volume
+remain in the game's Menu. The standalone gameplay sound button and provider
+footer are hidden in the V12 project.
+
+Validation: 49 unit tests passed and the embedded production build passed.
+Browser/device QA is still pending: this workspace cannot launch Chromium,
+and WebKit is not installed. No remote publication or deployment has occurred.

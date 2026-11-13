@@ -7,6 +7,7 @@ const stagingHosts = ["game-studio-web-staging.up.railway.app"];
 
 export default defineConfig({
   plugins: [react()],
+  base: process.env.LEGEND_EMBEDDED ? "/studio/universal/" : "/",
   server: {
     host: "0.0.0.0",
     allowedHosts: stagingHosts,

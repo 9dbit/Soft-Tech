@@ -11,8 +11,11 @@ import { clampDraftLayout, SLOT_LIMITS } from "./slot/slotCore.js";
 import { validateFactoryImport } from "./factoryImport.js";
 import { importRasterPack, loadRasterUrls, revokeRasterUrls, replaceRasterAsset } from "./rasterAssets.js";
 import JSZip from "jszip";
+import { importLegendLayout, exportLegendLayout, patchLegendLayer, selectLegendSource, LEGEND_SCALE } from "./legendLink.js";
+import LegendPreview from "./LegendPreview.jsx";
 
-const STORAGE_KEY = "softtech-universal-game-studio-v1";
+const LEGEND_MODE = new URLSearchParams(location.search).get("game") === "legend-ball-x1000";
+const STORAGE_KEY = LEGEND_MODE ? "universal-legend-layout-v12" : "softtech-universal-game-studio-v1";
 const INITIAL = {
   name: "Cyber Punk",
   canvas: { device: "desktop", grid: "dots", background: "#23252a", gridSize: 24, gridOpacity: 28, zoom: 75, snap: false },
@@ -233,7 +236,20 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   });
   const patch = (section, changes) => commit(prev => ({ ...prev, [section]: { ...prev[section], ...changes } }));
-  const patchLayer = (id, changes) => commit(prev => ({ ...prev, layers: prev.layers.map(l => l.id === id ? { ...l, ...changes } : l) }));
+  const loadLegend = async () => {
+    try {
+      const [response,manifestResponse,releaseResponse] = await Promise.all([fetch('/play/layout.json',{cache:'no-store'}),fetch('/play/assets/legend-v12/manifest.json',{cache:'no-store'}),fetch('/play/release.json',{cache:'no-store'})]);
+      if(!response.ok || !manifestResponse.ok)throw Error('Open this editor from the Legend Ball staging site');
+      const template=await response.json();
+      const released=releaseResponse.ok?(await releaseResponse.json())?.project:null;
+      const source=selectLegendSource(template,released);
+      const draft=importLegendLayout(source,(await manifestResponse.json()).assets);
+      commit(draft);setSelection('logo');setTab('visual');setFitToView(true);
+      setFactoryMessage('Legend Ball: shared game renderer connected. Layout edits preview immediately; Export saves the native game project for release from Game Studio.');
+    }catch(e){setFactoryMessage(e.message);}
+  };
+  useEffect(()=>{if(LEGEND_MODE&&!project.linked)loadLegend();},[]);
+  const patchLayer = (id, changes) => commit(prev => patchLegendLayer(prev,id,changes));
   const patchAudio = (id, changes) => commit(prev => ({ ...prev, audio: prev.audio.map(t => t.id === id ? { ...t, ...changes } : t) }));
   const importFactoryProject = async file => {
     if (!file) return;
@@ -345,11 +361,11 @@ function App() {
     backgroundImage: canvas.grid === "dots" ? "radial-gradient(circle, " + gridColor + " 1px, transparent 1.5px)"
       : canvas.grid === "squares" ? "linear-gradient(" + gridColor + " 1px, transparent 1px), linear-gradient(90deg, " + gridColor + " 1px, transparent 1px)" : "none",
   };
-  const stageSize = device === "desktop" ? { width: 960, height: 540 } : { width: 390, height: 844 };
+  const stageSize = project.linked ? {width:390,height:1920*LEGEND_SCALE} : device === "desktop" ? { width: 960, height: 540 } : { width: 390, height: 844 };
   const stageStyle = { width: stageSize.width, height: stageSize.height, transform: "scale(" + (canvas.zoom / 100) + ")", transformOrigin: "top left" };
   const fitZoomFor = (el, mode) => {
     if (!el) return null;
-    const dimensions = mode === "desktop" ? { width: 960, height: 540 } : { width: 390, height: 844 };
+    const dimensions = project.linked ? {width:390,height:1920*LEGEND_SCALE} : mode === "desktop" ? { width: 960, height: 540 } : { width: 390, height: 844 };
     const ratio = Math.min(
       Math.max(1, el.clientWidth - 70) / dimensions.width,
       Math.max(1, el.clientHeight - 72) / dimensions.height
@@ -371,6 +387,7 @@ function App() {
     return () => observer.disconnect();
   }, [tab, fitToView, project.canvas.device, timelineOpen]);
   const switchDevice = nextDevice => {
+    if(project.linked)return;
     setFitToView(true);
     patch("canvas", { device: nextDevice });
   };
@@ -384,12 +401,14 @@ function App() {
     patch("canvas", { zoom: Math.max(25, Math.min(160, nextZoom)) });
   };
   const addLayer = (type) => {
+    if(project.linked){setAssetInfo("Choose a separate component from the Legend asset library.");return;}
     const id = "layer-" + Math.random().toString(36).slice(2, 10);
     const fresh = { id, type, name: type === "button" ? "New Button" : type === "image" ? "New Image" : "New Text", x: 315, y: 220, width: type === "text" ? 240 : 180, height: 60,
       mobile: { x: 70, y: 320, width: 220, height: 60 }, opacity: 100, fill: type === "button" ? "#0d99ff" : "#ffffff", text: type === "button" ? "BUTTON" : "Edit text", visible: true, locked: false };
     commit(prev => ({ ...prev, layers: [...prev.layers, fresh] })); setSelection(id);
   };
   const importImage = (file) => {
+    if(project.linked){setAssetInfo("Import replacement artwork through the game asset library before publishing.");return;}
     if (!file) return;
     if (!file.type.startsWith("image/") || file.size > 1024 * 1024) {
       setAssetInfo("Only images up to 1 MB can be added to this browser-local draft."); return;
@@ -414,14 +433,11 @@ function App() {
     const dy = (e.clientY - d.y) / (canvas.zoom / 100);
     const snap = v => canvas.snap ? Math.round(v / 8) * 8 : Math.round(v);
     const changes = { x: snap(d.start.x + dx), y: snap(d.start.y + dy), width: d.start.width, height: d.start.height };
-    setProject(prev => ({ ...prev, layers: prev.layers.map(l => {
-      if (l.id !== d.id) return l;
-      return d.device === "mobile" ? { ...l, mobile: changes } : { ...l, x: changes.x, y: changes.y };
-    }) }));
+    setProject(prev => patchLegendLayer(prev,d.id,d.device === "mobile" ? {mobile:changes} : {x:changes.x,y:changes.y}));
   };
   const onDragEnd = () => { drag.current = null; };
   const changeRect = (key, value) => {
-    if (!layer) return;
+    if (!layer || layer.locked) return;
     if (device === "desktop") patchLayer(layer.id, { [key]: value });
     else patchLayer(layer.id, { mobile: { ...getRect(layer, "mobile"), [key]: value } });
   };
@@ -430,7 +446,7 @@ function App() {
     commit(prev => ({ ...prev, layers: prev.layers.filter(l => l.id !== layer.id) }));
     setSelection("spin");
   };
-  const exportProject = () => downloadBlob(new Blob([JSON.stringify(project, null, 2)], { type: "application/json" }), "softtech-cyber-punk-studio-draft.json");
+  const exportProject = () => downloadBlob(new Blob([JSON.stringify(project.linked?exportLegendLayout(project):project, null, 2)], { type: "application/json" }), project.linked?"Legend_Ball_X1000_Studio_Project.json":"universal-studio-draft.json");
   const triggerAudio = (id, file) => {
     if (!file || !file.type.startsWith("audio/")) return;
     if (audioFiles[id]) URL.revokeObjectURL(audioFiles[id]);
@@ -456,6 +472,7 @@ function App() {
         {hasFactoryBackup && <button className="factory-restore-button" title="Restore the most recent Studio draft backup" onClick={restoreFactoryBackup}><RotateCcw size={14}/> Restore Draft</button>}
         <button className="factory-import-button" onClick={() => factoryPicker.current?.click()} title="Import a versioned, demo-only Game Factory project"><Upload size={14}/> Import Game Factory</button>
         <button className="factory-import-button raster-import" onClick={() => rasterPicker.current?.click()} title="Import an art ZIP with PNG/WebP alpha assets"><ImageIcon size={14}/> Import Art ZIP</button>
+        <button className="factory-import-button" onClick={loadLegend}>Legend Ball</button>
         <Button title="Export project JSON" onClick={exportProject}><Save size={17}/></Button>
         <button className={"preview-toggle " + (preview ? "playing" : "")} onClick={() => setPreview(v => !v)}>{preview ? <Square size={14}/> : <Play size={14}/>} {preview ? "Edit" : "Preview"}</button>
       </div>
@@ -463,7 +480,7 @@ function App() {
     {factoryMessage && <div role="status" className="factory-import-message">{factoryMessage}<button title="Dismiss import notice" onClick={() => setFactoryMessage("")}>×</button></div>}
     <nav className="workspace-tabs" aria-label="Studio sections">
       {[["visual", Layers3], ["audio", Music2], ["economy", ChartNoAxesCombined], ["brand", Share2]].map(([id, Icon]) => <button key={id} className={tab === id ? "selected" : ""} onClick={() => setTab(id)}><Icon size={16}/>{names[id]}</button>)}
-      <div className="workspace-tabs-note">V1 ART CANDIDATE · NO LIVE GAME</div>
+      <div className="workspace-tabs-note">{project.linked ? "LEGEND BALL · SHARED LAYOUT · LOCAL DRAFT" : "V1 ART CANDIDATE · NO LIVE GAME"}</div>
     </nav>
     {tab === "visual" && <div className="editor-grid">
       <aside className="editor-panel left-panel">
@@ -479,6 +496,7 @@ function App() {
           <div className="subtle-label">Every UI element is independent; edit visuals without changing game mathematics.</div>
         </> : <>
           <GroupTitle>ASSET LIBRARY</GroupTitle>
+          {project.linked && <section className="factory-assets"><b>LEGEND BALL · WEBP + MP4</b><p>Same source assets and 1080 × 1920 layout as the game.</p><div className="factory-symbols raster-thumbnails">{project.linked.assets.map(a=><div className="raster-card" key={a.id}>{a.kind==='video'?<video src={'/play/assets/'+a.path} muted controls playsInline preload="none"/>:<img src={'/play/assets/'+a.path} alt={a.label}/>}<small>{a.label}</small>{a.kind==='image'&&<button onClick={()=>{const id='art_'+Date.now();const native={id,name:a.label,kind:'image',asset:a.path,x:200,y:100,w:400,h:400*a.naturalHeight/a.naturalWidth,z:7,rotate:0,opacity:100,visible:true,locked:false};const imported=importLegendLayout({...project.linked.source,layers:[native]}).layers[0];commit(prev=>({...prev,layers:[...prev.layers,imported]}));setSelection(id);setSidebar('layers');}}>Add layer</button>}</div>)}</div></section>}
           {project.factory && <section className="factory-assets"><b>GAME FACTORY SYMBOLS</b>
             <p>{project.factory.gameId} · source v{project.factory.sourceGameVersion}</p>
             <div className="factory-symbols">{project.factory.symbolIds.map(symbol => <label key={symbol} className="factory-symbol-card" title={"Replace " + symbol + " (SVG)"}>
@@ -529,13 +547,14 @@ function App() {
         <div className="canvas-viewport" ref={viewportRef} style={gridStyle}>
           <div className="stage-outer" style={{ width: stageSize.width * canvas.zoom / 100, height: stageSize.height * canvas.zoom / 100 }}>
             <div className="game-stage" style={stageStyle}>
-              {project.layers.map(l => <GameLayer key={l.id} layer={l} selected={selection === l.id} preview={preview} device={device} spinIteration={spinIteration} layout={layout} factory={project.factory} rasterUrls={rasterUrls} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>)}
-              {preview && <button title="Demonstrate reel visuals only. Not a real spin." className="preview-spin-overlay" style={{ left: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).x, top: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).y, width: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).width, height: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).height }} onClick={() => setSpinIteration(n => n + 1)} /> }
+              {!project.linked && project.layers.map(l => <GameLayer key={l.id} layer={l} selected={selection === l.id} preview={preview} device={device} spinIteration={spinIteration} layout={layout} factory={project.factory} rasterUrls={rasterUrls} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>)}
+              {project.linked && <LegendPreview project={project} selection={selection} preview={preview} onSelect={setSelection} onPointerDown={onDragStart} onPointerMove={onDragMove} onPointerUp={onDragEnd}/>}
+              {!project.linked && preview && <button title="Demonstrate reel visuals only. Not a real spin." className="preview-spin-overlay" style={{ left: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).x, top: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).y, width: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).width, height: getRect(project.layers.find(l => l.id === "spin") || INITIAL.layers[3], device).height }} onClick={() => setSpinIteration(n => n + 1)} /> }
             </div>
           </div>
-          <div className="canvas-corner-note">{preview ? "PLAYABLE VISUAL PREVIEW ONLY · NOT RNG / WALLET" : "DRAG AN ELEMENT TO REPOSITION"}</div>
+          <div className="canvas-corner-note">{preview ? "STAGING PREVIEW · VIRTUAL CREDITS" : "DRAG AN ELEMENT TO REPOSITION"}</div>
         </div>
-        {timelineOpen && <div className="timeline"><div className="timeline-head"><b>ANIMATION TIMELINE</b><span>Visual reference · No keyframes yet</span><button onClick={() => setTimelineOpen(false)}>Hide</button></div><div className="timeline-track"><div>Scene</div><div className="track-markers"><span/><span/><span/><span/><span/></div><span>0:00 / 0:05</span></div></div>}
+        {timelineOpen && <div className="timeline"><div className="timeline-head"><b>ANIMATION TIMELINE</b><span>5-second source loops · MP4</span><button onClick={() => setTimelineOpen(false)}>Hide</button></div><div className="timeline-track"><div>Scene</div><div className="track-markers"><span/><span/><span/><span/><span/></div><span>0:00 / 0:05</span></div></div>}
         {!timelineOpen && <button className="timeline-reveal" onClick={() => setTimelineOpen(true)}>Show timeline</button>}
       </main>
       <aside className="editor-panel right-panel">
@@ -554,7 +573,7 @@ function App() {
         {!layer ? <div className="empty-inspector">Select a layer to edit its position, size, text, opacity and colors.</div> : <div className="inspector-section">
           <div className="selected-name">{layer.name}<span>{layer.type}</span></div>
           <div className="inspector-grid">
-            {["x", "y", "width", "height"].map(key => <Field key={key} label={key.toUpperCase()} type="number" value={getRect(layer, device)[key]} onChange={v => changeRect(key, Math.max(key === "width" || key === "height" ? 1 : -2000, v))}/>)}
+            {["x", "y", "width", "height"].map(key => <Field key={key} label={key.toUpperCase()} type="number" disabled={layer.locked} value={getRect(layer, device)[key]} onChange={v => changeRect(key, Math.max(key === "width" || key === "height" ? 1 : -2000, v))}/>)}
           </div>
           <label className="range-field"><span>Opacity <b>{layer.opacity}%</b></span><input type="range" min={0} max={100} value={layer.opacity} onChange={e => patchLayer(layer.id, { opacity: int(e.target.value) })}/></label>
           {layer.fill && <label className="field"><span>Fill color</span><input type="color" value={layer.fill} onChange={e => patchLayer(layer.id, { fill: e.target.value })}/></label>}
@@ -572,7 +591,8 @@ function App() {
         {audioFiles[t.id] ? <audio ref={el => { audioRefs.current[t.id] = el; }} controls src={audioFiles[t.id]}/> : <div className="subtle-label">No audio uploaded for preview.</div>}
       </section>)}</div>
     </div>}
-    {tab === "economy" && <div className="simple-workspace economy-workspace">
+    {tab === "economy" && project.linked && <div className="workspace-intro"><div><h2>Legend Ball · Skygate rules</h2><p>6 × 5 · Pay anywhere / tumble · 4+ Scatter → 15 Free Spins · 3+ in bonus → +5</p><p>Layout editing preserves the existing engine, weights, paytable and 5,000× round cap. Export retains the exact source math configuration.</p></div></div>}
+    {tab === "economy" && !project.linked && <div className="simple-workspace economy-workspace">
       <div className="workspace-intro"><div><h2>Economy & Math Lab</h2><p>Keep draft game parameters separate from visuals. These are not certified mathematical outcomes.</p></div><span className="soft-tag danger"><AlertTriangle size={14}/> NOT VERIFIED</span></div>
       {project.factory && <section className="factory-import-banner"><b>Game Factory: {project.factory.gameId}</b><span>Version {project.factory.sourceGameVersion} · {project.factory.mathBinding} · RELEASE BLOCKED</span><p>Layout/payline math is sourced from the generated manifest and locked here. To change game math, regenerate through Game Factory; visuals and sound remain editable.</p></section>}
       <section className="economy-card soft-panel"><GroupTitle>DRAFT GAME CONFIGURATION</GroupTitle><div className="economy-fields">
