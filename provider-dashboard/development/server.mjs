@@ -4,6 +4,7 @@ import {randomBytes, createHash, timingSafeEqual} from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
 import {DevelopmentSessionStore} from './session-store.mjs';
+import {ensureFinance,validateProfile,previewInvoice,financeSummary} from './finance.mjs';
 
 // This entry point deliberately has no imports from the provider Core, staff
 // authentication, wallets, game adapters, databases or release-control modules.
@@ -21,9 +22,9 @@ const same = (a, b) => {
 };
 const id = prefix => prefix + randomBytes(8).toString('hex');
 const roles = Object.freeze([
-  {id:'owner',label:'Owner',description:'Explore every view and manage this development workspace.',permissions:['operators:write','games:write','release:request','release:validate','release:approve','release:reject','release:cancel','workspace:reset']},
+  {id:'owner',label:'Owner',description:'Explore every view and manage this development workspace.',permissions:['operators:write','games:write','release:request','release:validate','release:approve','release:reject','release:cancel','workspace:reset','finance:manage','finance:record']},
   {id:'operator',label:'Operator',description:'Practice operator setup and prepare sample release requests.',permissions:['operators:write','games:write','release:request','release:validate','release:cancel']},
-  {id:'approver',label:'Approver',description:'Review and approve or reject simulated release requests.',permissions:['release:approve','release:reject']},
+  {id:'approver',label:'Approver',description:'Review and approve or reject simulated release requests.',permissions:['release:approve','release:reject','finance:issue']},
   {id:'auditor',label:'Auditor',description:'Inspect sample activity, transactions and audit records.',permissions:[]}
 ].map(role => Object.freeze({...role,permissions:Object.freeze(role.permissions)})));
 
@@ -221,10 +222,11 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
         }
         const workspace=session.workspace;
         ensureGameSettings(workspace,clock());
+        const finance=ensureFinance(workspace,clock());
         if(path==='/api/bootstrap'&&method==='GET')return reply(res,200,{
           development:true,environment:'development',production_enabled:false,identity:identity(session),
           summary:{operators:workspace.operators.length,games:workspace.games.length,sessions:workspace.sessions.length,rounds:2,pending_releases:workspace.releases.filter(item=>['requested','validated'].includes(item.status)).length},
-          ...workspace,updated_at:clock()
+          ...workspace,finance_summary:financeSummary(finance,clock()),updated_at:clock()
         });
         if(path==='/api/logout'&&method==='POST') {
           removeSession(hash(raw));return reply(res,200,{success:true,development:true},{'Set-Cookie':cookie('xdplay_dev_session','',0)});
@@ -268,6 +270,65 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
           audit(workspace,'development.operator_game_settings_updated.'+operator.id+'.'+game.id,session.role,clock());
           saveSession(hash(raw));
           return reply(res,200,{setting:existing,development:true,production_enabled:false});
+        }
+
+        // Finance is sample-only and scoped to this browser workspace.
+        // Never touch the provider ledger, commercial accounts or payment gateways.
+        if(path==='/api/finance/profile'&&method==='PATCH') {
+          permission(session,'finance:manage');
+          const data=await body(req);
+          if(!workspace.operators.some(op=>op.id===data.operator_id))fail(404,'OPERATOR_NOT_FOUND');
+          let profile;
+          try{profile=validateProfile(data);}catch(e){fail(422,e.message,'Check the billing contact, currency and integer IDR sample fees.');}
+          const existing=finance.profiles.find(p=>p.operator_id===data.operator_id);
+          if(!existing)fail(404,'BILLING_PROFILE_NOT_FOUND');
+          if(data.revision!==existing.revision)fail(409,'STALE_BILLING_PROFILE','Refresh and retry the newer profile.');
+          Object.assign(existing,profile,{revision:existing.revision+1,updated_at:clock(),updated_by:session.role});
+          audit(workspace,'development.finance.profile_updated.'+existing.operator_id,session.role,clock());
+          saveSession(hash(raw));
+          return reply(res,200,{profile:existing,development:true,simulation:true});
+        }
+        if(path==='/api/finance/invoices'&&method==='POST'){
+          permission(session,'finance:manage');
+          const data=await body(req);payloadFields(data,['operator_id','billing_month']);
+          if(!workspace.operators.some(op=>op.id===data.operator_id))fail(404,'OPERATOR_NOT_FOUND');
+          if(finance.invoices.some(i=>i.operator_id===data.operator_id&&i.billing_month===data.billing_month&&i.status!=='void'))fail(409,'INVOICE_PERIOD_EXISTS');
+          if(finance.invoices.length>=200)fail(409,'DEVELOPMENT_LIMIT');
+          let preview;
+          try{preview=previewInvoice(workspace,data.operator_id,data.billing_month,clock());}
+          catch(e){fail(422,e.message,'Check the complete billing profile and month.');}
+          if(finance.sequence>=999999)fail(409,'DEVELOPMENT_LIMIT');
+          finance.sequence++;
+          const invoice={...preview,id:id('inv_dev_'),number:'DEMO-'+String(data.billing_month).replace('-','')+'-'+String(finance.sequence).padStart(5,'0'),
+            status:'draft',issued_at:null,due_at:null,paid_at:null,voided_at:null,created_at:clock(),created_by:session.role,issued_by:null,paid_by:null};
+          finance.invoices.unshift(invoice);
+          audit(workspace,'development.finance.invoice_drafted.'+invoice.id,session.role,clock());
+          saveSession(hash(raw));
+          return reply(res,201,{invoice,simulation:true,production_enabled:false});
+        }
+        let invoiceMatch=path.match(/^\/api\/finance\/invoices\/(inv_dev_[a-f0-9]+)\/(issue|mark-paid|void)$/);
+        if(invoiceMatch&&method==='POST'){
+          const action=invoiceMatch[2];
+          permission(session,action==='issue'?'finance:issue':action==='mark-paid'?'finance:record':'finance:issue');
+          payloadFields(await body(req),[]);
+          const invoice=finance.invoices.find(i=>i.id===invoiceMatch[1]);
+          if(!invoice)fail(404,'INVOICE_NOT_FOUND');
+          if(action==='issue'){
+            if(invoice.status!=='draft')fail(409,'INVALID_INVOICE_TRANSITION');
+            if(invoice.created_by===session.role)fail(403,'INDEPENDENT_APPROVAL_REQUIRED');
+            invoice.status='issued';invoice.issued_by=session.role;invoice.issued_at=clock();
+            invoice.due_at=clock()+invoice.due_days*86400000;
+          } else if(action==='mark-paid'){
+            if(invoice.status!=='issued')fail(409,'INVALID_INVOICE_TRANSITION');
+            invoice.status='paid';invoice.paid_by=session.role;invoice.paid_at=clock();
+            invoice.payment_note='DEMO CONFIRMATION ONLY - no funds received';
+          } else {
+            if(!['draft','issued'].includes(invoice.status))fail(409,'INVALID_INVOICE_TRANSITION');
+            invoice.status='void';invoice.voided_at=clock();
+          }
+          audit(workspace,'development.finance.invoice_'+action+'.'+invoice.id,session.role,clock());
+          saveSession(hash(raw));
+          return reply(res,200,{invoice,simulation:true,production_enabled:false});
         }
         let match=path.match(/^\/api\/operators\/(op_dev_[\w-]+)$/);
         if(match&&method==='PATCH') {
