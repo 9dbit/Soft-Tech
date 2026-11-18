@@ -14,10 +14,7 @@ Use Node.js 24:
 NODE_ENV=development XDPLAY_DEVELOPMENT_ONLY=true CORE_ENVIRONMENT=development PORT=8080 node development/server.mjs
 ```
 
-Open `http://localhost:8080` and select a development role. Each browser receives
-its own sample workspace stored in server memory. Refreshing the page or using
-Switch Role preserves that workspace. Logging out, expiry after two hours or a
-server restart discards it. Another browser cannot see its changes. Owner can
+Open `http://localhost:8080` and select a development role. Each browser receives its own isolated sample workspace. Without\n`XDPLAY_DEVELOPMENT_DB_PATH`, the workspace stays in server memory. With\nthat variable configured, session data and sample operators are persisted\nto a SQLite database on the dedicated development volume, surviving server\nrestarts. Refreshing or using Switch Role preserves that workspace. Logging\nout or expiry after two hours discards it. Another browser cannot see its changes. Owner can
 also reset only their own development workspace.
 
 The UI supports sample operator creation/status, maintenance toggles and
@@ -28,8 +25,7 @@ activation are intentionally unavailable.
 
 ## Railway deployment
 
-Deploy in a dedicated project with an environment named `development`, a fresh
-service, no persistent volume and no production variables. Root directory is
+Deploy in a dedicated project with an environment named `development`, a fresh\nservice, no production variables, and optionally one dedicated development\nvolume mounted to `/data`. Set `XDPLAY_DEVELOPMENT_DB_PATH` to\n`/data/xdplay-development/sessions.sqlite` when using the volume. Root directory is
 `/provider-dashboard`; Dockerfile is `development/Dockerfile`; health check is
 `/health`; start command is `node development/server.mjs`.
 
