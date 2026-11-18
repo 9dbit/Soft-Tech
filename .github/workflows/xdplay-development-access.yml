@@ -1,0 +1,38 @@
+name: XDPLAY Development Access
+
+on:
+  push:
+    branches:
+      - feat/xdplay-development-role-access-20261118
+    paths:
+      - provider-dashboard/development/**
+      - provider-dashboard/test/development-http.test.mjs
+      - .github/workflows/xdplay-development-access.yml
+  pull_request:
+    paths:
+      - provider-dashboard/development/**
+      - provider-dashboard/test/development-http.test.mjs
+      - .github/workflows/xdplay-development-access.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  development-boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: provider-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate development JavaScript
+        run: node --check development/server.mjs && node --check development/public/app.js
+      - name: Development session, role and isolation tests
+        run: node --test test/development-http.test.mjs
+      - name: Existing staff authentication regression
+        run: node --test --test-concurrency=1 test/staff-auth.test.mjs test/staff-http.test.mjs test/shared-bootstrap-auth.test.mjs

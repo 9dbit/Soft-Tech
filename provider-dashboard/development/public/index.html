@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b10">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="XDPLAY development workspace. Explore four staff roles with isolated sample data.">
+  <title>XDPLAY — Development Workspace</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div id="login-screen" class="login-screen">
+    <header class="login-header wrap">
+      <a class="brand" href="/" aria-label="XDPLAY development home"><span>XD</span>PLAY<small>PROVIDER CONTROL</small></a>
+      <span class="environment"><i aria-hidden="true"></i> DEVELOPMENT</span>
+    </header>
+    <main id="main-content" class="login-main wrap" tabindex="-1">
+      <section class="login-intro" aria-labelledby="welcome-heading">
+        <span class="eyebrow">YOUR WORKSPACE. YOUR PERSPECTIVE.</span>
+        <h1 id="welcome-heading">ONE PLATFORM.<br><em>FOUR ROLES.</em></h1>
+        <p class="lead">Choose a role and start exploring the XDPLAY dashboard. No password needed in this development workspace.</p>
+        <div class="intro-visual" aria-hidden="true"><span class="pixel-tile tile-a">XD</span><span class="pixel-tile tile-b">+</span><span class="pixel-tile tile-c">PLAY</span><div class="visual-caption">BUILD / REVIEW / REFINE</div></div>
+        <div class="scope-note"><span class="scope-symbol" aria-hidden="true">◇</span><p><strong>Sample data. A separate workspace.</strong>Your changes stay in this browser's development session. Switch roles to review a workflow from another perspective.</p></div>
+      </section>
+      <section class="role-section" aria-labelledby="role-heading">
+        <div class="section-heading"><div><span class="eyebrow">QUICK SIGN IN</span><h2 id="role-heading">Choose your role</h2></div><span class="small-tag">4 PERSPECTIVES</span></div>
+        <div id="role-cards" class="role-grid" aria-busy="true"></div>
+        <div id="login-feedback" class="inline-feedback" role="status" aria-live="polite">Preparing your development workspace…</div>
+        <button type="button" id="retry-session" class="button button-secondary" hidden>Try again</button>
+        <p class="login-fineprint">Development sessions use sample operators and virtual credits. Real accounts, credentials, game engines and production releases are outside this workspace.</p>
+      </section>
+    </main>
+    <footer class="login-footer wrap"><span>XDPLAY © 2026</span><span>DEVELOPMENT / SAMPLE DATA</span></footer>
+  </div>
+
+  <div id="app-shell" class="app-shell" hidden>
+    <header class="app-header">
+      <a class="brand compact" href="#overview" data-route="overview" aria-label="XDPLAY overview"><span>XD</span>PLAY</a>
+      <span class="environment"><i aria-hidden="true"></i> <span>DEVELOPMENT</span><b>/ SAMPLE DATA</b></span>
+      <div class="header-actions">
+        <label class="role-switch"><span class="sr-only">Switch development role</span><select id="role-switch" aria-label="Switch development role"></select></label>
+        <button type="button" class="button button-secondary logout-button" id="logout-button">Log out <span aria-hidden="true">↗</span></button>
+      </div>
+    </header>
+    <div class="app-frame">
+      <aside class="sidebar" aria-label="Workspace navigation">
+        <div class="workspace-heading"><span class="workspace-icon" aria-hidden="true">XD</span><div><strong>Development</strong><small>Your sample workspace</small></div></div>
+        <p class="nav-caption">WORKSPACE</p>
+        <nav id="workspace-nav" aria-label="Dashboard pages"></nav>
+        <div class="sidebar-note"><span class="small-tag">SESSION WORKSPACE</span><p>Refresh keeps your sample changes. Log out starts a fresh workspace next time.</p><span id="session-expiry"></span></div>
+      </aside>
+      <div class="main-column">
+        <main id="page-content" class="content" tabindex="-1" aria-live="polite"></main>
+        <footer class="workspace-footer"><span>XDPLAY / DEVELOPMENT WORKSPACE</span><span id="updated-at">Sample data</span></footer>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="workspace-dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
