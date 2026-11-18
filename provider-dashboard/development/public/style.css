@@ -19,3 +19,15 @@
 .settings-toggle{display:flex;align-items:center;gap:12px;padding:12px 0;cursor:pointer}
 .settings-toggle input{width:18px;height:18px;accent-color:#8d7aff}
 @media(max-width:500px){.settings-fields{grid-template-columns:1fr}.game-operator-row{gap:6px}}
+
+
+/* Sample finance: quiet layout, deliberately unmistakable DEMO notation. */
+.invoice-preview{border:1px solid rgba(135,123,170,.33);background:rgba(124,100,190,.04);border-radius:18px;padding:16px;margin:10px 0}
+.invoice-preview h3{overflow-wrap:anywhere}
+.invoice-preview p{overflow-wrap:anywhere}
+.invoice-stamp{display:inline-block;padding:7px 12px;border:1px dashed rgba(185,126,255,.7);border-radius:10px;font-weight:800;letter-spacing:.07em;font-size:11px;margin-bottom:10px}
+.invoice-preview .table-wrap{margin:12px 0;max-width:100%}
+.invoice-preview td,.invoice-preview th{padding:9px 7px;font-size:12px}
+.form-field textarea{width:100%;max-width:100%;min-height:80px;padding:12px;border-radius:10px;background:rgba(135,135,155,.08);color:inherit;border:1px solid rgba(150,150,175,.26);font:inherit;resize:vertical}
+.form-field textarea:focus-visible{outline:2px solid #9a84fa;outline-offset:2px}
+@media(max-width:620px){.invoice-preview{padding:10px}.invoice-preview .table-wrap{overflow-x:auto}.action-group{flex-wrap:wrap}}
