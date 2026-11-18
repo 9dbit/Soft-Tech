@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 import {randomBytes, createHash, timingSafeEqual} from 'node:crypto';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
+import {DevelopmentSessionStore} from './session-store.mjs';
 
 // This entry point deliberately has no imports from the provider Core, staff
 // authentication, wallets, game adapters, databases or release-control modules.
@@ -41,6 +42,7 @@ export function validateDevelopmentEnvironment(env) {
   } else if (!['development','test'].includes(env.NODE_ENV)) {
     throw Error('Local development requires NODE_ENV=development or test.');
   }
+  if (env.XDPLAY_DEVELOPMENT_DB_PATH && !/^\/data\/xdplay-development\/[^/]+\.sqlite$/.test(env.XDPLAY_DEVELOPMENT_DB_PATH) && env.NODE_ENV === 'production') throw Error('Development DB path must be on its isolated volume.');
   const prohibited = /^(?:PANEL_|BACKUP_|OFFSITE_|WALLET_|DATABASE_URL$|CORE_DB_PATH$|CORE_ENGINE_|CORE_ALLOWED_WALLET_|CORE_PUBLIC_ORIGIN$|CORE_QUALIFICATION_|CORE_ACCEPTANCE_|CORE_ISOLATION_)|_PROVIDER_ORIGIN$/;
   for (const [key,value] of Object.entries(env)) {
     if (value && prohibited.test(key)) throw Error('Live provider configuration is forbidden in development: '+key);
@@ -121,11 +123,15 @@ async function body(req) {
 
 export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
   const config=validateDevelopmentEnvironment(env);
-  const sessions=new Map(),logins=new Map(),limits=new Map();
+  const store=env.XDPLAY_DEVELOPMENT_DB_PATH?new DevelopmentSessionStore(env.XDPLAY_DEVELOPMENT_DB_PATH):null;
+  const sessions=new Map(store?store.load(clock()):[]),logins=new Map(),limits=new Map();
+  const saveSession=key=>{if(store&&sessions.has(key))store.save(key,sessions.get(key));};
+  const removeSession=key=>{sessions.delete(key);store?.remove(key);};
   const cookie=(name,value,maxAge)=>`${name}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${config.secureCookies?'; Secure':''}`;
   function cleanup() {
     const now=clock();
-    for(const map of [sessions,logins]) for(const [key,item] of map) if(item.expires_at<=now)map.delete(key);
+    for(const map of [sessions,logins]) for(const [key,item] of map) if(item.expires_at<=now)(map===sessions?removeSession(key):map.delete(key));
+    store?.prune(now);
     for(const [key,item] of limits)if(item.until<=now)limits.delete(key);
   }
   function throttle(req,bucket,max) {
@@ -148,7 +154,7 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
   }
   function newSession(role,workspace,expires_at=clock()+SESSION_MS) {
     if(sessions.size>=MAX_SESSIONS)fail(503,'DEVELOPMENT_BUSY','Development preview is busy. Try again later.');
-    const token=random(),session={role,csrf:random(),workspace,expires_at};sessions.set(hash(token),session);
+    const token=random(),session={role,csrf:random(),workspace,expires_at};sessions.set(hash(token),session);saveSession(hash(token));
     return {token,session};
   }
   const server=createServer({maxHeaderSize:16384},async(req,res)=>{
@@ -183,7 +189,7 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
           const data=await body(req);payloadFields(data,['role','csrf']);
           if(!login||!same(req.headers['x-csrf-token'],login.csrf)||!same(data.csrf,login.csrf))fail(403,'CSRF_REQUIRED','Reload the sign-in page and try again.');
           if(!roleById(data.role))fail(422,'INVALID_ROLE','Choose one of the four development roles.');
-          if(session)sessions.delete(hash(raw));
+          if(session)removeSession(hash(raw));
           const result=newSession(data.role,fixture(clock()));logins.delete(hash(token));
           audit(result.session.workspace,'development.signed_in',data.role,clock());
           return reply(res,200,view(result.session),{'Set-Cookie':[cookie('xdplay_dev_session',result.token,SESSION_MS/1000),cookie('xdplay_dev_login','',0)]});
@@ -200,18 +206,18 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
           ...workspace,updated_at:clock()
         });
         if(path==='/api/logout'&&method==='POST') {
-          sessions.delete(hash(raw));return reply(res,200,{success:true,development:true},{'Set-Cookie':cookie('xdplay_dev_session','',0)});
+          removeSession(hash(raw));return reply(res,200,{success:true,development:true},{'Set-Cookie':cookie('xdplay_dev_session','',0)});
         }
         if(path==='/api/development/switch-role'&&method==='POST') {
           const data=await body(req);payloadFields(data,['role']);if(!roleById(data.role))fail(422,'INVALID_ROLE');
-          sessions.delete(hash(raw));const result=newSession(data.role,workspace,session.expires_at);
+          removeSession(hash(raw));const result=newSession(data.role,workspace,session.expires_at);
           audit(workspace,'development.role_switched',data.role,clock());
           return reply(res,200,view(result.session),{'Set-Cookie':cookie('xdplay_dev_session',result.token,Math.max(1,Math.floor((session.expires_at-clock())/1000)))});
         }
         if(path==='/api/development/reset'&&method==='POST') {
           permission(session,'workspace:reset');const data=await body(req);payloadFields(data,['confirmation']);
           if(data.confirmation!=='RESET DEVELOPMENT')fail(422,'CONFIRMATION_REQUIRED');
-          session.workspace=fixture(clock());audit(session.workspace,'development.workspace_reset',session.role,clock());
+          session.workspace=fixture(clock());audit(session.workspace,'development.workspace_reset',session.role,clock());saveSession(hash(raw));
           return reply(res,200,{success:true,development:true});
         }
         if(path==='/api/operators'&&method==='POST') {
@@ -220,20 +226,20 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
           if(name.length<2||name.length>80||/[\u0000-\u001f\u007f]/.test(name)||data.currency!=='VCOIN'||!Array.isArray(data.games)||!data.games.length||data.games.length>3||data.games.some(game=>!workspace.games.some(item=>item.id===game)))fail(422,'INVALID_OPERATOR','Enter a name, VCOIN currency and at least one sample game.');
           if(workspace.operators.length>=100)fail(409,'DEVELOPMENT_LIMIT','Reset this workspace to create more sample operators.');
           const operator={id:id('op_dev_'),name,status:'enabled',environment:'development',currency:'VCOIN',games:[...new Set(data.games)]};
-          workspace.operators.push(operator);audit(workspace,'development.operator_created',session.role,clock());return reply(res,201,{operator,development:true});
+          workspace.operators.push(operator);audit(workspace,'development.operator_created',session.role,clock());saveSession(hash(raw));return reply(res,201,{operator,development:true});
         }
         let match=path.match(/^\/api\/operators\/(op_dev_[\w-]+)$/);
         if(match&&method==='PATCH') {
           permission(session,'operators:write');const data=await body(req);payloadFields(data,['status']);
           if(!['enabled','disabled'].includes(data.status))fail(422,'INVALID_STATUS');
           const operator=workspace.operators.find(item=>item.id===match[1]);if(!operator)fail(404,'OPERATOR_NOT_FOUND');
-          operator.status=data.status;audit(workspace,'development.operator_'+data.status,session.role,clock());return reply(res,200,{operator,development:true});
+          operator.status=data.status;audit(workspace,'development.operator_'+data.status,session.role,clock());saveSession(hash(raw));return reply(res,200,{operator,development:true});
         }
         match=path.match(/^\/api\/games\/([\w-]+)$/);
         if(match&&method==='PATCH') {
           permission(session,'games:write');const data=await body(req);payloadFields(data,['maintenance']);if(typeof data.maintenance!=='boolean')fail(422,'INVALID_MAINTENANCE');
           const game=workspace.games.find(item=>item.id===match[1]);if(!game)fail(404,'GAME_NOT_FOUND');
-          game.maintenance=data.maintenance;audit(workspace,'development.game_maintenance_changed',session.role,clock());return reply(res,200,{game,development:true});
+          game.maintenance=data.maintenance;audit(workspace,'development.game_maintenance_changed',session.role,clock());saveSession(hash(raw));return reply(res,200,{game,development:true});
         }
         if(path==='/api/release-requests'&&method==='POST') {
           permission(session,'release:request');const data=await body(req);payloadFields(data,['operator_id','game_id']);
@@ -242,7 +248,7 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
           if(workspace.releases.some(item=>item.operator_id===data.operator_id&&item.game_id===data.game_id&&['requested','validated'].includes(item.status)))fail(409,'RELEASE_REQUEST_PENDING','A sample request for this operator and game is already pending.');
           if(workspace.releases.length>=100)fail(409,'DEVELOPMENT_LIMIT');
           const request={id:id('rel_dev_'),operator_id:operator.id,game_id:data.game_id,status:'requested',requested_by:session.role,approved_by:null,created_at:clock(),updated_at:clock(),simulation:true};
-          workspace.releases.unshift(request);audit(workspace,'development.release_requested',session.role,clock());return reply(res,201,{...request,development:true});
+          workspace.releases.unshift(request);audit(workspace,'development.release_requested',session.role,clock());saveSession(hash(raw));return reply(res,201,{...request,development:true});
         }
         match=path.match(/^\/api\/release-requests\/(rel_dev_[\w-]+)\/(validate|approve|reject|cancel)$/);
         if(match&&method==='POST') {
@@ -256,7 +262,7 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
             if(!operator||operator.status!=='enabled'||!operator.games.includes(request.game_id)||!game||game.maintenance)fail(409,'OPERATOR_GAME_NOT_READY');
           }
           request.status=next;request.updated_at=clock();if(action==='approve')request.approved_by=session.role;if(action==='validate')request.validated_by=session.role;
-          audit(workspace,'development.release_'+next,session.role,clock());return reply(res,200,{...request,development:true,production_enabled:false});
+          audit(workspace,'development.release_'+next,session.role,clock());saveSession(hash(raw));return reply(res,200,{...request,development:true,production_enabled:false});
         }
         fail(404,'NOT_FOUND');
       }
@@ -278,7 +284,7 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
     }
   });
   server.requestTimeout=15000;server.headersTimeout=10000;
-  server.on('close',()=>{sessions.clear();logins.clear();limits.clear();});
+  server.on('close',()=>{sessions.clear();logins.clear();limits.clear();store?.close();});
   return server;
 }
 
