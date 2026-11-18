@@ -57,3 +57,26 @@ node --test test/development-http.test.mjs
 
 Browser QA should cover all four sign-ins, refresh, role switching, role-specific
 demo permissions, independent approval, sign-out, and desktop/mobile overflow.
+
+
+## Games: per-operator settings (development only)
+
+The Games page now lists the sample operators assigned to each game. Owner and
+Operator may open Settings for an assignment and edit:
+
+- enabled/disabled for that operator
+- maintenance mode for that operator
+- virtual VCOIN minimum and maximum bet limits, integer values 1 through
+  100,000,000, with min <= max
+
+Each assignment carries a monotonically increasing revision; stale writes are
+rejected. Changes have a server-side audit event, persist with the browser's
+development session on the dedicated SQLite volume, and are considered in
+sample release request/validation/approval eligibility. New sample operators
+receive default sample settings for each assigned game.
+
+These are **not** live game settings. RTP, RNG, mathematical outcomes, signing
+keys, real-money currencies, callbacks, engine deployments and production
+release activation cannot be changed from this dashboard. The integration
+contract for actual operator/engine settings requires separate sandbox
+certification and distinct production authentication.
