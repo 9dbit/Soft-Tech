@@ -80,3 +80,40 @@ keys, real-money currencies, callbacks, engine deployments and production
 release activation cannot be changed from this dashboard. The integration
 contract for actual operator/engine settings requires separate sandbox
 certification and distinct production authentication.
+
+
+## Finance & Billing: development preview
+
+The dashboard contains a **Finance & Billing** page that is entirely isolated
+from the provider core, Playground, wallets, banking, staff login, tax reporting
+and operator contract systems. It is NOT an accounts-receivable or production
+invoicing service.
+
+For each sample operator, an Owner may maintain a billing contact and integer-IDR
+demo tariff assumptions (monthly and per-completed-session rates, optional setup
+fee for future work, tax basis points and payment terms). These fields do not
+change the game ledger and no charge is automatically incurred.
+
+An Owner can draft a **DEMO-YYYYMM-#####** invoice, with a frozen line-item
+snapshot of sample sessions in the selected billing month. Duplicate active
+months per operator are rejected. Approver may change a draft to issued, with
+an independent development role; Owner can subsequently mark an issued invoice
+as PAID (DEMO only). Approver can void drafts or issued samples. These are
+simulated status transitions; no money is received, no invoice is emailed and
+the preview provides no payment instructions.
+
+The overview includes sample draft, issued, overdue, paid and IDR outstanding
+counts. The invoice detail modal is a nonpayable HTML preview. It is NOT a
+legal tax invoice, PDF, or regulated accounting record. The configured tax
+rate is only a testing assumption, not a representation of applicable taxes.
+
+Like the rest of the development app, records belong to one browser's short-
+lived 2-hour session, saved on the dedicated SQLite development volume if
+configured. Logout/expiry removes them. Data is not a persistent organization-
+wide billing database and will not be shared with production.
+
+A real finance launch still needs a durable multi-user store, real operator
+identities and commercial contract pricing, signed immutable accounting
+postings, financial reconciliation, formal invoice number and PDF generation,
+tax-compliant fields, delivery, receipt verification, audit/backup retention,
+and a documented approval/reversal policy.
