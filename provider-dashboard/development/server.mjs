@@ -78,12 +78,32 @@ function fixture(now) {
       {id:'tx_dev_1004',operator_id:'op_dev_beta',game_id:'skygate',kind:'sample credit',amount_minor:'0',currency:'VCOIN',reference:'sample_round_1002',created_at:now-11*60000}
     ],
     releases:[{id:'rel_dev_example',operator_id:'op_dev_alpha',game_id:'uno-luck',status:'validated',requested_by:'operator',validated_by:'operator',approved_by:null,created_at:now-8*60000,updated_at:now-6*60000,simulation:true}],
+    game_settings: [
+      {operator_id:'op_dev_alpha',game_id:'uno-luck',enabled:true,maintenance:false,min_bet:400,max_bet:10000,currency:'VCOIN',revision:1,updated_at:now,updated_by:'system'},
+      {operator_id:'op_dev_alpha',game_id:'mahjong-wild',enabled:true,maintenance:false,min_bet:400,max_bet:10000,currency:'VCOIN',revision:1,updated_at:now,updated_by:'system'},
+      {operator_id:'op_dev_alpha',game_id:'skygate',enabled:true,maintenance:false,min_bet:400,max_bet:10000,currency:'VCOIN',revision:1,updated_at:now,updated_by:'system'},
+      {operator_id:'op_dev_beta',game_id:'uno-luck',enabled:true,maintenance:false,min_bet:400,max_bet:10000,currency:'VCOIN',revision:1,updated_at:now,updated_by:'system'},
+      {operator_id:'op_dev_beta',game_id:'skygate',enabled:true,maintenance:false,min_bet:400,max_bet:10000,currency:'VCOIN',revision:1,updated_at:now,updated_by:'system'}
+    ],
     staff:roles.map(role=>({role:role.id,display_name:'Development '+role.label,description:role.description})),
     audit:[{id:'audit_dev_initial',event:'development.workspace_created',actor:'system',created_at:now}],
     created_at:now
   };
 }
 
+function ensureGameSettings(workspace,now) {
+  if(!Array.isArray(workspace.game_settings)) workspace.game_settings=[];
+  for(const operator of workspace.operators) for(const gameId of operator.games){
+    if(!workspace.games.some(game=>game.id===gameId))continue;
+    if(!workspace.game_settings.some(item=>item.operator_id===operator.id&&item.game_id===gameId)){
+      workspace.game_settings.push({operator_id:operator.id,game_id:gameId,enabled:true,maintenance:false,min_bet:400,max_bet:10000,currency:'VCOIN',revision:1,updated_at:now,updated_by:'system'});
+    }
+  }
+  return workspace.game_settings;
+}
+function assignedGameSetting(workspace,operatorId,gameId,now){
+  return ensureGameSettings(workspace,now).find(item=>item.operator_id===operatorId&&item.game_id===gameId);
+}
 class DevelopmentError extends Error {
   constructor(status,code,message=code) { super(message);this.status=status;this.code=code; }
 }
@@ -200,6 +220,7 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
           if(!same(req.headers['x-csrf-token'],session.csrf))fail(403,'CSRF_REQUIRED','Refresh the page and try again.');
         }
         const workspace=session.workspace;
+        ensureGameSettings(workspace,clock());
         if(path==='/api/bootstrap'&&method==='GET')return reply(res,200,{
           development:true,environment:'development',production_enabled:false,identity:identity(session),
           summary:{operators:workspace.operators.length,games:workspace.games.length,sessions:workspace.sessions.length,rounds:2,pending_releases:workspace.releases.filter(item=>['requested','validated'].includes(item.status)).length},
@@ -226,7 +247,27 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
           if(name.length<2||name.length>80||/[\u0000-\u001f\u007f]/.test(name)||data.currency!=='VCOIN'||!Array.isArray(data.games)||!data.games.length||data.games.length>3||data.games.some(game=>!workspace.games.some(item=>item.id===game)))fail(422,'INVALID_OPERATOR','Enter a name, VCOIN currency and at least one sample game.');
           if(workspace.operators.length>=100)fail(409,'DEVELOPMENT_LIMIT','Reset this workspace to create more sample operators.');
           const operator={id:id('op_dev_'),name,status:'enabled',environment:'development',currency:'VCOIN',games:[...new Set(data.games)]};
-          workspace.operators.push(operator);audit(workspace,'development.operator_created',session.role,clock());saveSession(hash(raw));return reply(res,201,{operator,development:true});
+          workspace.operators.push(operator);ensureGameSettings(workspace,clock());audit(workspace,'development.operator_created',session.role,clock());saveSession(hash(raw));return reply(res,201,{operator,development:true});
+        }
+        if(path==='/api/operator-game-settings'&&method==='PATCH') {
+          permission(session,'games:write');
+          const data=await body(req);
+          payloadFields(data,['operator_id','game_id','enabled','maintenance','min_bet','max_bet','currency','revision']);
+          const operator=workspace.operators.find(item=>item.id===data.operator_id);
+          const game=workspace.games.find(item=>item.id===data.game_id);
+          if(!operator||!game||!operator.games.includes(data.game_id))fail(422,'OPERATOR_GAME_NOT_ASSIGNED');
+          const existing=assignedGameSetting(workspace,operator.id,game.id,clock());
+          if(!existing)fail(404,'GAME_SETTING_NOT_FOUND');
+          if(!Number.isSafeInteger(data.revision)||data.revision!==existing.revision)fail(409,'STALE_GAME_SETTINGS','Settings changed. Refresh before editing.');
+          if(typeof data.enabled!=='boolean'||typeof data.maintenance!=='boolean'||data.currency!=='VCOIN'||
+             !Number.isSafeInteger(data.min_bet)||!Number.isSafeInteger(data.max_bet)||
+             data.min_bet<1||data.max_bet>100000000||data.min_bet>data.max_bet) {
+            fail(422,'INVALID_GAME_SETTINGS','Use VCOIN and valid sample limits (1 to 100,000,000), with minimum no greater than maximum.');
+          }
+          Object.assign(existing,{enabled:data.enabled,maintenance:data.maintenance,min_bet:data.min_bet,max_bet:data.max_bet,revision:existing.revision+1,updated_at:clock(),updated_by:session.role});
+          audit(workspace,'development.operator_game_settings_updated.'+operator.id+'.'+game.id,session.role,clock());
+          saveSession(hash(raw));
+          return reply(res,200,{setting:existing,development:true,production_enabled:false});
         }
         let match=path.match(/^\/api\/operators\/(op_dev_[\w-]+)$/);
         if(match&&method==='PATCH') {
@@ -247,6 +288,8 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
           if(!operator||operator.status!=='enabled'||!operator.games.includes(data.game_id))fail(422,'OPERATOR_GAME_NOT_READY');
           if(workspace.releases.some(item=>item.operator_id===data.operator_id&&item.game_id===data.game_id&&['requested','validated'].includes(item.status)))fail(409,'RELEASE_REQUEST_PENDING','A sample request for this operator and game is already pending.');
           if(workspace.releases.length>=100)fail(409,'DEVELOPMENT_LIMIT');
+          const settings=assignedGameSetting(workspace,operator.id,data.game_id,clock());
+          if(!settings?.enabled||settings.maintenance||workspace.games.find(item=>item.id===data.game_id)?.maintenance)fail(409,'OPERATOR_GAME_NOT_READY');
           const request={id:id('rel_dev_'),operator_id:operator.id,game_id:data.game_id,status:'requested',requested_by:session.role,approved_by:null,created_at:clock(),updated_at:clock(),simulation:true};
           workspace.releases.unshift(request);audit(workspace,'development.release_requested',session.role,clock());saveSession(hash(raw));return reply(res,201,{...request,development:true});
         }
@@ -259,7 +302,8 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
           if(action==='approve'&&request.requested_by===session.role)fail(403,'INDEPENDENT_APPROVER_REQUIRED','Switch to another allowed development persona to simulate independent approval.');
           if(action==='validate'||action==='approve') {
             const operator=workspace.operators.find(item=>item.id===request.operator_id),game=workspace.games.find(item=>item.id===request.game_id);
-            if(!operator||operator.status!=='enabled'||!operator.games.includes(request.game_id)||!game||game.maintenance)fail(409,'OPERATOR_GAME_NOT_READY');
+            const settings=assignedGameSetting(workspace,request.operator_id,request.game_id,clock());
+            if(!operator||operator.status!=='enabled'||!operator.games.includes(request.game_id)||!game||game.maintenance||!settings?.enabled||settings.maintenance)fail(409,'OPERATOR_GAME_NOT_READY');
           }
           request.status=next;request.updated_at=clock();if(action==='approve')request.approved_by=session.role;if(action==='validate')request.validated_by=session.role;
           audit(workspace,'development.release_'+next,session.role,clock());saveSession(hash(raw));return reply(res,200,{...request,development:true,production_enabled:false});
