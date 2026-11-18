@@ -301,3 +301,65 @@ test('per-operator game controls validate limits, enforce role access and block 
  const later=expectStatus(await browser.call('/api/bootstrap'),200).game_settings.find(item=>item.operator_id===newOp.id&&item.game_id==='uno-luck');
  assert.ok(later);assert.equal(later.currency,'VCOIN');
 });
+
+
+test('finance demo validates profiles, prevents duplicate invoices and enforces independent issuance',async t=>{
+ const f=await fixture(t),b=f.browser();await b.login('owner');
+ const before=expectStatus(await b.call('/api/bootstrap'),200);
+ assert.ok(before.finance.profiles.some(p=>p.operator_id==='op_dev_alpha'));
+ assert.equal(before.finance.invoices.length,0);
+ const p=before.finance.profiles.find(row=>row.operator_id==='op_dev_alpha');
+ const route='/api/finance/profile';
+ const payload={operator_id:p.operator_id,revision:p.revision,bill_to:'Demo Studio Ltd',
+   billing_email:'billing@example.test',billing_address:'Sample address only',
+   currency:'IDR',setup_fee:0,monthly_fee:100000,usage_fee:3000,tax_bps:0,due_days:14};
+ for(const patch of [{currency:'VCOIN'},{monthly_fee:-1},{usage_fee:1.2},{tax_bps:2100},
+                     {bank_account:'12345'},{billing_email:'invalid-email'}]){
+   expectDenied(await b.call(route,{method:'PATCH',body:{...payload,...patch}}));
+ }
+ const updated=expectStatus(await b.call(route,{method:'PATCH',body:payload}),200).profile;
+ assert.equal(updated.revision,p.revision+1);
+ assert.equal((await b.call(route,{method:'PATCH',body:payload})).status,409);
+ const month='2026-11';
+ const created=expectStatus(await b.call('/api/finance/invoices',{method:'POST',body:{operator_id:p.operator_id,billing_month:month}}),201).invoice;
+ assert.equal(created.status,'draft');assert.equal(created.currency,'IDR');assert.equal(created.simulation,true);
+ assert.match(created.number,/^DEMO-202611-\d{5}$/);
+ assert.equal(created.total,103000);
+ assert.equal((await b.call('/api/finance/invoices',{method:'POST',body:{operator_id:p.operator_id,billing_month:month}})).status,409);
+ const issue='/api/finance/invoices/'+created.id+'/issue';
+ assert.equal((await b.call(issue,{method:'POST',body:{}})).status,403);
+ expectStatus(await b.call('/api/development/switch-role',{method:'POST',body:{role:'auditor'}}),200);
+ assert.equal((await b.call(route,{method:'PATCH',body:{...payload,revision:updated.revision}})).status,403);
+ assert.equal((await b.call(issue,{method:'POST',body:{}})).status,403);
+ expectStatus(await b.call('/api/development/switch-role',{method:'POST',body:{role:'approver'}}),200);
+ const issued=expectStatus(await b.call(issue,{method:'POST',body:{}}),200).invoice;
+ assert.equal(issued.status,'issued');assert.ok(issued.due_at>issued.issued_at);
+ assert.equal((await b.call(issue,{method:'POST',body:{}})).status,409);
+ expectStatus(await b.call('/api/development/switch-role',{method:'POST',body:{role:'owner'}}),200);
+ const paid=expectStatus(await b.call('/api/finance/invoices/'+created.id+'/mark-paid',{method:'POST',body:{}}),200).invoice;
+ assert.equal(paid.status,'paid');assert.match(paid.payment_note,/no funds received/);
+ const after=expectStatus(await b.call('/api/bootstrap'),200);
+ assert.equal(after.finance_summary.paid,1);assert.equal(after.finance_summary.paid_idr,103000);
+ assert.equal(after.finance_summary.outstanding_idr,0);
+ assert.equal((await b.call('/api/finance/invoices/'+created.id+'/mark-paid',{method:'POST',body:{}})).status,409);
+ assert.equal((await b.call('/api/finance/invoices',{method:'POST',body:{operator_id:p.operator_id,billing_month:month,real_money:true}})).status,422);
+});
+test('invoice sample snapshots are separate from game-wallet journal and isolated between browser sessions',async t=>{
+ const f=await fixture(t),a=f.browser(),b=f.browser();await a.login('owner');await b.login('owner');
+ const first=expectStatus(await a.call('/api/bootstrap'),200);
+ const p=first.finance.profiles[0];
+ expectStatus(await a.call('/api/finance/profile',{method:'PATCH',body:{
+   operator_id:p.operator_id,revision:p.revision,bill_to:'Example Sandbox',billing_email:'accounts@example.test',
+   billing_address:'',currency:'IDR',setup_fee:0,monthly_fee:1000,usage_fee:0,tax_bps:0,due_days:14
+ }}),200);
+ const before=expectStatus(await a.call('/api/bootstrap'),200);
+ expectStatus(await a.call('/api/finance/invoices',{method:'POST',body:{operator_id:p.operator_id,billing_month:'2026-11'}}),201);
+ const after=expectStatus(await a.call('/api/bootstrap'),200);
+ assert.deepEqual(after.transactions,before.transactions);
+ assert.deepEqual(after.sessions,before.sessions);
+ assert.equal((await b.call('/api/bootstrap')).data.finance.invoices.length,0);
+ for(const path of ['/api/finance/payments/external','/api/finance/payouts','/api/finance/tax-invoice']){
+   const response=await a.call(path,{method:'POST',body:{}});
+   expectDenied(response);
+ }
+});
