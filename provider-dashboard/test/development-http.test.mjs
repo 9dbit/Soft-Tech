@@ -273,3 +273,31 @@ test('SQLite development workspace persists over restart, remains browser-isolat
  assert.equal((await call(secondOrigin,'/api/logout','POST',{})).status,200);
  assert.equal((await call(secondOrigin,'/api/bootstrap')).status,401);
 });
+
+
+test('per-operator game controls validate limits, enforce role access and block paused release',async t=>{
+ const f=await fixture(t),browser=f.browser();await browser.login('owner');
+ const initial=expectStatus(await browser.call('/api/bootstrap'),200);
+ const original=initial.game_settings.find(item=>item.operator_id==='op_dev_alpha'&&item.game_id==='uno-luck');
+ assert.ok(original);
+ const endpoint='/api/operator-game-settings';
+ const valid={operator_id:original.operator_id,game_id:original.game_id,revision:original.revision,enabled:true,maintenance:true,min_bet:400,max_bet:9000,currency:'VCOIN'};
+ for(const patch of [{min_bet:10000,max_bet:9999},{currency:'IDR'},{min_bet:-1},{max_bet:100000001},{min_bet:'400'},{rtp:99},{wallet_url:'https://example.invalid'},{operator_id:'op_missing'}]){
+  const rejected=await browser.call(endpoint,{method:'PATCH',body:{...valid,...patch}});
+  expectDenied(rejected);
+ }
+ const changed=expectStatus(await browser.call(endpoint,{method:'PATCH',body:valid}),200).setting;
+ assert.equal(changed.maintenance,true);assert.equal(changed.max_bet,9000);assert.equal(changed.revision,original.revision+1);
+ const refreshed=expectStatus(await browser.call('/api/bootstrap'),200);
+ const untouched=refreshed.game_settings.find(item=>item.operator_id==='op_dev_beta'&&item.game_id==='uno-luck');
+ assert.equal(untouched.maintenance,false);
+ assert.equal((await browser.call('/api/release-requests',{method:'POST',body:{operator_id:original.operator_id,game_id:'uno-luck'}})).status,409);
+ assert.equal((await browser.call(endpoint,{method:'PATCH',body:valid})).status,409);
+ expectStatus(await browser.call('/api/development/switch-role',{method:'POST',body:{role:'auditor'}}),200);
+ assert.equal((await browser.call(endpoint,{method:'PATCH',body:{...valid,revision:changed.revision}})).status,403);
+ expectStatus(await browser.call('/api/development/switch-role',{method:'POST',body:{role:'owner'}}),200);
+ expectStatus(await browser.call(endpoint,{method:'PATCH',body:{...valid,revision:changed.revision,maintenance:false}}),200);
+ const newOp=await createOperator(browser,'Configured Later');
+ const later=expectStatus(await browser.call('/api/bootstrap'),200).game_settings.find(item=>item.operator_id===newOp.id&&item.game_id==='uno-luck');
+ assert.ok(later);assert.equal(later.currency,'VCOIN');
+});
