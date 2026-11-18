@@ -5,6 +5,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
 import {DevelopmentSessionStore} from './session-store.mjs';
 import {ensureFinance,validateProfile,previewInvoice,financeSummary} from './finance.mjs';
+import {sourceReadiness,forbidUnverifiedImport} from './source-readiness.mjs';
 
 // This entry point deliberately has no imports from the provider Core, staff
 // authentication, wallets, game adapters, databases or release-control modules.
@@ -226,7 +227,7 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
         if(path==='/api/bootstrap'&&method==='GET')return reply(res,200,{
           development:true,environment:'development',production_enabled:false,identity:identity(session),
           summary:{operators:workspace.operators.length,games:workspace.games.length,sessions:workspace.sessions.length,rounds:2,pending_releases:workspace.releases.filter(item=>['requested','validated'].includes(item.status)).length},
-          ...workspace,finance_summary:financeSummary(finance,clock()),updated_at:clock()
+          ...workspace,finance_summary:financeSummary(finance,clock()),finance_source:sourceReadiness(),updated_at:clock()
         });
         if(path==='/api/logout'&&method==='POST') {
           removeSession(hash(raw));return reply(res,200,{success:true,development:true},{'Set-Cookie':cookie('xdplay_dev_session','',0)});
@@ -274,6 +275,15 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
 
         // Finance is sample-only and scoped to this browser workspace.
         // Never touch the provider ledger, commercial accounts or payment gateways.
+        if(path==='/api/finance/source-readiness'&&method==='GET') {
+          return reply(res,200,sourceReadiness());
+        }
+        if(path==='/api/finance/external-usage'&&['POST','PATCH','PUT'].includes(method)) {
+          permission(session,'finance:manage');
+          // We intentionally reject before reading or storing any purported
+          // evidence. This service cannot verify Genesis signatures or scope.
+          forbidUnverifiedImport();
+        }
         if(path==='/api/finance/profile'&&method==='PATCH') {
           permission(session,'finance:manage');
           const data=await body(req);
@@ -300,7 +310,7 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
           if(finance.sequence>=999999)fail(409,'DEVELOPMENT_LIMIT');
           finance.sequence++;
           const invoice={...preview,id:id('inv_dev_'),number:'DEMO-'+String(data.billing_month).replace('-','')+'-'+String(finance.sequence).padStart(5,'0'),
-            status:'draft',issued_at:null,due_at:null,paid_at:null,voided_at:null,created_at:clock(),created_by:session.role,issued_by:null,paid_by:null};
+            source_kind:'fixture',evidence_status:'unverified',commercial:false,status:'draft',issued_at:null,due_at:null,paid_at:null,voided_at:null,created_at:clock(),created_by:session.role,issued_by:null,paid_by:null};
           finance.invoices.unshift(invoice);
           audit(workspace,'development.finance.invoice_drafted.'+invoice.id,session.role,clock());
           saveSession(hash(raw));
