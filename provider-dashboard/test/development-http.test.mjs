@@ -363,3 +363,26 @@ test('invoice sample snapshots are separate from game-wallet journal and isolate
    expectDenied(response);
  }
 });
+
+
+test('external Genesis usage cannot be fabricated or imported into passwordless development finance',async t=>{
+ const f=await fixture(t),b=f.browser();await b.login('owner');
+ const boot=expectStatus(await b.call('/api/bootstrap'),200);
+ assert.equal(boot.finance_source.state,'not_connected');
+ assert.equal(boot.finance_source.data_classification,'sample_only');
+ assert.equal(boot.finance_source.can_import_external_usage,false);
+ assert.equal(boot.finance_source.can_issue_commercial_invoice,false);
+ assert.ok(boot.finance_source.checks.length>=4);
+ const read=expectStatus(await b.call('/api/finance/source-readiness'),200);
+ assert.equal(read.invoice_eligibility,'demo_only');
+ for(const method of ['POST','PATCH','PUT']){
+  const response=await b.call('/api/finance/external-usage',{method,body:{
+    source:'genesis',operator_id:'op_dev_alpha',verified:true,signature:'forged',total:1000000
+  }});
+  assert.equal(response.status,409);
+  assert.equal(response.data.error,'EXTERNAL_USAGE_NOT_CONNECTED');
+ }
+ const after=expectStatus(await b.call('/api/bootstrap'),200);
+ assert.deepEqual(after.finance.invoices,boot.finance.invoices);
+ assert.deepEqual(after.transactions,boot.transactions);
+});
