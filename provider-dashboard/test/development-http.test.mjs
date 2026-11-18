@@ -1,3 +1,6 @@
+import {mkdtempSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {once} from 'node:events';
@@ -232,4 +235,41 @@ test('malformed and oversized bodies fail safely without mutating fixtures',asyn
  expectDenied(await browser.call('/api/operators',{method:'POST',body:operatorPayload(),headers:{'Content-Type':'text/plain'}}));
  expectDenied(await browser.call('/api/operators',{method:'POST',body:operatorPayload('x'.repeat(70000))}));
  assert.equal((await browser.call('/api/bootstrap')).data.operators.length,before);
+});
+
+
+test('SQLite development workspace persists over restart, remains browser-isolated and expires normally',async t=>{
+ const dir=mkdtempSync(join(tmpdir(),'xdplay-development-store-'));
+ t.after(()=>rmSync(dir,{recursive:true,force:true}));
+ const env={...localEnvironment(),XDPLAY_DEVELOPMENT_DB_PATH:join(dir,'sessions.sqlite')};
+ let clock=Date.UTC(2026,10,18,8);
+ const firstServer=createDevelopmentServer({env,clock:()=>clock});
+ firstServer.listen(0,'127.0.0.1');await once(firstServer,'listening');
+ const origin='http://127.0.0.1:'+firstServer.address().port;
+ let cookie='',csrf='';
+ async function call(base,path,method='GET',payload){
+  const response=await fetch(base+path,{method,headers:{...(cookie?{Cookie:cookie}:{}),...(method!=='GET'?{Origin:base,'Content-Type':'application/json','X-CSRF-Token':csrf}:{})},...(payload?{body:JSON.stringify(payload)}:{})});
+  const set=response.headers.getSetCookie();
+  for(const item of set)if(item.startsWith('xdplay_dev_')){const piece=item.split(';')[0];cookie=cookie.split('; ').filter(x=>!x.startsWith(piece.split('=')[0]+'=')).concat(piece).join('; ');}
+  const data=await response.json();if(data.csrf)csrf=data.csrf;
+  return {status:response.status,data};
+ }
+ const start=await call(origin,'/api/session');
+ assert.equal(start.status,200);
+ assert.equal((await call(origin,'/api/development/login','POST',{role:'owner',csrf:start.data.csrf})).status,200);
+ const op=await call(origin,'/api/operators','POST',operatorPayload('Persistent Operator'));
+ assert.equal(op.status,201);
+ const retainedCookie=cookie,retainedCsrf=csrf;
+ firstServer.closeAllConnections();await new Promise(resolve=>firstServer.close(resolve));
+ const nextServer=createDevelopmentServer({env,clock:()=>clock});
+ nextServer.listen(0,'127.0.0.1');await once(nextServer,'listening');
+ t.after(async()=>{nextServer.closeAllConnections();await new Promise(resolve=>nextServer.close(resolve));});
+ const secondOrigin='http://127.0.0.1:'+nextServer.address().port;
+ cookie=retainedCookie;csrf=retainedCsrf;
+ const after=await call(secondOrigin,'/api/bootstrap');
+ assert.equal(after.status,200);
+ assert.ok(after.data.operators.some(item=>item.id===op.data.operator.id));
+ const anon=await fetch(secondOrigin+'/api/bootstrap');assert.equal(anon.status,401);
+ assert.equal((await call(secondOrigin,'/api/logout','POST',{})).status,200);
+ assert.equal((await call(secondOrigin,'/api/bootstrap')).status,401);
 });
