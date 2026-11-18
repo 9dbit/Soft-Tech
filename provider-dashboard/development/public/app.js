@@ -185,9 +185,36 @@ function overviewPage() {
     `<div class="grid-two space-top"><section class="panel"><div class="panel-header"><h2>RECENT ACTIVITY</h2><span class="tiny">This workspace</span></div>${auditList(state.data.audit.slice(0,6))}</section><section class="panel"><div class="panel-header"><h2>ORIGINAL GAMES</h2>${button('View games','data-route="games"','quiet')}</div><ul class="permission-list">${state.data.games.map(game => `<li><span>${escapeHTML(game.name)}<br><small>${escapeHTML(game.version || 'Development fixture')}</small></span>${tag(game.maintenance ? 'maintenance' : 'available',game.maintenance ? 'Paused in sample' : 'Sample available')}</li>`).join('')}</ul><p class="tiny space-top">Game cards represent sample configuration. This workspace does not start live game sessions.</p></section></div>`;
 }
 
+function sampleSettingsTable(game) {
+  const records=(state.data.game_settings||[]).filter(item=>item.game_id===game.id);
+  if(!records.length)return '<p class="tiny">No assigned operators for this game.</p>';
+  return '<div class="game-operator-list">'+records.map(item=>{
+    const title=operatorName(item.operator_id);
+    return '<div class="game-operator-row"><div><strong>'+escapeHTML(title)+'</strong><small>'+escapeHTML(item.min_bet.toLocaleString('en-US'))+'–'+escapeHTML(item.max_bet.toLocaleString('en-US'))+' VCOIN · Rev '+escapeHTML(item.revision)+'</small></div>'+tag(item.enabled&&!item.maintenance?'available':item.maintenance?'maintenance':'disabled',item.enabled&&!item.maintenance?'Enabled':item.maintenance?'Paused':'Disabled')+button('Settings','data-action="config-game" data-id="'+escapeHTML(game.id)+'" data-operator="'+escapeHTML(item.operator_id)+'"','secondary button-small',!can('games:write'))+'</div>';
+  }).join('')+'</div>';
+}
+function gameSettingsDialog(gameId,operatorId) {
+  const game=state.data.games.find(item=>item.id===gameId);
+  const item=(state.data.game_settings||[]).find(record=>record.game_id===gameId&&record.operator_id===operatorId);
+  if(!game||!item)return notice('No assigned operator settings found.',true);
+  openDialog('GAME SETTINGS',`<p><strong>${escapeHTML(game.name)}</strong> · ${escapeHTML(operatorName(operatorId))}</p><p class="tiny">Development only. Limits are virtual VCOIN. RNG, RTP, live game math and engine deployment are locked.</p>
+  <form id="game-settings-form">
+  <input type="hidden" name="operator_id" value="${escapeHTML(operatorId)}">
+  <input type="hidden" name="game_id" value="${escapeHTML(gameId)}">
+  <input type="hidden" name="revision" value="${item.revision}">
+  <div class="settings-fields">
+   <label class="form-field">Minimum bet (VCOIN)<input name="min_bet" type="number" min="1" max="100000000" step="1" value="${item.min_bet}" required></label>
+   <label class="form-field">Maximum bet (VCOIN)<input name="max_bet" type="number" min="1" max="100000000" step="1" value="${item.max_bet}" required></label>
+  </div>
+  <label class="settings-toggle"><input type="checkbox" name="enabled" ${item.enabled?'checked':''}>Enable for this operator</label>
+  <label class="settings-toggle"><input type="checkbox" name="maintenance" ${item.maintenance?'checked':''}>Operator maintenance mode</label>
+  <p class="tiny">Currency: VCOIN (fixed) · Game version: ${escapeHTML(game.version)} · Revision: ${item.revision}</p>
+  <p class="form-error" id="form-error" role="alert"></p>
+  <div class="dialog-footer">${button('Cancel','data-close-dialog','quiet')}<button class="button button-primary" type="submit">Save sample settings</button></div></form>`);
+}
 function gamesPage() {
   return pageHeading('GAME <em>WORKSPACE.</em>','Review the sample game catalog and explore maintenance controls for your selected role.') + sampleBanner('Game settings below apply to sample data. Live game engines are not connected.') +
-    `<div class="grid-three">${state.data.games.map((game,index) => `<article class="game-card"><div class="game-cover ${game.id.includes('sky') ? 'skygate' : game.id.includes('mahjong') ? 'mahjong' : 'uno'}"><small>XDPLAY ORIGINAL / UI FIXTURE</small><span class="game-monogram" aria-hidden="true">0${index + 1}</span><h2>${escapeHTML(game.name)}</h2></div><div class="game-details"><div class="game-meta">${tag(game.maintenance ? 'maintenance' : 'available',game.maintenance ? 'Maintenance' : 'Available')}<span class="tiny">${escapeHTML(game.version || 'DEV')}</span></div><p>${escapeHTML(game.id)}<br>Sample configuration · No live gameplay</p>${button(game.maintenance ? 'Resume sample game' : 'Pause sample game',`data-action="maintenance" data-id="${escapeHTML(game.id)}" title="${can('games:write') ? 'Change this sample game setting' : 'Owner or Operator role required'}"`,'secondary',!can('games:write'))}</div></article>`).join('')}</div>` +
+    `<div class="grid-three">${state.data.games.map((game,index) => `<article class="game-card"><div class="game-cover ${game.id.includes('sky') ? 'skygate' : game.id.includes('mahjong') ? 'mahjong' : 'uno'}"><small>XDPLAY ORIGINAL / UI FIXTURE</small><span class="game-monogram" aria-hidden="true">0${index + 1}</span><h2>${escapeHTML(game.name)}</h2></div><div class="game-details"><div class="game-meta">${tag(game.maintenance ? 'maintenance' : 'available',game.maintenance ? 'Maintenance' : 'Available')}<span class="tiny">${escapeHTML(game.version || 'DEV')}</span></div><p>${escapeHTML(game.id)}<br>Sample configuration · No live gameplay</p>${sampleSettingsTable(game)}${button(game.maintenance ? 'Resume sample game' : 'Pause sample game',`data-action="maintenance" data-id="${escapeHTML(game.id)}" title="${can('games:write') ? 'Change this sample game setting' : 'Owner or Operator role required'}"`,'secondary',!can('games:write'))}</div></article>`).join('')}</div>` +
     (!can('games:write') ? '<p class="readonly-note">Your role can review game settings. Switch to Owner or Operator to edit the sample configuration.</p>' : '');
 }
 
@@ -352,6 +379,7 @@ document.addEventListener('click',event => {
   }
   const action = element.dataset.action;
   if (action === 'add-operator') { operatorDialog(); return; }
+  if (action === 'config-game') { gameSettingsDialog(element.dataset.id,element.dataset.operator); return; }
   if (action === 'new-release') { releaseDialog(); return; }
   if (action === 'clear-filters') { state.filter = {operator:'',game:''}; renderPage(); return; }
   if (action === 'reset' && can('workspace:reset')) { confirmDialog('reset'); return; }
@@ -403,21 +431,25 @@ document.addEventListener('change',event => {
 
 document.addEventListener('submit',event => {
   const form = event.target;
-  if (!['operator-form','release-form'].includes(form.id)) return;
+  if (!['operator-form','release-form','game-settings-form'].includes(form.id)) return;
   event.preventDefault();
   if (!form.reportValidity()) return;
   const values = new FormData(form);
   const submit = form.querySelector('[type=submit]');
   $('form-error').textContent = '';
   runAction(submit,async () => {
-    if (form.id === 'operator-form') {
+    if (form.id === 'game-settings-form') {
+      const minBet=Number(values.get('min_bet')),maxBet=Number(values.get('max_bet'));
+      if(!Number.isSafeInteger(minBet)||!Number.isSafeInteger(maxBet)||minBet<1||maxBet>100000000||minBet>maxBet)throw new Error('Check the VCOIN limits. Minimum must not exceed maximum.');
+      await patch('/api/operator-game-settings',{operator_id:values.get('operator_id'),game_id:values.get('game_id'),revision:Number(values.get('revision')),enabled:values.has('enabled'),maintenance:values.has('maintenance'),min_bet:minBet,max_bet:maxBet,currency:'VCOIN'});
+    } else if (form.id === 'operator-form') {
       const games = values.getAll('games');
       if (!games.length) throw new Error('Choose at least one game for this sample operator.');
       await post('/api/operators',{name:String(values.get('name') || '').trim(),games,currency:'VCOIN'});
     } else await post('/api/release-requests',{operator_id:values.get('operator_id'),game_id:values.get('game_id')});
     $('workspace-dialog').close();
     await loadWorkspace();
-    notice(form.id === 'operator-form' ? 'Sample operator created.' : 'Sample release request created.');
+    notice(form.id === 'operator-form' ? 'Sample operator created.' : form.id === 'game-settings-form' ? 'Per-operator game settings saved.' : 'Sample release request created.');
   });
 });
 
