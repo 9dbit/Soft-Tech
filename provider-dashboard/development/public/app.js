@@ -8,10 +8,10 @@ const DEFAULT_ROLES = [
   {id:'approver',label:'Approver',description:'Review requests and simulate independent approval.',mark:'AP'},
   {id:'auditor',label:'Auditor',description:'Explore sample sessions, activity and reports with read access.',mark:'AU'}
 ];
-const ROUTES = {overview:'Overview',games:'Games',operators:'Operators',ledger:'Sessions & Ledger',releases:'Releases',staff:'Staff Roles'};
+const ROUTES = {overview:'Overview',games:'Games',operators:'Operators',ledger:'Sessions & Ledger',releases:'Releases',finance:'Finance & Billing',staff:'Staff Roles'};
 const PERMISSION_GROUPS = [
   ['View sample reports',null],['Manage operators','operators:write'],['Manage game settings','games:write'],
-  ['Request & validate releases','release:request'],['Approve & reject releases','release:approve'],['Reset sample workspace','workspace:reset']
+  ['Request & validate releases','release:request'],['Approve & reject releases','release:approve'],['Manage demo billing','finance:manage'],['Issue demo invoices','finance:issue'],['Reset sample workspace','workspace:reset']
 ];
 const state = {csrf:null,identity:null,data:null,roles:DEFAULT_ROLES,page:'overview',busy:false,ready:false,expiresAt:null,filter:{operator:'',game:''}};
 let toastTimer;
@@ -269,7 +269,65 @@ function staffPage() {
     }).join('')}</div>`;
 }
 
-const renderers = {overview:overviewPage,games:gamesPage,operators:operatorsPage,ledger:ledgerPage,releases:releasesPage,staff:staffPage};
+
+function idr(value) {
+  return 'Rp ' + Number(value || 0).toLocaleString('id-ID');
+}
+function financePage() {
+  const finance=state.data.finance || {profiles:[],invoices:[]};
+  const summary=state.data.finance_summary || {draft:0,issued:0,paid:0,overdue:0,outstanding_idr:0,paid_idr:0};
+  const profiles=finance.profiles || [];
+  const invoices=finance.invoices || [];
+  const rows=profiles.map(profile=>{
+    const ready=Boolean(profile.bill_to && profile.billing_email);
+    return '<tr><td><strong>'+escapeHTML(operatorName(profile.operator_id))+'</strong><small>'+escapeHTML(profile.operator_id)+'</small></td><td>'+escapeHTML(profile.bill_to || 'Not configured')+'<small>'+escapeHTML(profile.billing_email || 'Missing billing contact')+'</small></td><td>'+idr(profile.monthly_fee)+'<small>Per month · sample</small></td><td>'+idr(profile.usage_fee)+'<small>Per completed demo session</small></td><td>'+tag(ready?'available':'pending',ready?'Configured':'Incomplete')+'</td><td>'+button('Edit profile','data-action="finance-profile" data-id="'+escapeHTML(profile.operator_id)+'"','secondary button-small',!can('finance:manage'))+'</td></tr>';
+  });
+  const invoiceRows=invoices.map(invoice=>{
+    let actions=button('View','data-action="finance-view" data-id="'+escapeHTML(invoice.id)+'"','secondary button-small');
+    if(invoice.status==='draft'&&can('finance:issue'))actions+=button('Issue DEMO','data-action="finance-transition" data-op="issue" data-id="'+escapeHTML(invoice.id)+'"','primary button-small');
+    if(invoice.status==='issued'&&can('finance:record'))actions+=button('Mark paid (DEMO)','data-action="finance-transition" data-op="mark-paid" data-id="'+escapeHTML(invoice.id)+'"','secondary button-small');
+    if(['draft','issued'].includes(invoice.status)&&can('finance:issue'))actions+=button('Void','data-action="finance-transition" data-op="void" data-id="'+escapeHTML(invoice.id)+'"','quiet button-small');
+    return '<tr><td><strong>'+escapeHTML(invoice.number)+'</strong><small>'+escapeHTML(invoice.billing_month)+'</small></td><td>'+escapeHTML(operatorName(invoice.operator_id))+'</td><td>'+idr(invoice.total)+'</td><td>'+tag(invoice.status)+'</td><td>'+escapeHTML(invoice.due_at?dateLabel(invoice.due_at,true):'Not issued')+'</td><td><div class="action-group">'+actions+'</div></td></tr>';
+  });
+  return pageHeading('FINANCE <em>& BILLING.</em>','Manage sample billing profiles and simulate the complete invoice lifecycle.',can('finance:manage')?button('Create sample invoice','data-action="finance-new-invoice"','primary'):'')+
+    sampleBanner('All invoices use synthetic IDR amounts and are marked DEMO. No tax assessment, payable obligation, bank transfer, payment gateway or real operator billing occurs.')+
+    '<div class="metrics">'+metric('Draft invoices',summary.draft,'Pending demo issuance')+metric('Issued invoices',summary.issued,'Unpaid sample invoices')+metric('Overdue sample',summary.overdue,'Not a real receivable')+metric('Paid demo',summary.paid,'Simulated confirmation only')+'</div>'+
+    '<div class="grid-two"><section class="panel"><div class="panel-header"><h2>OPEN SAMPLE INVOICES</h2></div><strong class="metric-value">'+idr(summary.outstanding_idr)+'</strong><p class="tiny">Synthetic outstanding amount in IDR. No payment is owed.</p></section><section class="panel"><div class="panel-header"><h2>PAID SIMULATIONS</h2></div><strong class="metric-value">'+idr(summary.paid_idr)+'</strong><p class="tiny">Status-only, no funds have been received.</p></section></div>'+
+    '<div class="section-title"><h2>OPERATOR BILLING PROFILES</h2><span class="small-tag">DEVELOPMENT</span></div>'+
+    table(['OPERATOR','BILL TO','MONTHLY','USAGE','STATUS','ACTION'],rows,'Development billing profiles')+
+    '<div class="section-title"><h2>DEMO INVOICES</h2><span class="small-tag">'+invoices.length+' RECORDS</span></div>'+
+    (invoices.length?table(['INVOICE','OPERATOR','TOTAL','STATUS','DUE','ACTIONS'],invoiceRows,'Sample invoice records'):empty('No invoices. Complete a billing profile, then create a demo invoice.'))+
+    '<div class="notice-panel space-top"><strong>Approval simulation:</strong> Owner configures a billing profile and drafts an invoice. Switch to Approver to issue the sample invoice, then return to Owner to record a simulated payment. All statuses are non-commercial.</div>';
+}
+function profileDialog(operatorId) {
+  const f=state.data.finance;
+  const p=f?.profiles.find(item=>item.operator_id===operatorId);
+  if(!p || !can('finance:manage'))return;
+  const field=(label,name,val,max=100)=>'<label class="form-field">'+label+'<input name="'+name+'" value="'+escapeHTML(val)+'" maxlength="'+max+'" required></label>';
+  const amount=(label,name,val)=>'<label class="form-field">'+label+' (IDR)<input type="number" name="'+name+'" value="'+val+'" min="0" max="1000000000" step="1" required></label>';
+  openDialog('BILLING PROFILE', '<p><strong>'+escapeHTML(operatorName(operatorId))+'</strong> · DEMO DATA ONLY</p><form id="finance-profile-form"><input type="hidden" name="operator_id" value="'+escapeHTML(operatorId)+'"><input type="hidden" name="revision" value="'+p.revision+'">'+field('Billing name','bill_to',p.bill_to,120)+field('Billing email','billing_email',p.billing_email,160)+'<label class="form-field">Address (optional)<textarea name="billing_address" maxlength="280" rows="2">'+escapeHTML(p.billing_address)+'</textarea></label><div class="settings-fields">'+amount('Monthly platform fee','monthly_fee',p.monthly_fee)+amount('Per completed sample session','usage_fee',p.usage_fee)+amount('One-time setup (not automatically charged)','setup_fee',p.setup_fee)+'<label class="form-field">Sample tax % (basis points)<input type="number" name="tax_bps" min="0" max="2000" step="1" value="'+p.tax_bps+'" required></label><label class="form-field">Payment terms (days)<input type="number" name="due_days" min="1" max="90" step="1" value="'+p.due_days+'" required></label></div><p class="tiny">IDR only · tax is a configurable demo assumption, not a legal tax determination.</p><p class="form-error" id="form-error" role="alert"></p><div class="dialog-footer">'+button('Cancel','data-close-dialog','quiet')+'<button class="button button-primary" type="submit">Save demo profile</button></div></form>');
+}
+function newInvoiceDialog() {
+  if(!can('finance:manage'))return;
+  const options=(state.data.finance?.profiles||[]).filter(p=>p.bill_to&&p.billing_email);
+  if(!options.length){notice('Configure at least one operator billing profile before creating a sample invoice.',true);return;}
+  const month=new Date().toISOString().slice(0,7);
+  openDialog('CREATE DEMO INVOICE','<p>Invoices are synthetic snapshots from local sample sessions and explicitly configured mock fees.</p><form id="finance-invoice-form"><label class="form-field">Operator<select name="operator_id" required>'+options.map(p=>'<option value="'+escapeHTML(p.operator_id)+'">'+escapeHTML(operatorName(p.operator_id))+'</option>').join('')+'</select></label><label class="form-field">Billing month<input type="month" name="billing_month" value="'+month+'" max="'+month+'" required></label><p class="tiny">One active demo invoice per operator per billing month. Repeated requests are rejected.</p><p class="form-error" id="form-error" role="alert"></p><div class="dialog-footer">'+button('Cancel','data-close-dialog','quiet')+'<button class="button button-primary" type="submit">Create draft (DEMO)</button></div></form>');
+}
+function invoiceViewDialog(id) {
+  const i=state.data.finance?.invoices.find(row=>row.id===id);
+  if(!i)return;
+  const lines=i.lines.map(line=>'<tr><td>'+escapeHTML(line.description)+'</td><td>'+line.quantity+'</td><td>'+idr(line.unit_amount)+'</td><td>'+idr(line.amount)+'</td></tr>');
+  openDialog('DEMO INVOICE','<section class="invoice-preview"><div class="invoice-stamp">NOT PAYABLE · DEMO ONLY</div><h3>'+escapeHTML(i.number)+'</h3><p>'+escapeHTML(i.bill_to)+'<br>'+escapeHTML(i.billing_email)+'<br>'+escapeHTML(i.billing_address||'')+'</p><p><strong>Period:</strong> '+escapeHTML(i.billing_month)+' · <strong>Status:</strong> '+escapeHTML(i.status)+'</p>'+table(['DESCRIPTION','QTY','RATE','AMOUNT'],lines,'Invoice lines')+'<p>Subtotal <strong>'+idr(i.subtotal)+'</strong></p><p>Sample tax basis points: '+i.tax_bps+' · '+idr(i.tax_amount)+'</p><h3>TOTAL '+idr(i.total)+'</h3><p class="tiny">Issued: '+escapeHTML(i.issued_at?dateLabel(i.issued_at):'Not issued')+' · Due: '+escapeHTML(i.due_at?dateLabel(i.due_at,true):'Not assigned')+'</p></section><p class="tiny">Preview only. No legal tax invoice, payment instruction or PDF export.</p><div class="dialog-footer">'+button('Close','data-close-dialog','secondary')+'</div>');
+}
+function financeTransitionDialog(id,action) {
+  const i=state.data.finance?.invoices.find(row=>row.id===id);
+  if(!i)return;
+  const label=action==='issue'?'Issue demo invoice':action==='mark-paid'?'Confirm demo paid status':'Void demo invoice';
+  openDialog(label.toUpperCase(),'<p><strong>'+escapeHTML(i.number)+'</strong> · '+escapeHTML(operatorName(i.operator_id))+'</p><p>'+escapeHTML(label)+'? This changes only sample invoice status and does not create a legal invoice or confirm a real payment.</p><p class="form-error" id="form-error" role="alert"></p><div class="dialog-footer">'+button('Cancel','data-close-dialog','quiet')+button(label,'data-finance-confirm="'+action+'" data-id="'+escapeHTML(id)+'"','primary')+'</div>');
+}
+
+const renderers = {overview:overviewPage,games:gamesPage,operators:operatorsPage,ledger:ledgerPage,releases:releasesPage,finance:financePage,staff:staffPage};
 
 function renderPage() {
   if (!state.data || !state.identity) return;
@@ -379,6 +437,11 @@ document.addEventListener('click',event => {
   }
   const action = element.dataset.action;
   if (action === 'add-operator') { operatorDialog(); return; }
+  if (action === 'finance-profile') { profileDialog(element.dataset.id); return; }
+  if (action === 'finance-new-invoice') { newInvoiceDialog(); return; }
+  if (action === 'finance-view') { invoiceViewDialog(element.dataset.id); return; }
+  if (action === 'finance-transition') { financeTransitionDialog(element.dataset.id,element.dataset.op); return; }
+  if (element.dataset.financeConfirm) { runAction(element,async()=>{await post('/api/finance/invoices/'+encodeURIComponent(element.dataset.id)+'/'+encodeURIComponent(element.dataset.financeConfirm),{});$('workspace-dialog').close();await loadWorkspace();notice('DEMO invoice status updated. No financial transaction occurred.');});return; }
   if (action === 'config-game') { gameSettingsDialog(element.dataset.id,element.dataset.operator); return; }
   if (action === 'new-release') { releaseDialog(); return; }
   if (action === 'clear-filters') { state.filter = {operator:'',game:''}; renderPage(); return; }
@@ -431,14 +494,19 @@ document.addEventListener('change',event => {
 
 document.addEventListener('submit',event => {
   const form = event.target;
-  if (!['operator-form','release-form','game-settings-form'].includes(form.id)) return;
+  if (!['operator-form','release-form','game-settings-form','finance-profile-form','finance-invoice-form'].includes(form.id)) return;
   event.preventDefault();
   if (!form.reportValidity()) return;
   const values = new FormData(form);
   const submit = form.querySelector('[type=submit]');
   $('form-error').textContent = '';
   runAction(submit,async () => {
-    if (form.id === 'game-settings-form') {
+    if (form.id === 'finance-profile-form') {
+      const n=key=>Number(values.get(key));
+      await patch('/api/finance/profile',{operator_id:values.get('operator_id'),bill_to:String(values.get('bill_to')||'').trim(),billing_email:String(values.get('billing_email')||'').trim(),billing_address:String(values.get('billing_address')||'').trim(),currency:'IDR',setup_fee:n('setup_fee'),monthly_fee:n('monthly_fee'),usage_fee:n('usage_fee'),tax_bps:n('tax_bps'),due_days:n('due_days'),revision:n('revision')});
+    } else if (form.id === 'finance-invoice-form') {
+      await post('/api/finance/invoices',{operator_id:values.get('operator_id'),billing_month:values.get('billing_month')});
+    } else if (form.id === 'game-settings-form') {
       const minBet=Number(values.get('min_bet')),maxBet=Number(values.get('max_bet'));
       if(!Number.isSafeInteger(minBet)||!Number.isSafeInteger(maxBet)||minBet<1||maxBet>100000000||minBet>maxBet)throw new Error('Check the VCOIN limits. Minimum must not exceed maximum.');
       await patch('/api/operator-game-settings',{operator_id:values.get('operator_id'),game_id:values.get('game_id'),revision:Number(values.get('revision')),enabled:values.has('enabled'),maintenance:values.has('maintenance'),min_bet:minBet,max_bet:maxBet,currency:'VCOIN'});
@@ -449,7 +517,7 @@ document.addEventListener('submit',event => {
     } else await post('/api/release-requests',{operator_id:values.get('operator_id'),game_id:values.get('game_id')});
     $('workspace-dialog').close();
     await loadWorkspace();
-    notice(form.id === 'operator-form' ? 'Sample operator created.' : form.id === 'game-settings-form' ? 'Per-operator game settings saved.' : 'Sample release request created.');
+    notice(form.id === 'operator-form' ? 'Sample operator created.' : form.id === 'game-settings-form' ? 'Per-operator game settings saved.' : form.id === 'finance-profile-form' ? 'Demo billing profile saved.' : form.id === 'finance-invoice-form' ? 'Demo invoice draft created.' : 'Sample release request created.');
   });
 });
 
