@@ -5,7 +5,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {resolve} from 'node:path';
 import {DevelopmentSessionStore} from './session-store.mjs';
 import {ensureFinance,validateProfile,previewInvoice,financeSummary} from './finance.mjs';
-import {sourceReadiness,forbidUnverifiedImport} from './source-readiness.mjs';
+import {sourceReadiness} from './source-readiness.mjs';
 
 // This entry point deliberately has no imports from the provider Core, staff
 // authentication, wallets, game adapters, databases or release-control modules.
@@ -282,7 +282,7 @@ export function createDevelopmentServer({env=process.env,clock=Date.now}={}) {
           permission(session,'finance:manage');
           // We intentionally reject before reading or storing any purported
           // evidence. This service cannot verify Genesis signatures or scope.
-          forbidUnverifiedImport();
+          fail(409,'EXTERNAL_USAGE_NOT_CONNECTED','Genesis signed usage evidence cannot be imported into the passwordless development workspace.');
         }
         if(path==='/api/finance/profile'&&method==='PATCH') {
           permission(session,'finance:manage');
