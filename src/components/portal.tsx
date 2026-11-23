@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, CirclePlay, Compass, Gamepad2, Globe2, Layers3,
   Mail, Menu, Play, Search, ShieldCheck, Sparkles, WandSparkles, X, Zap
 } from "lucide-react";
-import { games, logo, type Game } from "@/data/games";
+import { canLaunchGame, games, logo, type Game } from "@/data/games";
 import { ParallaxScene, Reveal, ScrollProgress, TiltCard } from "./motion";
 import { V4WorldStory } from "./v4-playground";
 import V52MobileHero from "./v52-mobile-hero";
@@ -50,9 +50,15 @@ function GameCard({ game, navigate, index }: {
           <span className="eyebrow">{game.tag}</span>
           <p>{game.slogan}</p>
         </div>
-        <a className="card-play" href={game.url} {...externalProps} aria-label={"Play " + game.name + " demo"}>
-          <Play size={15} fill="currentColor"/><span>PLAY DEMO</span>
-        </a>
+        {canLaunchGame(game) ? (
+          <a className="card-play" href={game.url} {...externalProps} aria-label={"Play " + game.name + " demo"}>
+            <Play size={15} fill="currentColor"/><span>PLAY DEMO</span>
+          </a>
+        ) : (
+          <button className="card-play" type="button" disabled aria-label={game.name + " security review pending"} style={{opacity:.75,cursor:"not-allowed"}}>
+            <ShieldCheck size={15}/><span>SECURITY REVIEW</span>
+          </button>
+        )}
       </div>
     </TiltCard>
   );
@@ -124,9 +130,15 @@ function HeroShowcase({
         <p className="stage-slogan">{game.slogan}</p>
         <p className="stage-description">{lang === "EN" ? game.description : game.idDescription}</p>
         <div className="stage-actions">
-          <a className="btn btn-light" href={game.url} {...externalProps}>
-            <CirclePlay size={18}/> {lang === "EN" ? "PLAY THE DEMO" : "MAIN DEMO"} <ArrowUpRight size={16}/>
-          </a>
+          {canLaunchGame(game) ? (
+            <a className="btn btn-light" href={game.url} {...externalProps}>
+              <CirclePlay size={18}/> {lang === "EN" ? "PLAY THE DEMO" : "MAIN DEMO"} <ArrowUpRight size={16}/>
+            </a>
+          ) : (
+            <button className="btn btn-light" type="button" disabled aria-label="UNO LUCK security review pending" style={{opacity:.75,cursor:"not-allowed"}}>
+              <ShieldCheck size={18}/> {lang === "EN" ? "SECURITY REVIEW" : "AUDIT KEAMANAN"}
+            </button>
+          )}
           <button className="btn btn-glass" onClick={() => navigate("/games/" + game.id)}>
             {lang === "EN" ? "EXPLORE GAME" : "DETAIL GAME"} <ArrowUpRight size={16}/>
           </button>
@@ -278,7 +290,11 @@ function GameDetails({ game, lang, navigate }: {
           <div className="detail-copy">
             <span className="eyebrow"><span className="blink-dot"/> XDPLAY ORIGINAL / 0{index + 1}</span>
             <h1>{game.name}</h1><p>{game.slogan}</p>
-            <div className="detail-actions"><a href={game.url} {...externalProps} className="btn btn-light"><Play size={16} fill="currentColor"/> PLAY DEMO <ArrowUpRight size={17}/></a><button className="btn btn-glass" onClick={() => navigate("/games")}>ALL GAMES <ArrowRight size={17}/></button></div>
+            <div className="detail-actions">{canLaunchGame(game) ? (
+              <a href={game.url} {...externalProps} className="btn btn-light"><Play size={16} fill="currentColor"/> PLAY DEMO <ArrowUpRight size={17}/></a>
+            ) : (
+              <button className="btn btn-light" type="button" disabled aria-label="UNO LUCK security review pending" style={{opacity:.75,cursor:"not-allowed"}}><ShieldCheck size={16}/> SECURITY REVIEW</button>
+            )}<button className="btn btn-glass" onClick={() => navigate("/games")}>ALL GAMES <ArrowRight size={17}/></button></div>
           </div>
           <div className="detail-float-card"><img src={game.detailImage} alt={game.name + " original game visual"}/><span>{game.tag}</span></div>
           <span className="detail-corner">ST. / 0{index + 1} — 03</span>
@@ -290,7 +306,9 @@ function GameDetails({ game, lang, navigate }: {
           {[["THE GENRE", game.genre], ["DESIGNED BY", "XDPLAY"], ["PLAY FORMAT", "WEB DEMO"], ["GAME MODE", "VIRTUAL CREDITS"]].map(([key, val]) => <div key={key}><span>{key}</span><strong>{val}</strong></div>)}
         </div></Reveal>
       </div>
-      <Reveal><div className="demo-disclaimer"><ShieldCheck size={22}/> Game demos open on their official standalone websites. This showcase does not process deposits, payments, or withdrawals.</div></Reveal>
+      <Reveal><div className="demo-disclaimer"><ShieldCheck size={22}/> {canLaunchGame(game)
+        ? "Game demos open on their official standalone websites. This showcase does not process deposits, payments, or withdrawals."
+        : "UNO LUCK is undergoing cybersecurity, wallet and release review. Gameplay launch is disabled here. No deposits, payments, withdrawals or redeemable credits are offered."}</div></Reveal>
       <div className="detail-pager">
         <button onClick={() => navigate("/games/" + games[(index + games.length - 1) % games.length].id)}><ChevronLeft size={19}/> PREVIOUS WORLD</button>
         <button onClick={() => navigate("/games/" + games[(index + 1) % games.length].id)}>NEXT WORLD <ChevronRight size={19}/></button>

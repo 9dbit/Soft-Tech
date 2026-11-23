@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type KeyboardEvent, type TouchEvent } from "react";
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Play, Sparkles, MoveUpRight } from "lucide-react";
-import { games, type Game } from "@/data/games";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Play, ShieldCheck, Sparkles, MoveUpRight } from "lucide-react";
+import { canLaunchGame, games, type Game } from "@/data/games";
 import { Reveal, TiltCard } from "./motion";
 
 type Props = {
@@ -47,6 +47,12 @@ function MagneticLink({ game, label }: { game: Game; label: string }) {
     ref.current?.style.setProperty("--magnetic-y", "0px");
   };
   useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  if (!canLaunchGame(game)) {
+    return <span className="v4-magnetic-cta" role="status" aria-label="UNO LUCK security review pending" style={{opacity:.75,cursor:"not-allowed"}}>
+      <span className="v4-play-icon" aria-hidden="true"><ShieldCheck size={14}/></span>
+      <span>SECURITY REVIEW</span>
+    </span>;
+  }
   return (
     <a ref={ref} className="v4-magnetic-cta" onPointerMove={move} onPointerLeave={reset}
       onBlur={reset} href={game.url} {...external}>

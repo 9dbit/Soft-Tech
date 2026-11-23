@@ -1,4 +1,5 @@
-// UI LOCK V6.1: the approved layout, navbar, game visuals and six-layer
+// UI LOCK V6.1: preserve approved layout and images; allow reviewed UNO-only CTA disabling.
+// The approved layout, navbar, game visuals and six-layer
 // orange-computer assets may not be silently changed by a typography release.
 // Git blob IDs include file mode independent content bytes.
 import {readFileSync} from "node:fs";
@@ -27,10 +28,10 @@ const locked = {
   "src/app/v57-unified-ui.css": "fb9eb8fb6fd082c66764974844c9c539092d490e",
   "src/app/v58-landscape-games.css": "e6bc61d924c87d917a61c8931d9d58e659d0f83e",
   "src/components/motion.tsx": "6eb8e5bb0e5fac653d31a8fcbd7fa4a3e09de5d1",
-  "src/components/portal.tsx": "2768e7b06f5191b4490798ac81755ca9d3ff57ee",
+  "src/components/portal.tsx": "3708dc75fb4428d75601614c20499eeab7c2e534",
   "src/components/v5-desktop-hero.tsx": "7d18d6aa0fc5fc6bf201d0454357dc8692a6e3bb",
-  "src/components/v52-mobile-hero.tsx": "948ab0371454d75673585392435cc606ff56ae2d",
-  "src/data/games.ts": "6d4bc26f860420760baf59e75e9736b102f20e2c",
+  "src/components/v52-mobile-hero.tsx": "ca15c9ac1c568187404c0c5f6d00f132d686148e",
+  "src/data/games.ts": "7e78f110436ae4dfb8568dbaeacfcde387911891",
   "public/fonts/Minecraft.woff2": "24a32947adfdc19d2bc5745ae99cb6a8b5375f95"
 };
 const failures=[];
