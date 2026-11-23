@@ -18,7 +18,7 @@ export default {
   reactStrictMode: true,
   async redirects() {
     return [
-      { source: '/:path*', has: [{ type: 'host', value: 'uno.xd-play.com' }], destination: 'https://xd-play.com/games/uno-luck', permanent: false },
+      // UNO vanity host is quarantined by src/proxy.ts to discard query strings.
       { source: '/:path*', has: [{ type: 'host', value: 'www.xd-play.com' }], destination: 'https://xd-play.com/:path*', permanent: true }
     ];
   },
