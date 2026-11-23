@@ -9,7 +9,7 @@ test('UNO is discoverable but has no external public game launch',()=>{
   const entry=catalogue.split('\n').find(x=>x.includes('id:"uno-luck"'));
   assert(entry,'UNO must remain in the XDPLAY catalog');
   assert.match(entry,/launchState:"security_review"/);
-  assert.match(entry,/url:"https:\/\/xd-play\.com\/games\/uno-luck"/);
+  assert.match(entry,/url:"\/games\/uno-luck\/play"/);
   assert.doesNotMatch(entry,/\.onrender\.com|up\.railway\.app|wallet|agent/);
   assert.match(catalogue,/canLaunchGame/);
 });

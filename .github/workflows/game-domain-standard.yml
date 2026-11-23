@@ -1,0 +1,81 @@
+name: XDPLAY game domain standard
+
+on:
+  pull_request:
+    branches: [rebrand/xdplay-public-20261112]
+  push:
+    branches: [rebrand/xdplay-public-20261112]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xdplay-domain-standard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  domain-and-viewer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        domain-mode: [pending, verified-fixture]
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked application dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Validate registry, quarantine and approved artwork
+        run: |
+          node --test scripts/game-domain-standard.test.mjs scripts/uno-secure-onboarding.test.mjs scripts/rebrand-xdplay.test.mjs
+          node scripts/verify-ui-lock.mjs
+          git diff --check
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Prepare verified-host browser fixture build
+        if: matrix.domain-mode == 'verified-fixture'
+        run: |
+          node --input-type=module <<'EOF'
+          import {readFileSync,writeFileSync} from 'node:fs';
+          const path='config/game-runtimes.json';
+          const registry=JSON.parse(readFileSync(path,'utf8'));
+          // This isolated CI workspace never deploys. Browser requests are
+          // intercepted fixtures; production readiness remains unchanged.
+          for(const game of registry.runtimes) {
+            if(game.publicLaunch==='enabled') game.domainReady=true;
+          }
+          writeFileSync(path,JSON.stringify(registry,null,2)+'\n');
+          EOF
+      - name: Build production portal
+        run: npm run build
+      - name: Install isolated browser acceptance dependency
+        run: |
+          npm install --no-save --package-lock=false playwright@1.65.1 --ignore-scripts --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Verify actual HTTP policy and desktop/mobile viewer
+        shell: bash
+        run: |
+          set -euo pipefail
+          PORT=3000 npm run start > /tmp/xdplay-domain-standard.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3000/api/health; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then cat /tmp/xdplay-domain-standard.log; exit 1; fi
+          node scripts/game-viewer-qa.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xdplay-domain-standard-${{ matrix.domain-mode }}-qa
+          path: qa-artifacts/game-domain-standard/
+          if-no-files-found: warn

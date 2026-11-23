@@ -1,0 +1,22 @@
+; XDPLAY game runtime records, prepared 2026-11-24 Asia/Jakarta
+; Additive records only. Inspect existing records before import.
+$ORIGIN xd-play.com.
+$TTL 300
+
+skygate 300 IN CNAME zhs5766n.up.railway.app.
+_railway-verify.skygate 300 IN TXT "railway-verify=4f6937918fa6c32b597f06bba8e77f3d2057bf4ba6db1f64389918597fd9e65d"
+
+staging-uno 300 IN CNAME 9rjcje8h.up.railway.app.
+_railway-verify.staging-uno 300 IN TXT "railway-verify=1ebf2910805cbfb7321300bfdc520e054c59cef4af7f7680ac42f00cf915ce33"
+
+staging-legend-ball 300 IN CNAME 8ew8vcia.up.railway.app.
+_railway-verify.staging-legend-ball 300 IN TXT "railway-verify=ecd4ffe2184d65639864375ba098ee5c86a371f72b6ca2134fc6fedf02042623"
+
+staging-gachamon 300 IN CNAME 982avuut.up.railway.app.
+_railway-verify.staging-gachamon 300 IN TXT "railway-verify=6b964ccf0650a4aac60792b7486c54e60477973ffb21dcfca8efc042d0e08119"
+
+staging-mahjong 300 IN CNAME jj1p6owm.up.railway.app.
+_railway-verify.staging-mahjong 300 IN TXT "railway-verify=03f071bb5afb85849e294f77bef6c2321cb91e407417345cc99f42c38c292196"
+
+mahjong 300 IN CNAME q6b96lft.up.railway.app.
+_railway-verify.mahjong 300 IN TXT "railway-verify=2933c1ebe6bced189f2c5cd7b7c6b02c49962c50a0fd4ae17886a0a6e8085f79"

@@ -33,7 +33,7 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright@1.65.1 --no-audit --no-fund
           npx playwright install --with-deps chromium
-      - name: Secure same-domain viewer end-to-end acceptance
+      - name: Shared game launcher end-to-end acceptance
         run: |
           npm run start -- -p 3000 > /tmp/xdplay-skygate-next.log 2>&1 &
           ready=0
@@ -47,5 +47,5 @@ jobs:
         if: always()
         with:
           name: xdplay-skygate-launch-qa
-          path: qa-artifacts/xdplay-skygate/
+          path: qa-artifacts/game-domain-standard/
           if-no-files-found: ignore
