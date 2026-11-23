@@ -32,6 +32,10 @@ try{
  const reserved=await requestHost('uno.xd-play.com','/');report.redirects.push(reserved);
  assert.equal(reserved.status,307,'UNO vanity host must redirect to review');
  assert.equal(reserved.headers.location,'https://xd-play.com/games/uno-luck');
+ const blockedPath=await requestHost('uno.xd-play.com','/api/games/uno-luck/status?unused=1');
+ report.redirects.push(blockedPath);
+ assert.equal(blockedPath.status,307,'vanity host must not expose API routes');
+ assert.equal(blockedPath.headers.location,'https://xd-play.com/games/uno-luck');
  const canonical=await requestHost('xd-play.com','/games/uno-luck?test=1');report.redirects.push(canonical);assert.equal(canonical.status,200,'Canonical host must not loop');
  assert.equal((await fetch(base+'/api/health')).status,200);
  const original=execFileSync('git',['show','2dad8bbd89c9e93a556776051961b9a4c51cca97:src/data/games.ts'],{encoding:'utf8'}),current=await readFile('src/data/games.ts','utf8'),urls=s=>[...s.matchAll(/url:"([^"]+)"/g)].map(m=>m[1].split('?')[0]);const baseline=urls(original),updated=urls(current);assert.equal(updated.length,baseline.length);assert.equal(updated[0],'/games/skygate-5000/play','preserve Skygate in-domain demo');assert.equal(updated[1],'https://xd-play.com/games/uno-luck','safe UNO detail');assert.equal(updated[2],'/play/mahjong-wild','preserve Mahjong in-domain demo');assert.match(current,/launchState:"security_review"/);assert.equal(report.errors.length,0,'browser errors');report.status='PASS';
