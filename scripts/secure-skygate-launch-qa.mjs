@@ -15,7 +15,7 @@ try{
     // the XDPLAY framing policy without relying on a live external dependency.
     await context.route(sky,route=>route.fulfill({
       status:200,contentType:'text/html',
-      headers:{'Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; frame-ancestors https://xd-play.com;"},
+      headers:{'Cache-Control':'no-store','Content-Security-Policy':"default-src 'none'; frame-ancestors http://127.0.0.1:3000;"},
       body:'<!doctype html><title>Skygate fixture</title><body><main data-skygate-fixture>Skygate virtual demo</main></body>'
     }));
     const page=await context.newPage(),errors=[];
