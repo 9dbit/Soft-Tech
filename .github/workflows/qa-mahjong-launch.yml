@@ -1,0 +1,50 @@
+name: XDPLAY Mahjong launch acceptance
+on:
+  pull_request:
+  push:
+    branches: [rebrand/xdplay-public-20261112]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  route-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install exact XDPLAY dependencies
+        run: npm ci --ignore-scripts --no-fund
+      - name: Compile portal and routes
+        run: npm run build
+      - name: Verify first-party launch route and original catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          PORT=3000 npm run start > /tmp/xdplay-start.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3000/games/mahjong-wild; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then cat /tmp/xdplay-start.log; exit 1; fi
+          node --input-type=module <<'EOF'
+          import assert from 'node:assert/strict';
+          const base='http://127.0.0.1:3000';
+          const detail=await fetch(base+'/games/mahjong-wild');
+          assert.equal(detail.status,200);
+          const page=await detail.text();
+          assert.match(page,/MAHJONG WILD/i);
+          const launch=await fetch(base+'/play/mahjong-wild?next=https://attacker.example&playground_launch=do-not-forward', {redirect:'manual'});
+          assert.equal(launch.status,307);
+          assert.equal(launch.headers.get('location'),'https://mahjong-legend-web-production.up.railway.app/?utm_source=xdplay&utm_medium=game_portal&utm_campaign=mahjong_wild');
+          assert.match(launch.headers.get('cache-control')||'',/no-store/);
+          assert.equal(launch.headers.get('referrer-policy'),'no-referrer');
+          assert.doesNotMatch(launch.headers.get('location')||'',/attacker|do-not-forward/);
+          console.log('XDPLAY Mahjong Wild detail, fixed safe launch and token refusal: PASS');
+          EOF
