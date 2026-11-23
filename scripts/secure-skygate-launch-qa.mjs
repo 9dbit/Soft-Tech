@@ -32,6 +32,9 @@ try{
     assert.equal(headers['cache-control'],'private, no-store');
     assert.match(headers['permissions-policy'],/payment=\(\)/);
     assert.equal(await page.locator('meta[name="robots"]').getAttribute('content'),'noindex, nofollow');
+    const notice=page.locator('#game-virtual-credit-notice');
+    assert.match(await notice.innerText(),/virtual-credit demo/);
+    assert.equal(await notice.isVisible(),false,'screen reader notice should not obscure game');
     const frame=page.locator('#game-frame');
     assert.equal(await frame.count(),1);
     assert.equal(await frame.getAttribute('src'),sky);
