@@ -23,7 +23,7 @@ jobs:
           ref: ${{ github.ref }}
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Verify original layout and branding migration
         run: |
           node scripts/verify-ui-lock.mjs
@@ -64,7 +64,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Source checks and production build
         run: |
           node scripts/verify-ui-lock.mjs
@@ -73,7 +73,7 @@ jobs:
           npm run build
       - name: Install acceptance browser
         run: |
-          npm install --no-save --package-lock=false playwright@1.56.1 --no-audit --no-fund
+          npm install --no-save --package-lock=false playwright@1.65.1 --no-audit --no-fund
           npx playwright install --with-deps chromium
       - name: Production HTTP and desktop/mobile acceptance
         run: |

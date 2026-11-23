@@ -15,12 +15,16 @@ export const metadata:Metadata={
 export default function SkygateSecureLaunch(){
   return (
     <main className={styles.launch} aria-label="Skygate 5000 XDPLAY game viewer">
+      <p id="game-virtual-credit-notice" className={styles.srOnly}>
+        This is a virtual-credit demo. No real-money purchases, deposits or withdrawals.
+      </p>
       <a href="#game-frame" className={styles.skip}>Skip to Skygate gameplay</a>
       <iframe
         id="game-frame"
         className={styles.gameFrame}
         src={GAME_URL}
         title="SKYGATE 5000, virtual-credit game"
+        aria-describedby="game-virtual-credit-notice"
         sandbox="allow-scripts allow-same-origin allow-modals allow-downloads"
         allow="autoplay; fullscreen"
         allowFullScreen
