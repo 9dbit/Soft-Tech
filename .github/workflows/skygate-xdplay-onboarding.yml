@@ -1,0 +1,51 @@
+name: XDPLAY Skygate secure onboarding QA
+on:
+  pull_request:
+    branches: [rebrand/xdplay-public-20261112]
+  push:
+    branches: [rebrand/xdplay-public-20261112]
+permissions:
+  contents: read
+concurrency:
+  group: xdplay-skygate-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  secure-launch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify locked production visuals and approved game URLs
+        run: |
+          node scripts/verify-ui-lock.mjs
+          node --test scripts/rebrand-xdplay.test.mjs
+          git diff --check
+      - name: Install and build production bundle
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+      - name: Install Chromium acceptance browser
+        run: |
+          npm install --no-save --package-lock=false playwright@1.65.1 --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Secure same-domain viewer end-to-end acceptance
+        run: |
+          npm run start -- -p 3000 > /tmp/xdplay-skygate-next.log 2>&1 &
+          ready=0
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/api/health >/dev/null; then ready=1; break; fi
+            sleep 2
+          done
+          test "$ready" = 1 || { cat /tmp/xdplay-skygate-next.log; exit 1; }
+          node scripts/secure-skygate-launch-qa.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xdplay-skygate-launch-qa
+          path: qa-artifacts/xdplay-skygate/
+          if-no-files-found: ignore
