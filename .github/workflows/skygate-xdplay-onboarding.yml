@@ -31,7 +31,7 @@ jobs:
           NEXT_TELEMETRY_DISABLED: '1'
       - name: Install Chromium acceptance browser
         run: |
-          npm install --no-save --package-lock=false playwright@1.65.2 --no-audit --no-fund
+          npm install --no-save --package-lock=false playwright@1.65.1 --no-audit --no-fund
           npx playwright install --with-deps chromium
       - name: Secure same-domain viewer end-to-end acceptance
         run: |
