@@ -9,7 +9,7 @@ export async function generateMetadata({params}:RouteParams):Promise<Metadata> {
  const {route}=await params;
  if(!getValid(route))return {title:'Not Found',robots:{index:false,follow:false}};
  const canonical='/'+route.join('/'),game=route[0]==='games'&&route.length===2?games.find(g=>g.id===route[1]):undefined;
- if(game)return {title:game.name,description:game.description,alternates:{canonical},openGraph:{title:game.name,description:game.description,siteName:'XDPLAY',url:canonical,images:[game.cover]}};
+ if(game)return {title:game.name,description:game.description,alternates:{canonical},robots:game.launchState==='security_review'?{index:false,follow:false}:undefined,openGraph:{title:game.name,description:game.description,siteName:'XDPLAY',url:canonical,images:[game.cover]}};
  const names:Record<string,string>={games:'Our Games',company:'Company',technology:'Technology',partners:'Partnerships',contact:'Contact'};
  return {title:names[route[0]]||'XDPLAY',alternates:{canonical},openGraph:{url:canonical,siteName:'XDPLAY'}};
 }

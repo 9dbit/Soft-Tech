@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowDown, ArrowUpRight, Gamepad2, Globe2, Menu, X } from "lucide-react";
-import { games } from "@/data/games";
+import { canLaunchGame, games } from "@/data/games";
 
 type Props = {navigate:(path:string)=>void;lang:"EN"|"ID";menuOpen:boolean;toggleMenu:()=>void;toggleLanguage:()=>void};
 const LAYERS = [
@@ -130,7 +130,11 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
            <img src={game.cover} alt={game.name+" original game artwork"} loading="lazy"/><span>0{index+1} / ORIGINAL</span>
          </button>
          <div className="v52-card-info"><span>{game.tag}</span><h2>{game.name}</h2><p>{game.slogan}</p>
-           <a href={game.url} target="_blank" rel="noopener noreferrer" aria-label={"Play "+game.name+" demo"}>PLAY DEMO <ArrowUpRight size={16}/></a>
+           {canLaunchGame(game) ? (
+             <a href={game.url} target="_blank" rel="noopener noreferrer" aria-label={"Play "+game.name+" demo"}>PLAY DEMO <ArrowUpRight size={16}/></a>
+           ) : (
+             <button type="button" disabled aria-label="UNO LUCK security review pending" style={{opacity:.75,cursor:"not-allowed"}}>SECURITY REVIEW</button>
+           )}
          </div>
        </article>)}
      </div>

@@ -19,13 +19,25 @@ try{
    const title=await page.title(),text=await page.locator('body').innerText(),canonical=await page.locator('link[rel=canonical]').getAttribute('href');
    const logos=await page.locator('img[src*="xdplay-logo"]').evaluateAll(images=>images.map(i=>({src:i.getAttribute('src'),loaded:i.complete&&i.naturalWidth>0}))),scrollWidth=await page.evaluate(()=>document.documentElement.scrollWidth);
    assert.match(title,/XDPLAY/,path+' title');assert.doesNotMatch(text,/soft\s+tech/i,path+' visible legacy branding');assert.equal(canonical,'https://xd-play.com'+(path==='/'?'':path),path+' canonical');assert(logos.length>0&&logos.every(x=>x.loaded),path+' logo loads');assert(scrollWidth<=viewport.width+2,path+' horizontal overflow');
+   if(path==='/games/uno-luck'){
+     assert.equal(await page.locator('a[href*="uno-luck-v1172-qa.onrender.com"]').count(),0);
+     assert(await page.locator('button[disabled][aria-label="UNO LUCK security review pending"]').count()>=1);
+     assert.match(await page.locator('meta[name="robots"]').getAttribute('content'),/noindex/);
+   }
    const screenshot=viewport.name+'-'+(path==='/'?'home':path.slice(1).replaceAll('/','-'))+'.png';await page.screenshot({path:output+'/'+screenshot,fullPage:true,animations:'disabled'});report.checks.push({viewport:viewport.name,path,title,canonical,scrollWidth,logos:logos.length,screenshot});
   }await page.close();
  }
  for(const path of ['/robots.txt','/sitemap.xml']){const response=await fetch(base+path),text=await response.text();assert.equal(response.status,200);assert.match(text,/https:\/\/xd-play\.com/);assert.doesNotMatch(text,/soft-tech-web-production/);}
  const redirect=await requestHost('www.xd-play.com','/games/uno-luck?test=1');report.redirects.push(redirect);assert.equal(redirect.host,'www.xd-play.com');assert.equal(redirect.status,308);assert.equal(redirect.headers.location,'https://xd-play.com/games/uno-luck?test=1');
+ const reserved=await requestHost('uno.xd-play.com','/');report.redirects.push(reserved);
+ assert.equal(reserved.status,307,'UNO vanity host must redirect to review');
+ assert.equal(reserved.headers.location,'https://xd-play.com/games/uno-luck');
+ const blockedPath=await requestHost('uno.xd-play.com','/api/games/uno-luck/status?unused=1');
+ report.redirects.push(blockedPath);
+ assert.equal(blockedPath.status,307,'vanity host must not expose API routes');
+ assert.equal(blockedPath.headers.location,'https://xd-play.com/games/uno-luck');
  const canonical=await requestHost('xd-play.com','/games/uno-luck?test=1');report.redirects.push(canonical);assert.equal(canonical.status,200,'Canonical host must not loop');
  assert.equal((await fetch(base+'/api/health')).status,200);
- const original=execFileSync('git',['show','2dad8bbd89c9e93a556776051961b9a4c51cca97:src/data/games.ts'],{encoding:'utf8'}),current=await readFile('src/data/games.ts','utf8'),urls=s=>[...s.matchAll(/url:"([^"]+)"/g)].map(m=>m[1].split('?')[0]);const baseline=urls(original),updated=urls(current);assert.equal(updated.length,baseline.length);assert.equal(updated[0],'/games/skygate-5000/play','Skygate uses isolated on-domain demo');assert.equal(updated[1],baseline[1],'UNO game launch must remain unchanged');assert.equal(updated[2],'/play/mahjong-wild','Mahjong uses its independently reviewed on-domain launch');assert.equal(report.errors.length,0,'browser errors');report.status='PASS';
+ const original=execFileSync('git',['show','2dad8bbd89c9e93a556776051961b9a4c51cca97:src/data/games.ts'],{encoding:'utf8'}),current=await readFile('src/data/games.ts','utf8'),urls=s=>[...s.matchAll(/url:"([^"]+)"/g)].map(m=>m[1].split('?')[0]);const baseline=urls(original),updated=urls(current);assert.equal(updated.length,baseline.length);assert.equal(updated[0],'/games/skygate-5000/play','preserve Skygate in-domain demo');assert.equal(updated[1],'https://xd-play.com/games/uno-luck','safe UNO detail');assert.equal(updated[2],'/play/mahjong-wild','preserve Mahjong in-domain demo');assert.match(current,/launchState:"security_review"/);assert.equal(report.errors.length,0,'browser errors');report.status='PASS';
 }catch(error){report.status='FAIL';report.errors.push(error.stack);process.exitCode=1;}
 finally{await browser.close();await writeFile(output+'/report.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));}
