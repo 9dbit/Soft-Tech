@@ -7,7 +7,7 @@
 ## User-facing contract
 - Keep `https://xd-play.com/` as the canonical XDPLAY portfolio and current working website.
 - Show `UNO LUCK` game details at `https://xd-play.com/games/uno-luck`; preserve its branded artwork, mobile/desktop layout and other game links.
-- A reserved `uno.xd-play.com` host **redirects to the canonical non-launch detail page**, not to any wallet, QA engine, external Render URL or unreviewed game.
+- A reserved `uno.xd-play.com` host **redirects GET/HEAD to the canonical non-launch detail page**, using `src/proxy.ts` to strip original path/query and **deny non-GET/HEAD**. This prevents query forwarding to a wallet, QA engine, or game.
 - Set UNO `launchState = security_review`; replace every standalone Play Demo button with a noninteractive disabled Security Review status on desktop/mobile/alternate hero.
 - Remove the retired external Render QA launch URL. Other games retain their exact existing links and status.
 - Public `GET /api/games/uno-luck/status` reports launch/purchases/redemption disabled, with `Cache-Control: no-store`.
@@ -29,5 +29,5 @@
 
 ## QA evidence paths
 - `scripts/uno-secure-onboarding.test.mjs`: confirms disabled UNO CTA, safe host, headers, release state.
-- `scripts/xdplay-public-qa.mjs`: full portfolio desktop/mobile browser checks, canonical and host redirects and closed UNO launch.
+- `scripts/xdplay-public-qa.mjs`: full portfolio desktop/mobile browser checks, canonical and host redirects (including query stripping on vanity host), and closed UNO launch.
 - `.github/workflows/uno-secure-onboarding.yml`: isolated test runner and browser screenshot artifacts.
