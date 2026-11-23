@@ -1,0 +1,236 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-11-23T20:43:26.004Z",
+  "scope": "Original Railway hostname-registration snapshot; DNS and certificate verification pending",
+  "dnsWritesPerformed": false,
+  "domains": [
+    {
+      "key": "skygate",
+      "projectId": "626b6a33-c7f1-4ec5-a9c7-6834349fa3bd",
+      "environmentId": "588a155b-2cb3-4f42-b2fa-254a6aa3cd3c",
+      "serviceId": "fff3472b-24bb-418c-aa11-0f95cfd53390",
+      "domain": {
+        "id": "07de348c-c05d-487d-8f07-348a232e762c",
+        "domain": "skygate.xd-play.com",
+        "kind": "custom",
+        "targetPort": null
+      },
+      "verified": false,
+      "certificate": {
+        "status": "CERTIFICATE_STATUS_TYPE_VALIDATING_OWNERSHIP",
+        "errorMessage": null,
+        "retryable": null
+      },
+      "dnsRecords": [
+        {
+          "hostLabel": "skygate",
+          "fqdn": "skygate.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_CNAME",
+          "purpose": "DNS_RECORD_PURPOSE_TRAFFIC_ROUTE",
+          "requiredValue": "zhs5766n.up.railway.app",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_REQUIRES_UPDATE"
+        },
+        {
+          "hostLabel": "_railway-verify.skygate",
+          "fqdn": "_railway-verify.skygate.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_TXT",
+          "purpose": "DNS_RECORD_PURPOSE_OWNERSHIP_VERIFICATION",
+          "requiredValue": "railway-verify=4f6937918fa6c32b597f06bba8e77f3d2057bf4ba6db1f64389918597fd9e65d",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_UNSPECIFIED"
+        }
+      ]
+    },
+    {
+      "key": "uno-staging",
+      "projectId": "14cc881e-e478-406a-bad7-a1c1bb356892",
+      "environmentId": "c22194d6-35a2-4297-8eb6-c9f455a27f08",
+      "serviceId": "21657854-3cf6-4ebd-839b-5aa809713456",
+      "domain": {
+        "id": "2e9efe27-0534-4ba5-acd6-9c162f21cbf4",
+        "domain": "staging-uno.xd-play.com",
+        "kind": "custom",
+        "targetPort": 8080
+      },
+      "verified": false,
+      "certificate": {
+        "status": "CERTIFICATE_STATUS_TYPE_VALIDATING_OWNERSHIP",
+        "errorMessage": null,
+        "retryable": null
+      },
+      "dnsRecords": [
+        {
+          "hostLabel": "staging-uno",
+          "fqdn": "staging-uno.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_CNAME",
+          "purpose": "DNS_RECORD_PURPOSE_TRAFFIC_ROUTE",
+          "requiredValue": "9rjcje8h.up.railway.app",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_REQUIRES_UPDATE"
+        },
+        {
+          "hostLabel": "_railway-verify.staging-uno",
+          "fqdn": "_railway-verify.staging-uno.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_TXT",
+          "purpose": "DNS_RECORD_PURPOSE_OWNERSHIP_VERIFICATION",
+          "requiredValue": "railway-verify=1ebf2910805cbfb7321300bfdc520e054c59cef4af7f7680ac42f00cf915ce33",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_UNSPECIFIED"
+        }
+      ]
+    },
+    {
+      "key": "legend-ball-staging",
+      "projectId": "7acb5534-6785-4046-8dfb-e556b4aace76",
+      "environmentId": "d9ab3ae1-e7de-4529-86b1-1ca982d1248b",
+      "serviceId": "dcb16f8f-e11d-44b7-bb55-10aa9d5d3ae1",
+      "domain": {
+        "id": "9de10b23-f657-4ba0-8db8-65d4d29f436f",
+        "domain": "staging-legend-ball.xd-play.com",
+        "kind": "custom",
+        "targetPort": null
+      },
+      "verified": false,
+      "certificate": {
+        "status": "CERTIFICATE_STATUS_TYPE_VALIDATING_OWNERSHIP",
+        "errorMessage": null,
+        "retryable": null
+      },
+      "dnsRecords": [
+        {
+          "hostLabel": "staging-legend-ball",
+          "fqdn": "staging-legend-ball.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_CNAME",
+          "purpose": "DNS_RECORD_PURPOSE_TRAFFIC_ROUTE",
+          "requiredValue": "8ew8vcia.up.railway.app",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_REQUIRES_UPDATE"
+        },
+        {
+          "hostLabel": "_railway-verify.staging-legend-ball",
+          "fqdn": "_railway-verify.staging-legend-ball.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_TXT",
+          "purpose": "DNS_RECORD_PURPOSE_OWNERSHIP_VERIFICATION",
+          "requiredValue": "railway-verify=ecd4ffe2184d65639864375ba098ee5c86a371f72b6ca2134fc6fedf02042623",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_UNSPECIFIED"
+        }
+      ]
+    },
+    {
+      "key": "gachamon-staging",
+      "projectId": "2f624a46-ccbd-40de-9f57-9dc713c8fba7",
+      "environmentId": "d30d2916-2162-4198-a5af-3e98de9e0eb3",
+      "serviceId": "7e24c8a9-94db-4c7f-a797-8ece27f95f1d",
+      "domain": {
+        "id": "cc7e9dec-0552-40af-840a-6fa05f73da38",
+        "domain": "staging-gachamon.xd-play.com",
+        "kind": "custom",
+        "targetPort": null
+      },
+      "verified": false,
+      "certificate": {
+        "status": "CERTIFICATE_STATUS_TYPE_VALIDATING_OWNERSHIP",
+        "errorMessage": null,
+        "retryable": null
+      },
+      "dnsRecords": [
+        {
+          "hostLabel": "staging-gachamon",
+          "fqdn": "staging-gachamon.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_CNAME",
+          "purpose": "DNS_RECORD_PURPOSE_TRAFFIC_ROUTE",
+          "requiredValue": "982avuut.up.railway.app",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_REQUIRES_UPDATE"
+        },
+        {
+          "hostLabel": "_railway-verify.staging-gachamon",
+          "fqdn": "_railway-verify.staging-gachamon.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_TXT",
+          "purpose": "DNS_RECORD_PURPOSE_OWNERSHIP_VERIFICATION",
+          "requiredValue": "railway-verify=6b964ccf0650a4aac60792b7486c54e60477973ffb21dcfca8efc042d0e08119",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_UNSPECIFIED"
+        }
+      ]
+    },
+    {
+      "key": "mahjong-staging",
+      "projectId": "9092ba1b-4dbe-4461-a4c2-7c316038fc1a",
+      "environmentId": "7e7215c9-7d09-4a62-96c0-1fc456400511",
+      "serviceId": "e000fb9b-45fd-4e72-bd6d-8e661de3a9c7",
+      "domain": {
+        "id": "f652c3d5-b4b2-4899-8543-4ed0f810f0a2",
+        "domain": "staging-mahjong.xd-play.com",
+        "kind": "custom",
+        "targetPort": null
+      },
+      "verified": false,
+      "certificate": {
+        "status": "CERTIFICATE_STATUS_TYPE_VALIDATING_OWNERSHIP",
+        "errorMessage": null,
+        "retryable": null
+      },
+      "dnsRecords": [
+        {
+          "hostLabel": "staging-mahjong",
+          "fqdn": "staging-mahjong.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_CNAME",
+          "purpose": "DNS_RECORD_PURPOSE_TRAFFIC_ROUTE",
+          "requiredValue": "jj1p6owm.up.railway.app",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_REQUIRES_UPDATE"
+        },
+        {
+          "hostLabel": "_railway-verify.staging-mahjong",
+          "fqdn": "_railway-verify.staging-mahjong.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_TXT",
+          "purpose": "DNS_RECORD_PURPOSE_OWNERSHIP_VERIFICATION",
+          "requiredValue": "railway-verify=03f071bb5afb85849e294f77bef6c2321cb91e407417345cc99f42c38c292196",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_UNSPECIFIED"
+        }
+      ]
+    },
+    {
+      "key": "mahjong",
+      "projectId": "3af00403-4063-444c-87f8-31501a55438d",
+      "environmentId": "a283488a-2076-4056-bca9-89d737dbd1d3",
+      "serviceId": "fd2ca10d-be75-4344-b633-3a9a91c55536",
+      "domain": {
+        "id": "c467c256-92f0-47ad-865d-e81156bfbc60",
+        "domain": "mahjong.xd-play.com",
+        "kind": "custom",
+        "targetPort": null
+      },
+      "verified": false,
+      "certificate": {
+        "status": "CERTIFICATE_STATUS_TYPE_VALIDATING_OWNERSHIP",
+        "errorMessage": null,
+        "retryable": null
+      },
+      "dnsRecords": [
+        {
+          "hostLabel": "mahjong",
+          "fqdn": "mahjong.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_CNAME",
+          "purpose": "DNS_RECORD_PURPOSE_TRAFFIC_ROUTE",
+          "requiredValue": "q6b96lft.up.railway.app",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_REQUIRES_UPDATE"
+        },
+        {
+          "hostLabel": "_railway-verify.mahjong",
+          "fqdn": "_railway-verify.mahjong.xd-play.com",
+          "recordType": "DNS_RECORD_TYPE_TXT",
+          "purpose": "DNS_RECORD_PURPOSE_OWNERSHIP_VERIFICATION",
+          "requiredValue": "railway-verify=2933c1ebe6bced189f2c5cd7b7c6b02c49962c50a0fd4ae17886a0a6e8085f79",
+          "currentValue": "",
+          "status": "DNS_RECORD_STATUS_UNSPECIFIED"
+        }
+      ]
+    }
+  ]
+}

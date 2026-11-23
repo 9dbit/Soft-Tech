@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "portalOrigin": "https://xd-play.com",
+  "runtimes": [
+    {
+      "id": "skygate-5000",
+      "name": "SKYGATE 5000",
+      "label": "Skygate 5000",
+      "canonicalOrigin": "https://skygate.xd-play.com",
+      "stagingOrigin": null,
+      "domainReady": false,
+      "publicLaunch": "enabled",
+      "deploymentOrigin": "https://skygate-web-production.up.railway.app",
+      "entryPath": "/play/"
+    },
+    {
+      "id": "mahjong-wild",
+      "name": "MAHJONG WILD",
+      "label": "Mahjong Wild",
+      "canonicalOrigin": "https://mahjong.xd-play.com",
+      "stagingOrigin": "https://staging-mahjong.xd-play.com",
+      "domainReady": false,
+      "publicLaunch": "enabled",
+      "deploymentOrigin": "https://mahjong-legend-web-production.up.railway.app",
+      "entryPath": "/play/"
+    },
+    {
+      "id": "uno-luck",
+      "name": "UNO LUCK",
+      "label": "UNO Luck",
+      "canonicalOrigin": "https://uno.xd-play.com",
+      "stagingOrigin": "https://staging-uno.xd-play.com",
+      "domainReady": false,
+      "publicLaunch": "security_review",
+      "deploymentOrigin": null,
+      "entryPath": null
+    },
+    {
+      "id": "legend-ball-x1000",
+      "name": "LEGEND BALL X1000",
+      "label": "Legend Ball X1000",
+      "canonicalOrigin": "https://legend-ball.xd-play.com",
+      "stagingOrigin": "https://staging-legend-ball.xd-play.com",
+      "domainReady": false,
+      "publicLaunch": "staging_only",
+      "deploymentOrigin": null,
+      "entryPath": null
+    },
+    {
+      "id": "gachamon",
+      "name": "GACHAMON",
+      "label": "Gachamon",
+      "canonicalOrigin": "https://gachamon.xd-play.com",
+      "stagingOrigin": "https://staging-gachamon.xd-play.com",
+      "domainReady": false,
+      "publicLaunch": "staging_only",
+      "deploymentOrigin": null,
+      "entryPath": null
+    }
+  ]
+}
