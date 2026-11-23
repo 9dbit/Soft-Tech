@@ -25,8 +25,13 @@ test('every UI entry point has an explicit disabled-launch branch',()=>{
 });
 test('vanity host only points to non-launching canonical review page',()=>{
   const config=read('next.config.mjs');
-  assert.match(config,/uno\.xd-play\.com/);
-  assert.match(config,/destination: 'https:\/\/xd-play\.com\/games\/uno-luck'/);
+  const proxy=read('src/proxy.ts');
+  assert.match(proxy,/uno\.xd-play\.com/);
+  assert.match(proxy,/SAFE_DESTINATION = "https:\/\/xd-play\.com\/games\/uno-luck"/);
+  assert.match(proxy,/NextResponse\.redirect\(SAFE_DESTINATION, 307\)/);
+  assert.match(proxy,/request\.method !== "GET"/);
+  assert.match(proxy,/request\.method !== "HEAD"/);
+  assert.doesNotMatch(config,/type: 'host', value: 'uno\.xd-play\.com'/,'avoid automatic query forwarding');
   assert.match(config,/value: 'www\.xd-play\.com'/);
   for(const key of ['Strict-Transport-Security','Content-Security-Policy','X-Frame-Options','X-Content-Type-Options']){
     assert(config.includes(key), key+' must be configured');
