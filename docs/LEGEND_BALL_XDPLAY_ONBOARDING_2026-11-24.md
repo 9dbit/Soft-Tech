@@ -57,3 +57,9 @@ Gate requires ownership VERIFIED, certificate VALID and live domain assets befor
 - Shared production XDPLAY service has an unrelated 24-change staged Railway patch. It was not accepted. No portal production deployment or public launcher activation was made during this checkpoint.
 - Exact DNS needed: `legendballx` CNAME `rtchmvzp.up.railway.app` and `_railway-verify.legendballx` TXT `railway-verify=934da057b69de43039ac52b4c60636f2f4890a8b9f91e8de36ac76ccb423bf64`.
 - Rollback remains registry-only: keep LegendBallX `staging_only` and drop new DNS records if needed. Production game volume remains independent.
+
+## Final production-demo evidence (before DNS)
+- Actual production Railway-origin live browser acceptance: **SUCCESS**, GitHub Actions `https://github.com/9dbit/Legend-Ball-X1000/actions/runs/45375703868`, job `138381308804`. Validated root redirect, Studio Basic/CSRF refusal for unauthenticated calls, game-only XDPLAY `frame-ancestors`, all sampled art/assets, WebKit/Chromium mobile safe areas, menu controls and splash/PWA interactions.
+- Production game deployment `452810f8-eee5-4717-97fb-93f4793d2aac` SUCCESS, production release storage `/data`, explicit Railway fallback host. This proves Railway service is healthy, **not** that `legendballx.xd-play.com` DNS and TLS are ready.
+- Portal PR `https://github.com/9dbit/Soft-Tech/pull/15` is deliberately draft and closed-to-launch. Registry diff confirmed only the LEGEND BALL canonical hostname changed; no other game's entry changed relative to current XDPLAY release.
+- Blocker remains: DNS CNAME and TXT must be written at Cloudflare, Railway ownership verified and certificate valid. The shared portal Railway project's unrelated 24-change staged patch is not applied. Once the domain is ready, only then activate `enabled` and run custom-domain iframe acceptance, keeping real-money features disabled.
