@@ -39,8 +39,9 @@ jobs:
           git diff --check
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=moderate
-      - name: Prepare verified-host browser fixture build
-        if: matrix.domain-mode == 'verified-fixture'
+      - name: Prepare isolated browser fixture mode
+        env:
+          DOMAIN_MODE: ${{ matrix.domain-mode }}
         run: |
           node --input-type=module <<'EOF'
           import {readFileSync,writeFileSync} from 'node:fs';
@@ -49,7 +50,7 @@ jobs:
           // This isolated CI workspace never deploys. Browser requests are
           // intercepted fixtures; production readiness remains unchanged.
           for(const game of registry.runtimes) {
-            if(game.publicLaunch==='enabled') game.domainReady=true;
+            if(game.publicLaunch==='enabled') game.domainReady=process.env.DOMAIN_MODE==='verified-fixture';
           }
           writeFileSync(path,JSON.stringify(registry,null,2)+'\n');
           EOF
