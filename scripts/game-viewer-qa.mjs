@@ -94,6 +94,41 @@ const anchorTags = html => html.match(/<a\b[^>]*>[\s\S]*?<\/a>/gi) || [];
 const attr = (html, name) => new RegExp(`\\b${name}="([^"]*)"`, 'i').exec(html)?.[1] ?? null;
 
 async function httpChecks() {
+  await check('HTTP public catalog contains every enabled game', async () => {
+    for (const pathname of ['/', '/games']) {
+      const response = await fetchLocal(pathname);
+      assert.equal(response.status, 200, pathname);
+      const html = await response.text();
+      const launchLinks = anchorTags(html).map(tag => attr(tag, 'href')).filter(href => /^\/games\/[^/]+\/play$/.test(href || ''));
+      assert.deepEqual([...new Set(launchLinks)].sort(), active.map(game => `/games/${game.id}/play`).sort(), pathname + ': discoverable launch links');
+      if (pathname === '/games') {
+        const text = html.replace(/<script\b[\s\S]*?<\/script>/gi, '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+        assert.match(text, new RegExp(`SHOWING\\s+${active.length}\\s*/\\s*${active.length}\\s+ORIGINAL TITLES`));
+      }
+    }
+    const sitemap = await fetchLocal('/sitemap.xml');
+    assert.equal(sitemap.status, 200);
+    const xml = await sitemap.text();
+    for (const game of active) assert(xml.includes(`https://xd-play.com/games/${game.id}</loc>`), game.id + ': sitemap detail');
+    for (const game of blocked) assert(!xml.includes(`/games/${game.id}</loc>`), game.id + ': unreleased sitemap entry');
+    return { games: active.map(game => game.id) };
+  });
+  for (const game of active) {
+    await check(`HTTP detail and return destination ${game.id}`, async () => {
+      const response = await fetchLocal(`/games/${game.id}`);
+      assert.equal(response.status, 200, 'launcher back link must resolve to a real detail page');
+      const html = await response.text();
+      const title = /<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html)?.[1].replace(/<[^>]*>/g, '').trim();
+      assert.equal(title, game.name);
+      assert(anchorTags(html).some(tag => attr(tag, 'href') === `/games/${game.id}/play`), 'detail play action must return to canonical viewer');
+      const art = /<img\b[^>]*src="([^"]+)"[^>]*alt="[^"]*original game visual"/i.exec(html)?.[1];
+      assert(art?.startsWith('/assets/'), 'detail artwork must be locally shipped');
+      const asset = await fetchLocal(art, { method: 'HEAD' });
+      assert.equal(asset.status, 200);
+      assert.match(asset.headers.get('content-type') || '', /^image\//);
+      return { detail: `/games/${game.id}`, artwork: art };
+    });
+  }
   for (const game of registry.runtimes) {
     await check(`HTTP viewer ${game.id}`, async () => {
       const response = await fetchLocal(`/games/${game.id}/play${query}`);
@@ -336,6 +371,8 @@ async function browserChecks() {
             const screenshot = await saveScreenshot(page, `${game.id}-${viewport.name}-embedded`);
             await back.click();
             await page.waitForURL(new URL(`/games/${game.id}`, base).href, { timeout: 15000 });
+            await page.getByRole('heading', { name: game.name, exact: true, level: 1 }).waitFor({ state: 'visible' });
+            assert.equal(await page.getByRole('heading', { name: '404', exact: true }).count(), 0, 'back link must not land on a 404');
             return { launchMode, origin: new URL(source(game)).origin, viewport, dimensions, isolation, runtimeInput: true, screenshot };
           } finally { await context.close(); }
         });

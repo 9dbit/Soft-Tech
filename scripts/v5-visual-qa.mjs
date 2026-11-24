@@ -1,6 +1,8 @@
 import { chromium } from "playwright";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 
+const registry = JSON.parse(await readFile(new URL("../config/game-runtimes.json", import.meta.url), "utf8"));
+const catalogGames = registry.runtimes.filter(game => game.publicLaunch === "enabled");
 const root = process.env.V5_BASE_URL || "http://127.0.0.1:3000";
 const output = "qa-artifacts/v5";
 const checks = [];
@@ -157,7 +159,7 @@ try {
           landscapeCards:[...document.querySelectorAll(".catalog-grid .game-card-media")].map(el=>{const r=el.getBoundingClientRect();return {width:r.width,height:r.height};}),
           scrollWidth:document.documentElement.scrollWidth,windowWidth:innerWidth};
       });
-      if(route==="/games" && (audit.landscapeCards.length!==3||audit.landscapeCards.some(c=>c.width<=c.height)))errors.push(viewport.name+" "+route+": game catalog must have three landscape covers");
+      if(route==="/games" && (audit.landscapeCards.length!==catalogGames.length||audit.landscapeCards.some(c=>c.width<=c.height)))errors.push(viewport.name+" "+route+": game catalog must contain every enabled game with a landscape cover");
       if(audit.badEm.length)errors.push(viewport.name+" "+route+": gradient rectangles "+audit.badEm.join(","));
       if(["rgb(0, 0, 0)","rgb(23, 21, 27)"].includes(audit.logoBackground))errors.push(viewport.name+" "+route+": black logo plaque");
       if(audit.promoBackground==="rgb(25, 22, 29)")errors.push(viewport.name+" "+route+": black promo panel");
@@ -213,7 +215,7 @@ try {
     errors.push("Escape did not close the mobile navigation.");
   await mobile.locator(".v52-language-button").click();
   await mobile.waitForFunction(()=>document.querySelector(".v52-language-button")?.textContent?.includes("ID"));
-  if(await mobile.locator(".v52-games-rail .v52-game-card").count()!==3)errors.push("Homepage must display exactly three landscape cards.");
+  if(await mobile.locator(".v52-games-rail .v52-game-card").count()!==catalogGames.length)errors.push("Homepage must display one landscape card per enabled game.");
   const cardLayout=await mobile.locator(".v52-games-rail").evaluate(el=>getComputedStyle(el).gridTemplateColumns);
   if(cardLayout.split(" ").length!==1)errors.push("Homepage game cards must stack in one column.");
   const firstCard=await mobile.locator(".v52-card-cover").first().boundingBox();

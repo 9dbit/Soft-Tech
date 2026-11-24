@@ -12,13 +12,15 @@ portal pages; they do not combine game runtimes into the portal origin.
 | --- | --- | --- | --- | --- |
 | Skygate 5000 | `/games/skygate-5000/play` | `skygate.xd-play.com` | Not provisioned | Virtual-credit demo |
 | Mahjong Wild / Mahjong Legend project | `/games/mahjong-wild/play` | `mahjongwild.xd-play.com` | `staging-mahjong.xd-play.com` | Virtual-credit demo |
-| UNO Luck | `/games/uno-luck/play` | `uno.xd-play.com` | `staging-uno.xd-play.com` | Security review; unavailable |
-| Legend Ball X1000 | `/games/legend-ball-x1000/play` | `legend-ball.xd-play.com` | `staging-legend-ball.xd-play.com` | Staging only; unavailable |
+| UNO Luck | `/games/uno-luck/play` | `uno.xd-play.com` | `staging-uno.xd-play.com` | Virtual-credit demo |
+| Legend Ball X1000 | `/games/legend-ball-x1000/play` | `legendballx.xd-play.com` | `staging-legend-ball.xd-play.com` | Virtual-credit demo |
 | Gachamon | `/games/gachamon/play` | `gachamon.xd-play.com` | `staging-gachamon.xd-play.com` | Staging only; unavailable |
 
 Production names for unreleased games are reservations in configuration, not
-authorization to expose staging as production. Existing UNO vanity-host
-quarantine remains in `src/proxy.ts`. No deployable UNO Runner runtime was
+authorization to expose staging as production. The four admitted demos use
+their verified canonical subdomains. Gachamon remains reserved and unavailable.
+The UNO host guard in `src/proxy.ts` only handles traffic accidentally sent to
+the portal service; the real UNO subdomain is served by its isolated game service. No deployable UNO Runner runtime was
 identified in the reviewed projects; an unknown game ID fails closed.
 
 ## Why this architecture
@@ -77,12 +79,16 @@ existing frame restrictions. Its service worker does not cache HTML documents,
 so an old cached DENY document cannot replace the new embed response. Game API
 calls stay within the iframe's own origin; portal-to-game CORS is not opened.
 
-## DNS activation and staged rollout
+## Initial DNS activation and staged rollout (historical)
+
+This section records the initial rollout before the later UNO and Legend Ball
+activations. The current configured admission is in the table above and in
+`config/game-runtimes.json`.
 
 At registration time all `domainReady` flags were false. The two admitted demos
-use top-level links to their approved Railway service origins. Six custom hostnames
-have been registered with Railway, but registration is not DNS/TLS completion.
-The Cloudflare session requires account sign-in before records can be applied.
+used top-level links to their approved Railway service origins. Six custom hostnames
+had been registered with Railway, but registration is not DNS/TLS completion.
+At that checkpoint the Cloudflare session required account sign-in before records could be applied.
 
 `dns/xdplay-game-domains.zone` contains the twelve exact CNAME/TXT records from
 Railway. `dns/registration-receipt.json` records their original registration
@@ -136,7 +142,7 @@ absence of all application vulnerabilities.
 Security release reference: https://nextjs.org/blog/november-2026-security-release
 
 
-## Verified domain activation — 24 November 2026
+## First verified domain activation — 24 November 2026 (historical)
 
 The user selected `mahjongwild.xd-play.com` as the canonical Mahjong hostname.
 Railway reports ownership verified, CNAME propagated and valid certificates for
@@ -145,10 +151,47 @@ responded with HTTP 200 on their canonical HTTPS hosts. Mahjong's document hash
 is unchanged from the approved runtime release. Its session endpoint returned
 HTTP 200 with a host-only Secure/HttpOnly/SameSite=Lax cookie; anonymous Studio
 remains 401, an unrecognized play route remains 404, and the stylesheet is 200.
-Only the two admitted demos now have `domainReady: true`. UNO, Legend Ball and
-Gachamon admission remains closed. Staging DNS activation does not change admission.
+At this first activation checkpoint only the two admitted demos had
+`domainReady: true`; UNO, Legend Ball and Gachamon admission remained closed. Staging DNS activation does not change admission.
 
 The CI matrix now explicitly prepares both pending and verified fixture states,
 so rollback coverage remains active even when the deployed registry is ready.
 The earlier `dns/registration-receipt.json` remains an historical snapshot;
 `dns/xdplay-game-domains.zone` reflects the selected Mahjong hostname.
+
+
+## Four-game catalog completion — 24 November 2026
+
+The canonical runtime table and `config/game-runtimes.json` now admit Skygate,
+Mahjong Wild, UNO Luck and Legend Ball X1000 as virtual-credit demos. All four
+use `domainReady: true` and their separate production runtime services. The
+public `/play/` endpoint is distinct from each game's protected Studio root.
+Admission does not itself prove current runtime health.
+
+`src/data/games.ts` provides the public catalog, detail pages and game counts.
+The Legend Ball entry uses the unchanged shipped 512×512 brand image
+`play/icons/legend-brand-v12-maskable-512.png` from game commit
+`3aa6c1e0e31bf6fdd5cb66461f6ebca05c9fd69b`, copied to
+`public/assets/legend-ball-x1000-cover.png` (246,467 bytes; Git blob
+`c5dc4aa2c589a5a97705ff1e2c2f3ade26c9cfa2`). This original compact brand artwork
+has a safe-area inset that fits the existing card crop and avoids a larger
+publication payload; it has not been resized, converted or recomposited.
+Existing artwork, fonts and
+layout styles are retained. Counts on desktop/mobile, navigation, cards and
+stories are derived from the catalog. The sitemap includes the admitted detail
+pages.
+
+`config/catalog-policy.mjs` is checked when the runtime library is loaded during
+the production build. It rejects enabled runtimes missing a catalog/detail
+entry, duplicate IDs, unregistered catalog entries, non-canonical launcher URLs
+and unguarded unreleased entries. A rollback that closes public admission must
+also mark the affected catalog entry `launchState: "security_review"` and update
+the reviewed release-admission expectations (the current release pins four
+admitted demos in registry and catalog acceptance tests). Changing
+only `domainReady` to false remains a supported top-level fallback.
+
+Regression checks now request every admitted detail page and its local artwork,
+verify home/catalog discoverability and sitemap inclusion, and require the
+launcher back action to reach the actual game heading instead of accepting a
+matching URL that rendered 404. Existing pending/verified-domain fixture modes
+continue to run independently of production.

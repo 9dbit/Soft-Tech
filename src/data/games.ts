@@ -3,7 +3,16 @@ export type Game = {launchState?: "security_review"; id:string; name:string; gen
 export const games:Game[]=[
 {id:"skygate-5000",name:"SKYGATE 5000",genre:"Cinematic Fantasy",tag:"FANTASY CASCADE",slogan:"Enter the realm of the gods.",description:"Enter a world of golden temples, celestial power and thunder-charged cascades. Discover an electrifying mythology-inspired adventure.",idDescription:"Jelajahi kuil emas, kekuatan langit, dan rangkaian simbol penuh petir dalam petualangan fantasi sinematik.",cover:"/assets/skygate-cover.jpeg",detailImage:"/assets/skygate-cover.jpeg",url:"/games/skygate-5000/play",accent:"#60a7ff",number:"01"},
 {id:"uno-luck",name:"UNO LUCK",genre:"Neon Arcade",tag:"COLOR COMBINATION",slogan:"Ignite the dragon. Unleash the colors.",description:"Feel the pulse of a dragon-powered neon arcade, with dazzling color combinations and exhilarating celebrations.",idDescription:"Rasakan energi arcade neon dengan naga, kombinasi warna yang menyala, dan animasi selebrasi.",cover:"/assets/uno-luck-cover.webp",detailImage:"/assets/uno-luck-detail.webp",url:"/games/uno-luck/play",accent:"#ff634e",number:"02"},
-{id:"mahjong-wild",name:"MAHJONG WILD",genre:"Jade Cascade",tag:"MAHJONG CASCADE",slogan:"Ancient symbols. Wild possibilities.",description:"Timeless jade artistry meets modern tile-cascade action, glowing symbols and richly detailed oriental ornamentation.",idDescription:"Seni jade klasik bertemu dengan cascade tile modern, simbol bercahaya, dan ornamen yang kaya detail.",cover:"/assets/mahjong-cover.jpg",detailImage:"/assets/mahjong-detail.webp",url:"/games/mahjong-wild/play",accent:"#63e9ba",number:"03"}];
+{id:"mahjong-wild",name:"MAHJONG WILD",genre:"Jade Cascade",tag:"MAHJONG CASCADE",slogan:"Ancient symbols. Wild possibilities.",description:"Timeless jade artistry meets modern tile-cascade action, glowing symbols and richly detailed oriental ornamentation.",idDescription:"Seni jade klasik bertemu dengan cascade tile modern, simbol bercahaya, dan ornamen yang kaya detail.",cover:"/assets/mahjong-cover.jpg",detailImage:"/assets/mahjong-detail.webp",url:"/games/mahjong-wild/play",accent:"#63e9ba",number:"03"},
+{id:"legend-ball-x1000",name:"LEGEND BALL X1000",genre:"Anime Fantasy",tag:"RUNE CASCADE",slogan:"Awaken the runes. Rise into legend.",description:"Enter a storm-lit anime world of dragons, glowing runes and cascading symbols. Explore a cinematic adventure with virtual credits and explosive celebrations.",idDescription:"Masuki dunia anime penuh naga, rune bercahaya, dan cascade simbol. Jelajahi petualangan sinematik dengan kredit virtual dan selebrasi penuh energi.",cover:"/assets/legend-ball-x1000-cover.png",detailImage:"/assets/legend-ball-x1000-cover.png",url:"/games/legend-ball-x1000/play",accent:"#ffb447",number:"04"}];
+
+export const gameCount = games.length;
+export const gameCountLabel = String(gameCount).padStart(2, "0");
+const countWords = {
+  EN: ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"],
+  ID: ["Nol", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh"]
+};
+export const gameCountCopy = { EN: countWords.EN[gameCount] || String(gameCount), ID: countWords.ID[gameCount] || String(gameCount) };
 
 /** Marketing status can disable links; only the authoritative provider controls admission. */
 export const canLaunchGame = (game: Game): boolean =>

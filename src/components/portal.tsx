@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, CirclePlay, Compass, Gamepad2, Globe2, Layers3,
   Mail, Menu, Play, Search, ShieldCheck, Sparkles, WandSparkles, X, Zap
 } from "lucide-react";
-import { canLaunchGame, games, logo, type Game } from "@/data/games";
+import { canLaunchGame, games, gameCountLabel, gameCountCopy, logo, type Game } from "@/data/games";
 import { ParallaxScene, Reveal, ScrollProgress, TiltCard } from "./motion";
 import { V4WorldStory } from "./v4-playground";
 import V52MobileHero from "./v52-mobile-hero";
@@ -36,7 +36,7 @@ function GameCard({ game, navigate, index }: {
       <div className="game-card-media">
         <img src={game.cover} alt={game.name + " official artwork"} loading="lazy" />
         <span className="game-card-shine" aria-hidden="true" />
-        <div className="card-top"><span>XDPLAY ORIGINAL</span><span>0{index + 1} / 03</span></div>
+        <div className="card-top"><span>XDPLAY ORIGINAL</span><span>0{index + 1} / {gameCountLabel}</span></div>
         <button className="card-image-link" onClick={() => navigate("/games/" + game.id)}
           aria-label={"View " + game.name + " game details"} />
         <div className="card-cover-name">
@@ -124,7 +124,7 @@ function HeroShowcase({
       </div>
 
       <div className="stage-content" key={game.id}>
-        <span className="stage-kicker"><span className="blink-dot" /> FEATURED WORLD <span className="minor-text">/ 0{active + 1} — 03</span></span>
+        <span className="stage-kicker"><span className="blink-dot" /> FEATURED WORLD <span className="minor-text">/ 0{active + 1} — {gameCountLabel}</span></span>
         <div className="stage-number" aria-hidden="true">0{active + 1}</div>
         <h2>{game.name}</h2>
         <p className="stage-slogan">{game.slogan}</p>
@@ -147,7 +147,7 @@ function HeroShowcase({
       <div className="stage-footer">
         <div className="stage-count"><strong>0{active + 1}</strong><div className="stage-progress">{games.map((g, i) => <button key={g.id}
           className={"stage-progress-segment " + (active === i ? "selected" : "")}
-          onClick={() => setActive(i)} aria-label={"Feature " + g.name} aria-current={active === i ? "true" : undefined}/>)}</div><span>03</span></div>
+          onClick={() => setActive(i)} aria-label={"Feature " + g.name} aria-current={active === i ? "true" : undefined}/>)}</div><span>{gameCountLabel}</span></div>
         <div className="stage-controls">
           <span>CHANGE WORLD</span>
           <button onClick={() => setActive((active + games.length - 1) % games.length)} aria-label="Previous featured game"><ArrowLeft size={19}/></button>
@@ -297,7 +297,7 @@ function GameDetails({ game, lang, navigate }: {
             )}<button className="btn btn-glass" onClick={() => navigate("/games")}>ALL GAMES <ArrowRight size={17}/></button></div>
           </div>
           <div className="detail-float-card"><img src={game.detailImage} alt={game.name + " original game visual"}/><span>{game.tag}</span></div>
-          <span className="detail-corner">ST. / 0{index + 1} — 03</span>
+          <span className="detail-corner">ST. / 0{index + 1} — {gameCountLabel}</span>
         </ParallaxScene>
       </Reveal>
       <div className="detail-description">
@@ -369,7 +369,7 @@ export default function Portal() {
           ))}
         </div>
         <div className="side-card"><div className="side-card-stars"><Sparkles size={21}/><span>XDPLAY / 2026</span></div><strong>PLAY THE<br/>UNEXPECTED.</strong><div className="side-card-bottom">CREATIVE WORLD BUILDERS <ArrowUpRight size={15}/></div></div>
-        <div className="side-bottom"><span><span className="online-pulse"/> 03 WORLDS ONLINE</span><span>ST / 001</span></div>
+        <div className="side-bottom"><span><span className="online-pulse"/> {gameCountLabel} WORLDS ONLINE</span><span>ST / 001</span></div>
       </aside>
 
       <div className="site-body">
@@ -387,7 +387,7 @@ export default function Portal() {
             </button>)}
           </nav>
           <div className="header-right">
-            <span className="header-live"><span className="online-pulse"/> 03 ORIGINAL GAMES</span>
+            <span className="header-live"><span className="online-pulse"/> {gameCountLabel} ORIGINAL GAMES</span>
             <button className="language-switch" onClick={() => setLanguage(language === "EN" ? "ID" : "EN")} aria-label="Change language"><Globe2 size={15}/> {language}<ChevronDown size={12}/></button>
             <button className="contact-header" onClick={() => navigate("/contact")}>{t("LET'S TALK", "KONTAK")} <ArrowUpRight size={15}/></button>
             <button className="hamburger" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation">{mobileMenu ? <X size={21}/> : <Menu size={21}/>}</button>
@@ -407,7 +407,7 @@ export default function Portal() {
 
             <section className="home-collection" id="collection">
               <Reveal><div className="section-header"><div><span className="section-index">02</span><span className="section-slash">/</span><span>THE COLLECTION</span></div><button className="section-action" onClick={() => navigate("/games")}>VIEW ALL GAMES <ArrowUpRight size={17}/></button></div></Reveal>
-              <Reveal><div className="collection-heading"><div><span className="eyebrow">HANDCRAFTED ORIGINAL EXPERIENCES</span><h2>THREE WORLDS.<br/><em>ENDLESS WONDER.</em></h2><p>Every world plays by its own rules. Find one that speaks to you.</p></div><div className="collection-count"><strong>03</strong><span>XDPLAY<br/>ORIGINALS</span></div></div></Reveal>
+              <Reveal><div className="collection-heading"><div><span className="eyebrow">HANDCRAFTED ORIGINAL EXPERIENCES</span><h2>{gameCountCopy.EN.toUpperCase()} WORLDS.<br/><em>ENDLESS WONDER.</em></h2><p>Every world plays by its own rules. Find one that speaks to you.</p></div><div className="collection-count"><strong>{gameCountLabel}</strong><span>XDPLAY<br/>ORIGINALS</span></div></div></Reveal>
               <div className="game-grid">{games.map((item, index) =>
                 <Reveal key={item.id} delay={index * 95}><GameCard game={item} navigate={navigate} index={index}/></Reveal>)}</div>
             </section>
@@ -430,7 +430,7 @@ export default function Portal() {
           </>}
 
           {section === "games" && !game && <section className="inner-page games-page">
-            <Reveal className="page-head"><span className="eyebrow"><span className="blink-dot"/> OUR ORIGINAL UNIVERSE / 001</span><h1>CHOOSE YOUR<br/><em>WORLD.</em></h1><p>Three original experiences. Three very different adventures.</p></Reveal>
+            <Reveal className="page-head"><span className="eyebrow"><span className="blink-dot"/> OUR ORIGINAL UNIVERSE / 001</span><h1>CHOOSE YOUR<br/><em>WORLD.</em></h1><p>{t(`${gameCountCopy.EN} original experiences. ${gameCountCopy.EN} very different adventures.`, `${gameCountCopy.ID} pengalaman orisinal. ${gameCountCopy.ID} petualangan yang berbeda.`)}</p></Reveal>
             <Reveal><div className="catalog-tools"><label className="catalog-search"><Search size={18}/><input aria-label="Search games" placeholder={t("Search games...", "Cari game...")} value={search} onChange={event => setSearch(event.target.value)}/></label>
               <div className="catalog-filters" aria-label="Filter games">{["ALL", "FANTASY", "ARCADE", "JADE"].map(item => <button key={item} className={category === item ? "selected" : ""} onClick={() => setCategory(item)}>{item}</button>)}</div>
             </div><div className="catalog-count">SHOWING {filtered.length} / {games.length} ORIGINAL TITLES</div></Reveal>

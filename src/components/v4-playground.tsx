@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent, type KeyboardEvent, type TouchEvent } from "react";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUpRight, Play, ShieldCheck, Sparkles, MoveUpRight } from "lucide-react";
-import { canLaunchGame, games, type Game } from "@/data/games";
+import { canLaunchGame, games, gameCountLabel, gameCountCopy, type Game } from "@/data/games";
 import { Reveal, TiltCard } from "./motion";
 
 type Props = {
@@ -189,7 +189,7 @@ export function V4Playground({ active, setActive, lang, navigate }: Props) {
       </div>
 
       <div className="v4-left-rail">
-        <span className="v4-index">[ 0{active + 1} / 03 ] <span className="v4-pixel">FEATURED RELEASE</span></span>
+        <span className="v4-index">[ 0{active + 1} / {gameCountLabel} ] <span className="v4-pixel">FEATURED RELEASE</span></span>
         <div key={game.id} className="v4-left-animated">
           <span className="v4-label-pill"><Sparkles size={14}/>{game.genre.toUpperCase()}</span>
           <h2>{game.name}</h2>
@@ -205,7 +205,7 @@ export function V4Playground({ active, setActive, lang, navigate }: Props) {
 
       <div className="v4-right-rail">
         <span className="v4-vertical-copy">{title}</span>
-        <div className="v4-side-counter"><strong className="v4-pixel">03</strong><span>ORIGINAL<br/>GAME WORLDS</span></div>
+        <div className="v4-side-counter"><strong className="v4-pixel">{gameCountLabel}</strong><span>ORIGINAL<br/>GAME WORLDS</span></div>
       </div>
 
       <div className="v4-hero-bottomline">
@@ -235,8 +235,8 @@ export function V4WorldStory({ lang, navigate }: { lang: "EN"|"ID"; navigate: (p
           <span className="v4-spec-label">[ 04 / EVERY WORLD HAS A STORY ]</span>
           <h2>NOT MADE<br/>TO FIT.<br/><em>MADE TO<br/>FEEL.</em></h2>
           <p>{lang === "EN"
-            ? "Three worlds. Three distinct identities. Every interactive detail designed to make you feel something."
-            : "Tiga dunia, tiga karakter berbeda. Setiap detail dirancang untuk menghadirkan pengalaman yang berkesan."}</p>
+            ? `${gameCountCopy.EN} worlds. ${gameCountCopy.EN} distinct identities. Every interactive detail designed to make you feel something.`
+            : `${gameCountCopy.ID} dunia, ${gameCountCopy.ID.toLowerCase()} karakter berbeda. Setiap detail dirancang untuk menghadirkan pengalaman yang berkesan.`}</p>
           <div className="v4-story-scroll">SCROLL THROUGH THE WORLDS <ArrowDown size={16}/></div>
         </Reveal>
       </div>

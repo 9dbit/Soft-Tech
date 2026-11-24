@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { ArrowDown, ArrowUpRight, Gamepad2, Globe2, Menu, X } from "lucide-react";
-import { canLaunchGame, games } from "@/data/games";
+import { canLaunchGame, games, gameCountLabel } from "@/data/games";
 
 type Props = {navigate:(path:string)=>void;lang:"EN"|"ID";menuOpen:boolean;toggleMenu:()=>void;toggleLanguage:()=>void};
 const LAYERS = [
@@ -104,7 +104,7 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
 
      <div className="v52-end">
        <div className="v52-count-row">
-         <div className="v52-count-label"><Gamepad2 size={30}/><strong>03</strong><span>FLAGSHIP<br/>GAMES</span></div>
+         <div className="v52-count-label"><Gamepad2 size={30}/><strong>{gameCountLabel}</strong><span>FLAGSHIP<br/>GAMES</span></div>
          <div className="v52-thumbnails">
            {games.map((game,index)=><button key={game.id} onClick={()=>navigate("/games/"+game.id)} aria-label={"Explore "+game.name}>
              <img src={game.cover} alt="" loading="lazy"/><span>0{index+1}</span>
@@ -121,8 +121,8 @@ export default function V52MobileHero({navigate,lang,menuOpen,toggleMenu,toggleL
 
    <section className="v52-featured" id="v52-featured" aria-label="Featured games">
      <div className="v52-featured-header">
-       <div><i aria-hidden="true"/><strong>OUR FLAGSHIP GAMES</strong><small>01 / 03</small></div>
-       <div className="v52-rail-arrows"><span>03 ORIGINAL TITLES</span></div>
+       <div><i aria-hidden="true"/><strong>OUR FLAGSHIP GAMES</strong><small>01 / {gameCountLabel}</small></div>
+       <div className="v52-rail-arrows"><span>{gameCountLabel} ORIGINAL TITLES</span></div>
      </div>
      <div className="v52-games-rail">
        {games.map((game,index)=><article className="v52-game-card" key={game.id}>

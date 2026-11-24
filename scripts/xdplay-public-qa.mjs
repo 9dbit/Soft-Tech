@@ -4,7 +4,9 @@ import {execFileSync} from 'node:child_process';
 import {request as httpRequest} from 'node:http';
 import assert from 'node:assert/strict';
 const base='http://127.0.0.1:3000',output='qa-artifacts/xdplay';
-const routes=['/','/games','/company','/technology','/partners','/contact','/games/uno-luck','/games/mahjong-wild','/games/skygate-5000'];
+const registry=JSON.parse(await readFile(new URL('../config/game-runtimes.json',import.meta.url),'utf8'));
+const enabledGames=registry.runtimes.filter(game=>game.publicLaunch==='enabled');
+const routes=['/','/games','/company','/technology','/partners','/contact',...enabledGames.map(game=>'/games/'+game.id)];
 // Use the low-level HTTP client: fetch may replace Host with the URL's hostname.
 const requestHost=(host,path)=>new Promise((resolve,reject)=>{
  const req=httpRequest({hostname:'127.0.0.1',port:3000,path,method:'GET',headers:{Host:host}},res=>{res.resume();res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,host:req.getHeader('Host')}));});
@@ -41,6 +43,10 @@ try{
  assert.equal(blockedPath.headers.location,'https://xd-play.com/games/uno-luck');
  const canonical=await requestHost('xd-play.com','/games/uno-luck?test=1');report.redirects.push(canonical);assert.equal(canonical.status,200,'Canonical host must not loop');
  assert.equal((await fetch(base+'/api/health')).status,200);
- const original=execFileSync('git',['show','2dad8bbd89c9e93a556776051961b9a4c51cca97:src/data/games.ts'],{encoding:'utf8'}),current=await readFile('src/data/games.ts','utf8'),urls=s=>[...s.matchAll(/url:"([^"]+)"/g)].map(m=>m[1].split('?')[0]);const baseline=urls(original),updated=urls(current);assert.equal(updated.length,baseline.length);assert.equal(updated[0],'/games/skygate-5000/play','preserve Skygate in-domain demo');assert.equal(updated[1],'/games/uno-luck/play','closed UNO canonical launcher');assert.equal(updated[2],'/games/mahjong-wild/play','canonical Mahjong viewer');assert.doesNotMatch(current,/launchState:"security_review",url:"\/games\/uno-luck\/play"/);assert.equal(report.errors.length,0,'browser errors');report.status='PASS';
+ const current=await readFile('src/data/games.ts','utf8');
+ const updated=[...current.matchAll(/url:"([^"]+)"/g)].map(match=>match[1]);
+ assert.deepEqual([...updated].sort(),enabledGames.map(game=>`/games/${game.id}/play`).sort(),'every enabled game has exactly one canonical catalog launcher');
+ assert.deepEqual(updated.slice(0,3),['/games/skygate-5000/play','/games/uno-luck/play','/games/mahjong-wild/play'],'preserve established catalog order');
+ assert.equal(report.errors.length,0,'browser errors');report.status='PASS';
 }catch(error){report.status='FAIL';report.errors.push(error.stack);process.exitCode=1;}
 finally{await browser.close();await writeFile(output+'/report.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));}
