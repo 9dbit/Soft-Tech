@@ -11,7 +11,7 @@ const expected = {
   'skygate-5000': ['https://skygate.xd-play.com', null, 'enabled', 'https://skygate-web-production.up.railway.app'],
   'mahjong-wild': ['https://mahjongwild.xd-play.com', 'https://staging-mahjong.xd-play.com', 'enabled', 'https://mahjong-legend-web-production.up.railway.app'],
   'uno-luck': ['https://uno.xd-play.com', 'https://staging-uno.xd-play.com', 'enabled', 'https://uno-demo-web-production.up.railway.app'],
-  'legend-ball-x1000': ['https://legendballx.xd-play.com', 'https://staging-legend-ball.xd-play.com', 'staging_only', null],
+  'legend-ball-x1000': ['https://legendballx.xd-play.com', 'https://staging-legend-ball.xd-play.com', 'enabled', 'https://legendballx-demo-web-production.up.railway.app'],
   gachamon: ['https://gachamon.xd-play.com', 'https://staging-gachamon.xd-play.com', 'staging_only', null]
 };
 const fresh = () => structuredClone(registry);
@@ -31,9 +31,9 @@ test('release registry explicitly maps five games to nine separate production/st
   }
 });
 
-test('only qualified Skygate, Mahjong and UNO demos can produce launch URLs', () => {
+test('only qualified demos can produce launch URLs', () => {
   const enabled = registry.runtimes.filter(game => gameLaunchUrl(game));
-  assert.deepEqual(enabled.map(game => game.id).sort(), ['mahjong-wild', 'skygate-5000', 'uno-luck']);
+  assert.deepEqual(enabled.map(game => game.id).sort(), ['legend-ball-x1000', 'mahjong-wild', 'skygate-5000', 'uno-luck']);
   for (const game of registry.runtimes.filter(game => game.publicLaunch !== 'enabled')) {
     assert.equal(activeRuntimeOrigin(game), null);
     assert.equal(gameLaunchUrl(game), null);
@@ -106,8 +106,8 @@ const invalid = [
   ['unapproved entry path', r => { r.runtimes[0].entryPath = '/studio/'; }],
   ['protocol-relative entry path', r => { r.runtimes[0].entryPath = '//attacker.example/'; }],
   ['entry path carrying token', r => { r.runtimes[0].entryPath = '/play/?token=example'; }],
-  ['blocked game with deployment target', r => { r.runtimes[3].deploymentOrigin = 'https://uno-luck-web-staging.up.railway.app'; }],
-  ['blocked game with entry path', r => { r.runtimes[3].entryPath = '/play/'; }],
+  ['blocked game with deployment target', r => { r.runtimes.find(game => game.id === 'gachamon').deploymentOrigin = 'https://uno-luck-web-staging.up.railway.app'; }],
+  ['blocked game with entry path', r => { r.runtimes.find(game => game.id === 'gachamon').entryPath = '/play/'; }],
   ['blocked game marked domain ready', r => { r.runtimes[4].domainReady = true; }]
 ];
 for (const [name, mutate] of invalid) {

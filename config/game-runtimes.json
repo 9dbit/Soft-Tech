@@ -41,10 +41,10 @@
       "label": "Legend Ball X1000",
       "canonicalOrigin": "https://legendballx.xd-play.com",
       "stagingOrigin": "https://staging-legend-ball.xd-play.com",
-      "domainReady": false,
-      "publicLaunch": "staging_only",
-      "deploymentOrigin": null,
-      "entryPath": null
+      "domainReady": true,
+      "publicLaunch": "enabled",
+      "deploymentOrigin": "https://legendballx-demo-web-production.up.railway.app",
+      "entryPath": "/play/"
     },
     {
       "id": "gachamon",
