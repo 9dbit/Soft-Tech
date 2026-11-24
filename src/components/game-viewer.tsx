@@ -34,7 +34,7 @@ export default function GameViewer({ game }: { game: GameRuntime }) {
     </main>;
   }
 
-  return <main className={styles.launch} data-launch-mode="embedded" aria-label={`${game.label} XDPLAY game viewer`}>
+  return <main className={`${styles.launch}${game.id === "uno-luck" ? ` ${styles.unoLaunch}` : ""}`} data-launch-mode="embedded" aria-label={`${game.label} XDPLAY game viewer`}>
     <p id="game-virtual-credit-notice" className={styles.srOnly}>
       This is a virtual-credit demo. No real-money purchases, deposits or withdrawals.
     </p>
