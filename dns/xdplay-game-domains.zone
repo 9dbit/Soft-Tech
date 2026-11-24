@@ -20,3 +20,7 @@ _railway-verify.staging-mahjong 300 IN TXT "railway-verify=03f071bb5afb85849e294
 
 mahjongwild 300 IN CNAME du1rwnos.up.railway.app.
 _railway-verify.mahjongwild 300 IN TXT "railway-verify=98709a0e5514228d961fd396b7a832ddecca84454c5f461ceca4a6a7fb069b90"
+
+; Legend Ball X1000 production demo, registered separately from staging.
+legendballx 300 IN CNAME rtchmvzp.up.railway.app.
+_railway-verify.legendballx 300 IN TXT "railway-verify=934da057b69de43039ac52b4c60636f2f4890a8b9f91e8de36ac76ccb423bf64"
