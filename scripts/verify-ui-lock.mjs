@@ -1,10 +1,11 @@
-// UI LOCK V6.1: preserve approved layout and images; allow reviewed launch-route standardization and qualified UNO demo activation.
+// UI LOCK V6.1: preserve approved layout and images; allow reviewed launch-route standardization and four-game catalog completion.
 // The approved layout, navbar, game visuals and six-layer
 // orange-computer assets may not be silently changed by a typography release.
 // Git blob IDs include file mode independent content bytes.
 import {readFileSync} from "node:fs";
 import {createHash} from "node:crypto";
 const locked = {
+  "public/assets/legend-ball-x1000-cover.png": "c5dc4aa2c589a5a97705ff1e2c2f3ade26c9cfa2",
   "public/assets/v5/cable-layer.webp": "15ce0315edcec7c78d9d7a3ba15f56ec5e93c888",
   "public/assets/v5/cartridge-layer.webp": "0b553790e9f741293bf617f01cbfd560330c1e5d",
   "public/assets/v5/cursor-layer.webp": "3423bd16237a69e981d0cee9e72204f921535b64",
@@ -28,10 +29,10 @@ const locked = {
   "src/app/v57-unified-ui.css": "fb9eb8fb6fd082c66764974844c9c539092d490e",
   "src/app/v58-landscape-games.css": "e6bc61d924c87d917a61c8931d9d58e659d0f83e",
   "src/components/motion.tsx": "6eb8e5bb0e5fac653d31a8fcbd7fa4a3e09de5d1",
-  "src/components/portal.tsx": "3708dc75fb4428d75601614c20499eeab7c2e534",
-  "src/components/v5-desktop-hero.tsx": "7d18d6aa0fc5fc6bf201d0454357dc8692a6e3bb",
-  "src/components/v52-mobile-hero.tsx": "ca15c9ac1c568187404c0c5f6d00f132d686148e",
-  "src/data/games.ts": "6e78bbfadf70364eb1019e02c5214cd7d71e51b3",
+  "src/components/portal.tsx": "a25383ca4a6aa60a5006fa90d38140c411051f17",
+  "src/components/v5-desktop-hero.tsx": "e78fc3b709c59e47098b36ba912bcd7ed03a7fc2",
+  "src/components/v52-mobile-hero.tsx": "718f623d4617f6f1d40174b1e4592ce833becbc7",
+  "src/data/games.ts": "42477a1e129f92e67779d2b96f8bc167584dd66f",
   "public/fonts/Minecraft.woff2": "24a32947adfdc19d2bc5745ae99cb6a8b5375f95"
 };
 const failures=[];

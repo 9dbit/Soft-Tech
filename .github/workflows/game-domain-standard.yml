@@ -34,7 +34,7 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Validate registry, quarantine and approved artwork
         run: |
-          node --test scripts/game-domain-standard.test.mjs scripts/uno-secure-onboarding.test.mjs scripts/rebrand-xdplay.test.mjs
+          node --test scripts/game-domain-standard.test.mjs scripts/game-catalog.test.mjs scripts/uno-secure-onboarding.test.mjs scripts/rebrand-xdplay.test.mjs
           node scripts/verify-ui-lock.mjs
           git diff --check
       - name: Audit production dependencies

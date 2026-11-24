@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState, type PointerEvent, type CSSProperties } from "react";
 import { ArrowRight, ArrowDown, Globe2, Gamepad2, Instagram, Facebook, X, ChevronDown, LockKeyhole, Mail } from "lucide-react";
 
+import { gameCount } from "@/data/games";
+
 const V5_LAYERS = [
   { id: "cable", left: 160, top: 784, width: 525, height: 683, depthX: .44, depthY: .4 },
   { id: "monitor", left: 120, top: 40, width: 860, height: 800, depthX: .35, depthY: .35 },
@@ -133,7 +135,7 @@ export default function V5DesktopHero({ navigate, lang }: {
         </h1>
 
         <aside className="v5-stat">
-          <div className="v5-stat-title"><Gamepad2 aria-hidden="true" size={49}/><strong>3</strong><span>FLAGSHIP<br/>GAMES</span></div>
+          <div className="v5-stat-title"><Gamepad2 aria-hidden="true" size={49}/><strong>{gameCount}</strong><span>FLAGSHIP<br/>GAMES</span></div>
           <p>{t("Our games deliver immersive play experiences that connect players and spark lasting communities.",
             "Game kami menghadirkan pengalaman imersif yang menghubungkan pemain dan menciptakan komunitas.")}</p>
         </aside>
