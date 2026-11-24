@@ -305,6 +305,15 @@ async function browserChecks() {
             assert.match(await separate.getAttribute('rel'), /noopener/);
             assert.match(await separate.getAttribute('rel'), /noreferrer/);
             await assertControlBounds([back, separate], viewport);
+            if (game.id === 'uno-luck') {
+              const fullscreen = page.getByRole('button', { name: 'Enter fullscreen', exact: true });
+              await fullscreen.waitFor({ state: 'visible' });
+              await assertControlBounds([fullscreen], viewport);
+              await fullscreen.click();
+              await page.waitForFunction(() => document.fullscreenElement === document.documentElement);
+              await page.getByRole('button', { name: 'Exit fullscreen', exact: true }).click();
+              await page.waitForFunction(() => document.fullscreenElement === null);
+            }
             const isolation = await child.locator('body').evaluate(() => {
               let parentReadable = false;
               try { parentReadable = Boolean(window.parent.document.body); } catch {}
