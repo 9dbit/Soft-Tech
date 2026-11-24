@@ -1,6 +1,7 @@
 import type { GameRuntime } from "@/lib/game-runtime";
 import { getGameEmbedUrl, getGameLaunchUrl } from "@/lib/game-runtime";
 import styles from "./game-viewer.module.css";
+import GameFullscreenButton from "./game-fullscreen-button";
 
 export default function GameViewer({ game }: { game: GameRuntime }) {
   const source = getGameLaunchUrl(game);
@@ -56,6 +57,7 @@ export default function GameViewer({ game }: { game: GameRuntime }) {
       </a>
       <div className={styles.labels} aria-label="Game mode">
         <span className={styles.demoLabel}>VIRTUAL-CREDIT DEMO</span>
+        {game.id === "uno-luck" && <GameFullscreenButton />}
         <a href={source} className={styles.external} target="_blank"
            rel="noopener noreferrer" referrerPolicy="no-referrer">
           Open separately <span aria-hidden="true">↗</span>

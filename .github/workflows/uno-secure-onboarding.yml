@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run release-source integrity and closed-launch assertions
+      - name: Run release-source integrity and demo admission assertions
         run: |
           node scripts/verify-ui-lock.mjs
           node --test scripts/uno-secure-onboarding.test.mjs
@@ -38,7 +38,7 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright@1.56.1 --no-audit --no-fund
           npx playwright install --with-deps chromium
-      - name: Verify host redirects, disabled UNO buttons and responsive marketing
+      - name: Verify host quarantine, canonical UNO links and responsive marketing
         run: |
           npm run start -- -p 3000 > /tmp/xdplay-uno-onboard.log 2>&1 &
           ready=0
@@ -49,7 +49,7 @@ jobs:
           test "$ready" = 1 || { cat /tmp/xdplay-uno-onboard.log; exit 1; }
           node scripts/xdplay-public-qa.mjs
           curl -fsS http://127.0.0.1:3000/api/games/uno-luck/status |
-          node -e "let s=''; process.stdin.on('data',b=>s+=b).on('end',()=>{let v=JSON.parse(s);if(v.launch_enabled!==false||v.purchases_enabled!==false||v.redemption_enabled!==false||v.status!=='security_review')process.exit(1)})"
+          node -e "let s=''; process.stdin.on('data',b=>s+=b).on('end',()=>{let v=JSON.parse(s);if(v.launch_enabled!==true||v.purchases_enabled!==false||v.redemption_enabled!==false||v.status!=='virtual_demo')process.exit(1)})"
       - name: Preserve browser screenshots and server logs
         if: always()
         uses: actions/upload-artifact@v4

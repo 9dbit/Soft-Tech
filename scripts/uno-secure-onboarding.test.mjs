@@ -4,11 +4,11 @@ import {readFileSync} from 'node:fs';
 
 const read = path => readFileSync(path,'utf8');
 
-test('UNO is discoverable but has no external public game launch',()=>{
+test('UNO launches only through the canonical XDPLAY demo viewer',()=>{
   const catalogue=read('src/data/games.ts');
   const entry=catalogue.split('\n').find(x=>x.includes('id:"uno-luck"'));
   assert(entry,'UNO must remain in the XDPLAY catalog');
-  assert.match(entry,/launchState:"security_review"/);
+  assert.doesNotMatch(entry,/launchState:"security_review"/);
   assert.match(entry,/url:"\/games\/uno-luck\/play"/);
   assert.doesNotMatch(entry,/\.onrender\.com|up\.railway\.app|wallet|agent/);
   assert.match(catalogue,/canLaunchGame/);
@@ -38,11 +38,13 @@ test('vanity host only points to non-launching canonical review page',()=>{
   }
   assert.match(config,/value:\s*'max-age=86400'/,'avoid HSTS includeSubDomains until every game host is qualified');
 });
-test('public release status refuses purchases and gaming admission',()=>{
+test('public demo release refuses purchases and redemption',()=>{
   const status=read('src/app/api/games/uno-luck/status/route.ts');
-  for(const field of ['launch_enabled: false','purchases_enabled: false','redemption_enabled: false','"no-store"']){
+  for(const field of ['launch_enabled: enabled','purchases_enabled: false','redemption_enabled: false','"no-store"']){
     assert(status.includes(field),field);
   }
+  assert.match(status,/findGameRuntime/);
+  assert.match(status,/virtual_demo/);
   const page=read('src/app/[...route]/page.tsx');
   assert.match(page,/index:false,follow:false/);
   assert.doesNotMatch(read('src/app/sitemap.ts'),/games\/uno-luck/);
