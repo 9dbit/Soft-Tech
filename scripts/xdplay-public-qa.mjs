@@ -21,7 +21,7 @@ try{
    assert.match(title,/XDPLAY/,path+' title');assert.doesNotMatch(text,/soft\s+tech/i,path+' visible legacy branding');assert.equal(canonical,'https://xd-play.com'+(path==='/'?'':path),path+' canonical');assert(logos.length>0&&logos.every(x=>x.loaded),path+' logo loads');assert(scrollWidth<=viewport.width+2,path+' horizontal overflow');
    if(path==='/games/uno-luck'){
      assert.equal(await page.locator('a[href*="uno-luck-v1172-qa.onrender.com"]').count(),0);
-     assert(await page.locator('button[disabled][aria-label="UNO LUCK security review pending"]').count()>=1);
+     assert(await page.locator('a[href="/games/uno-luck/play"]').count()>=1);
      assert.match(await page.locator('meta[name="robots"]').getAttribute('content'),/noindex/);
    }
    const screenshot=viewport.name+'-'+(path==='/'?'home':path.slice(1).replaceAll('/','-'))+'.png';await page.screenshot({path:output+'/'+screenshot,fullPage:true,animations:'disabled'});report.checks.push({viewport:viewport.name,path,title,canonical,scrollWidth,logos:logos.length,screenshot});
@@ -38,6 +38,6 @@ try{
  assert.equal(blockedPath.headers.location,'https://xd-play.com/games/uno-luck');
  const canonical=await requestHost('xd-play.com','/games/uno-luck?test=1');report.redirects.push(canonical);assert.equal(canonical.status,200,'Canonical host must not loop');
  assert.equal((await fetch(base+'/api/health')).status,200);
- const original=execFileSync('git',['show','2dad8bbd89c9e93a556776051961b9a4c51cca97:src/data/games.ts'],{encoding:'utf8'}),current=await readFile('src/data/games.ts','utf8'),urls=s=>[...s.matchAll(/url:"([^"]+)"/g)].map(m=>m[1].split('?')[0]);const baseline=urls(original),updated=urls(current);assert.equal(updated.length,baseline.length);assert.equal(updated[0],'/games/skygate-5000/play','preserve Skygate in-domain demo');assert.equal(updated[1],'/games/uno-luck/play','closed UNO canonical launcher');assert.equal(updated[2],'/games/mahjong-wild/play','canonical Mahjong viewer');assert.match(current,/launchState:"security_review"/);assert.equal(report.errors.length,0,'browser errors');report.status='PASS';
+ const original=execFileSync('git',['show','2dad8bbd89c9e93a556776051961b9a4c51cca97:src/data/games.ts'],{encoding:'utf8'}),current=await readFile('src/data/games.ts','utf8'),urls=s=>[...s.matchAll(/url:"([^"]+)"/g)].map(m=>m[1].split('?')[0]);const baseline=urls(original),updated=urls(current);assert.equal(updated.length,baseline.length);assert.equal(updated[0],'/games/skygate-5000/play','preserve Skygate in-domain demo');assert.equal(updated[1],'/games/uno-luck/play','closed UNO canonical launcher');assert.equal(updated[2],'/games/mahjong-wild/play','canonical Mahjong viewer');assert.doesNotMatch(current,/launchState:"security_review",url:"\/games\/uno-luck\/play"/);assert.equal(report.errors.length,0,'browser errors');report.status='PASS';
 }catch(error){report.status='FAIL';report.errors.push(error.stack);process.exitCode=1;}
 finally{await browser.close();await writeFile(output+'/report.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report,null,2));}

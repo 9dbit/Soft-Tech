@@ -1,4 +1,4 @@
-// UI LOCK V6.1: preserve approved layout and images; allow reviewed launch-route standardization and UNO CTA disabling.
+// UI LOCK V6.1: preserve approved layout and images; allow reviewed launch-route standardization and qualified UNO demo activation.
 // The approved layout, navbar, game visuals and six-layer
 // orange-computer assets may not be silently changed by a typography release.
 // Git blob IDs include file mode independent content bytes.
@@ -31,7 +31,7 @@ const locked = {
   "src/components/portal.tsx": "3708dc75fb4428d75601614c20499eeab7c2e534",
   "src/components/v5-desktop-hero.tsx": "7d18d6aa0fc5fc6bf201d0454357dc8692a6e3bb",
   "src/components/v52-mobile-hero.tsx": "ca15c9ac1c568187404c0c5f6d00f132d686148e",
-  "src/data/games.ts": "95a023898e73c54745d59d9e0b06ad3c352e9511",
+  "src/data/games.ts": "6e78bbfadf70364eb1019e02c5214cd7d71e51b3",
   "public/fonts/Minecraft.woff2": "24a32947adfdc19d2bc5745ae99cb6a8b5375f95"
 };
 const failures=[];

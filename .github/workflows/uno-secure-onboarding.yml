@@ -49,7 +49,7 @@ jobs:
           test "$ready" = 1 || { cat /tmp/xdplay-uno-onboard.log; exit 1; }
           node scripts/xdplay-public-qa.mjs
           curl -fsS http://127.0.0.1:3000/api/games/uno-luck/status |
-          node -e "let s=''; process.stdin.on('data',b=>s+=b).on('end',()=>{let v=JSON.parse(s);if(v.launch_enabled!==false||v.purchases_enabled!==false||v.redemption_enabled!==false||v.status!=='security_review')process.exit(1)})"
+          node -e "let s=''; process.stdin.on('data',b=>s+=b).on('end',()=>{let v=JSON.parse(s);if(v.launch_enabled!==true||v.purchases_enabled!==false||v.redemption_enabled!==false||v.status!=='virtual_demo')process.exit(1)})"
       - name: Preserve browser screenshots and server logs
         if: always()
         uses: actions/upload-artifact@v4

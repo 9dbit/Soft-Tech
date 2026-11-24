@@ -30,10 +30,10 @@
       "label": "UNO Luck",
       "canonicalOrigin": "https://uno.xd-play.com",
       "stagingOrigin": "https://staging-uno.xd-play.com",
-      "domainReady": false,
-      "publicLaunch": "security_review",
-      "deploymentOrigin": null,
-      "entryPath": null
+      "domainReady": true,
+      "publicLaunch": "enabled",
+      "deploymentOrigin": "https://uno-demo-web-production.up.railway.app",
+      "entryPath": "/play/"
     },
     {
       "id": "legend-ball-x1000",
