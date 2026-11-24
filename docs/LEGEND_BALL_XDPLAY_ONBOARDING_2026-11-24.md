@@ -47,3 +47,13 @@ Gate requires ownership VERIFIED, certificate VALID and live domain assets befor
 - DNS changes: zone file prepared, not written to provider by this commit.
 - Rollback game: detach the production custom domain immediately, or restore the previous approved runtime revision `f50948e47a9ffd46ef42bb6386dfbf827696554e` without enabling demo mode. Preserve /data volume.
 - Rollback portal: return only LEGEND BALL registry status to `staging_only`, or restore the baseline deployed portal commit. Never revert other game's newer changes or apply the old 24-change Railway patch.
+
+## Verification addendum, 24 Nov 2026
+- The portal branch was rebased onto current XDPLAY release `740a08320611c6483b31024fd9e46bcbffb721b6`, retaining the active statuses of Skygate, Mahjong Wild, UNO and Gachamon. Pull request `https://github.com/9dbit/Soft-Tech/pull/15` changes only LEGEND BALL canonical runtime origin in `config/game-runtimes.json`; all other game registry entries are identical to the target base.
+- Existing domain-standard regression test was updated narrowly to expect `legendballx.xd-play.com` rather than the retired host.
+- LegendBallX portal gate CI `45375450068`: SUCCESS. Existing XDPLAY game domain standard `45375450025`, Mahjong launch acceptance `45375450177`, Skygate secure launch `45375450143`: SUCCESS on candidate `49129e3d06c9ecbe9a7f47be1ea300623257f667`.
+- Game-production Railway deployment `452810f8-eee5-4717-97fb-93f4793d2aac`: SUCCESS, isolated production project; fallback hostname explicit allowlist and Studio password configured. Live validation still subject to a separate CI run.
+- **DNS remains unverified**, ownership still pending, TLS certificate validating. Zone file is a record proposal only; no Cloudflare DNS mutation has been completed. Launch remains `staging_only` and iframe URL is absent.
+- Shared production XDPLAY service has an unrelated 24-change staged Railway patch. It was not accepted. No portal production deployment or public launcher activation was made during this checkpoint.
+- Exact DNS needed: `legendballx` CNAME `rtchmvzp.up.railway.app` and `_railway-verify.legendballx` TXT `railway-verify=934da057b69de43039ac52b4c60636f2f4890a8b9f91e8de36ac76ccb423bf64`.
+- Rollback remains registry-only: keep LegendBallX `staging_only` and drop new DNS records if needed. Production game volume remains independent.
