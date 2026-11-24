@@ -293,8 +293,9 @@ async function browserChecks() {
             const child = page.frameLocator('#game-frame');
             await child.locator(`[data-runtime-fixture="${game.id}"]`).waitFor({ state: 'visible', timeout: 15000 });
             const dimensions = await frame.boundingBox();
-            assert(dimensions && Math.abs(dimensions.x) <= 1 && Math.abs(dimensions.y) <= 1);
-            assert(Math.abs(dimensions.width - viewport.width) <= 1 && Math.abs(dimensions.height - viewport.height) <= 1, 'game frame must fill the visual viewport');
+            assert(dimensions && Math.abs(dimensions.x) <= 1);
+            assert(Math.abs(dimensions.width - viewport.width) <= 1 && Math.abs(dimensions.y + dimensions.height - viewport.height) <= 1, 'game frame must fill the available viewport');
+            if (game.id !== 'uno-luck') assert(Math.abs(dimensions.y) <= 1, 'existing game layout must remain unchanged');
             const notice = page.locator('#game-virtual-credit-notice');
             assert.match(await notice.innerText(), /virtual-credit demo/);
             const noticeBounds = await notice.boundingBox();
@@ -309,6 +310,10 @@ async function browserChecks() {
               const fullscreen = page.getByRole('button', { name: 'Enter fullscreen', exact: true });
               await fullscreen.waitFor({ state: 'visible' });
               await assertControlBounds([fullscreen], viewport);
+              for (const control of [back, separate, fullscreen]) {
+                const bounds = await control.boundingBox();
+                assert(bounds && bounds.y + bounds.height <= dimensions.y, 'launcher controls must not cover the UNO header');
+              }
               await fullscreen.click();
               await page.waitForFunction(() => document.fullscreenElement === document.documentElement);
               await page.getByRole('button', { name: 'Exit fullscreen', exact: true }).click();
