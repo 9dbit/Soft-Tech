@@ -11,7 +11,7 @@ const expected = {
   'skygate-5000': ['https://skygate.xd-play.com', null, 'enabled', 'https://skygate-web-production.up.railway.app'],
   'mahjong-wild': ['https://mahjongwild.xd-play.com', 'https://staging-mahjong.xd-play.com', 'enabled', 'https://mahjong-legend-web-production.up.railway.app'],
   'uno-luck': ['https://uno.xd-play.com', 'https://staging-uno.xd-play.com', 'enabled', 'https://uno-demo-web-production.up.railway.app'],
-  'legend-ball-x1000': ['https://legend-ball.xd-play.com', 'https://staging-legend-ball.xd-play.com', 'staging_only', null],
+  'legend-ball-x1000': ['https://legendballx.xd-play.com', 'https://staging-legend-ball.xd-play.com', 'staging_only', null],
   gachamon: ['https://gachamon.xd-play.com', 'https://staging-gachamon.xd-play.com', 'staging_only', null]
 };
 const fresh = () => structuredClone(registry);
