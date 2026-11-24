@@ -8,7 +8,7 @@
       "label": "Skygate 5000",
       "canonicalOrigin": "https://skygate.xd-play.com",
       "stagingOrigin": null,
-      "domainReady": false,
+      "domainReady": true,
       "publicLaunch": "enabled",
       "deploymentOrigin": "https://skygate-web-production.up.railway.app",
       "entryPath": "/play/"
@@ -17,9 +17,9 @@
       "id": "mahjong-wild",
       "name": "MAHJONG WILD",
       "label": "Mahjong Wild",
-      "canonicalOrigin": "https://mahjong.xd-play.com",
+      "canonicalOrigin": "https://mahjongwild.xd-play.com",
       "stagingOrigin": "https://staging-mahjong.xd-play.com",
-      "domainReady": false,
+      "domainReady": true,
       "publicLaunch": "enabled",
       "deploymentOrigin": "https://mahjong-legend-web-production.up.railway.app",
       "entryPath": "/play/"

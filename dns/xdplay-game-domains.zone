@@ -18,5 +18,5 @@ _railway-verify.staging-gachamon 300 IN TXT "railway-verify=6b964ccf0650a4aac607
 staging-mahjong 300 IN CNAME jj1p6owm.up.railway.app.
 _railway-verify.staging-mahjong 300 IN TXT "railway-verify=03f071bb5afb85849e294f77bef6c2321cb91e407417345cc99f42c38c292196"
 
-mahjong 300 IN CNAME q6b96lft.up.railway.app.
-_railway-verify.mahjong 300 IN TXT "railway-verify=2933c1ebe6bced189f2c5cd7b7c6b02c49962c50a0fd4ae17886a0a6e8085f79"
+mahjongwild 300 IN CNAME du1rwnos.up.railway.app.
+_railway-verify.mahjongwild 300 IN TXT "railway-verify=98709a0e5514228d961fd396b7a832ddecca84454c5f461ceca4a6a7fb069b90"

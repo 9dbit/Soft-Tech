@@ -9,7 +9,7 @@ import {
 const registry = JSON.parse(readFileSync(new URL('../config/game-runtimes.json', import.meta.url), 'utf8'));
 const expected = {
   'skygate-5000': ['https://skygate.xd-play.com', null, 'enabled', 'https://skygate-web-production.up.railway.app'],
-  'mahjong-wild': ['https://mahjong.xd-play.com', 'https://staging-mahjong.xd-play.com', 'enabled', 'https://mahjong-legend-web-production.up.railway.app'],
+  'mahjong-wild': ['https://mahjongwild.xd-play.com', 'https://staging-mahjong.xd-play.com', 'enabled', 'https://mahjong-legend-web-production.up.railway.app'],
   'uno-luck': ['https://uno.xd-play.com', 'https://staging-uno.xd-play.com', 'security_review', null],
   'legend-ball-x1000': ['https://legend-ball.xd-play.com', 'https://staging-legend-ball.xd-play.com', 'staging_only', null],
   gachamon: ['https://gachamon.xd-play.com', 'https://staging-gachamon.xd-play.com', 'staging_only', null]
@@ -25,7 +25,7 @@ test('release registry explicitly maps five games to nine separate production/st
   assert.equal(new Set(origins).size, 9, 'every assigned hostname must be isolated');
   for (const game of registry.runtimes) {
     assert.deepEqual([game.canonicalOrigin, game.stagingOrigin, game.publicLaunch, game.deploymentOrigin], expected[game.id]);
-    assert.equal(game.domainReady, false, 'DNS readiness must not be presumed during registration');
+    assert.equal(game.domainReady, game.publicLaunch === 'enabled', 'only verified admitted demos are activated');
     assert.equal(gamePlayPath(game), `/games/${game.id}/play`);
     assert.equal(gameDetailPath(game), `/games/${game.id}`);
   }
@@ -47,13 +47,14 @@ test('only Skygate and Mahjong can produce public launch URLs', () => {
 
 for (const game of registry.runtimes.filter(game => game.publicLaunch === 'enabled')) {
   test(`${game.id}: unverified domains allow only top-level fallback launch and no iframe`, () => {
-    assert.equal(activeRuntimeOrigin(game), expected[game.id][3]);
-    assert.equal(gameLaunchUrl(game), expected[game.id][3] + '/play/');
-    assert.equal(gameEmbedUrl(game), null, 'cross-site fallback must not be embedded');
-    assert.deepEqual(frameSources(viewerCsp(game)), ["'none'"]);
-    assert(!viewerCsp(game).includes(game.deploymentOrigin));
-    assert(!viewerCsp(game).includes(game.canonicalOrigin));
-    assert(!viewerCsp(game).includes('*'));
+    const pending = { ...game, domainReady: false };
+    assert.equal(activeRuntimeOrigin(pending), expected[game.id][3]);
+    assert.equal(gameLaunchUrl(pending), expected[game.id][3] + '/play/');
+    assert.equal(gameEmbedUrl(pending), null, 'cross-site fallback must not be embedded');
+    assert.deepEqual(frameSources(viewerCsp(pending)), ["'none'"]);
+    assert(!viewerCsp(pending).includes(game.deploymentOrigin));
+    assert(!viewerCsp(pending).includes(game.canonicalOrigin));
+    assert(!viewerCsp(pending).includes('*'));
   });
   test(`${game.id}: verified domain replaces the fallback, without permitting both origins`, () => {
     const changed = fresh();

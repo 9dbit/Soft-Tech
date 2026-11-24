@@ -11,7 +11,7 @@ portal pages; they do not combine game runtimes into the portal origin.
 | Game | Portal launcher | Canonical runtime | Staging runtime | Public admission |
 | --- | --- | --- | --- | --- |
 | Skygate 5000 | `/games/skygate-5000/play` | `skygate.xd-play.com` | Not provisioned | Virtual-credit demo |
-| Mahjong Wild / Mahjong Legend project | `/games/mahjong-wild/play` | `mahjong.xd-play.com` | `staging-mahjong.xd-play.com` | Virtual-credit demo |
+| Mahjong Wild / Mahjong Legend project | `/games/mahjong-wild/play` | `mahjongwild.xd-play.com` | `staging-mahjong.xd-play.com` | Virtual-credit demo |
 | UNO Luck | `/games/uno-luck/play` | `uno.xd-play.com` | `staging-uno.xd-play.com` | Security review; unavailable |
 | Legend Ball X1000 | `/games/legend-ball-x1000/play` | `legend-ball.xd-play.com` | `staging-legend-ball.xd-play.com` | Staging only; unavailable |
 | Gachamon | `/games/gachamon/play` | `gachamon.xd-play.com` | `staging-gachamon.xd-play.com` | Staging only; unavailable |
@@ -79,7 +79,7 @@ calls stay within the iframe's own origin; portal-to-game CORS is not opened.
 
 ## DNS activation and staged rollout
 
-At preparation time all `domainReady` flags are false. The two admitted demos
+At registration time all `domainReady` flags were false. The two admitted demos
 use top-level links to their approved Railway service origins. Six custom hostnames
 have been registered with Railway, but registration is not DNS/TLS completion.
 The Cloudflare session requires account sign-in before records can be applied.
@@ -134,3 +134,21 @@ build passed and the production dependency audit reported zero findings on
 absence of all application vulnerabilities.
 
 Security release reference: https://nextjs.org/blog/november-2026-security-release
+
+
+## Verified domain activation — 24 November 2026
+
+The user selected `mahjongwild.xd-play.com` as the canonical Mahjong hostname.
+Railway reports ownership verified, CNAME propagated and valid certificates for
+this host and `skygate.xd-play.com`. Both `/play/` documents and health endpoints
+responded with HTTP 200 on their canonical HTTPS hosts. Mahjong's document hash
+is unchanged from the approved runtime release. Its session endpoint returned
+HTTP 200 with a host-only Secure/HttpOnly/SameSite=Lax cookie; anonymous Studio
+remains 401, an unrecognized play route remains 404, and the stylesheet is 200.
+Only the two admitted demos now have `domainReady: true`. UNO, Legend Ball and
+Gachamon admission remains closed. Staging DNS activation does not change admission.
+
+The CI matrix now explicitly prepares both pending and verified fixture states,
+so rollback coverage remains active even when the deployed registry is ready.
+The earlier `dns/registration-receipt.json` remains an historical snapshot;
+`dns/xdplay-game-domains.zone` reflects the selected Mahjong hostname.
