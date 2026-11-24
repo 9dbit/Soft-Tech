@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run release-source integrity and closed-launch assertions
+      - name: Run release-source integrity and demo admission assertions
         run: |
           node scripts/verify-ui-lock.mjs
           node --test scripts/uno-secure-onboarding.test.mjs
@@ -38,7 +38,7 @@ jobs:
         run: |
           npm install --no-save --package-lock=false playwright@1.56.1 --no-audit --no-fund
           npx playwright install --with-deps chromium
-      - name: Verify host redirects, disabled UNO buttons and responsive marketing
+      - name: Verify host quarantine, canonical UNO links and responsive marketing
         run: |
           npm run start -- -p 3000 > /tmp/xdplay-uno-onboard.log 2>&1 &
           ready=0

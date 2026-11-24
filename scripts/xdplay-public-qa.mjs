@@ -22,7 +22,10 @@ try{
    if(path==='/games/uno-luck'){
      assert.equal(await page.locator('a[href*="uno-luck-v1172-qa.onrender.com"]').count(),0);
      assert(await page.locator('a[href="/games/uno-luck/play"]').count()>=1);
-     assert.match(await page.locator('meta[name="robots"]').getAttribute('content'),/noindex/);
+     // Enabled marketing pages may be indexed. The gameplay viewer remains
+     // noindex and is checked separately by game-viewer-qa.mjs.
+     const robots=await page.locator('meta[name="robots"]').allTextContents();
+     assert.equal(robots.length,0,'enabled UNO marketing uses default indexing');
    }
    const screenshot=viewport.name+'-'+(path==='/'?'home':path.slice(1).replaceAll('/','-'))+'.png';await page.screenshot({path:output+'/'+screenshot,fullPage:true,animations:'disabled'});report.checks.push({viewport:viewport.name,path,title,canonical,scrollWidth,logos:logos.length,screenshot});
   }await page.close();
@@ -30,7 +33,7 @@ try{
  for(const path of ['/robots.txt','/sitemap.xml']){const response=await fetch(base+path),text=await response.text();assert.equal(response.status,200);assert.match(text,/https:\/\/xd-play\.com/);assert.doesNotMatch(text,/soft-tech-web-production/);}
  const redirect=await requestHost('www.xd-play.com','/games/uno-luck?test=1');report.redirects.push(redirect);assert.equal(redirect.host,'www.xd-play.com');assert.equal(redirect.status,308);assert.equal(redirect.headers.location,'https://xd-play.com/games/uno-luck?test=1');
  const reserved=await requestHost('uno.xd-play.com','/');report.redirects.push(reserved);
- assert.equal(reserved.status,307,'UNO vanity host must redirect to review');
+ assert.equal(reserved.status,307,'misrouted UNO host must stay quarantined');
  assert.equal(reserved.headers.location,'https://xd-play.com/games/uno-luck');
  const blockedPath=await requestHost('uno.xd-play.com','/api/games/uno-luck/status?unused=1');
  report.redirects.push(blockedPath);
