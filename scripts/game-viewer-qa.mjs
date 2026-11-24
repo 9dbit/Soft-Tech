@@ -365,8 +365,8 @@ async function browserChecks() {
 }
 
 try {
-  assert.deepEqual(active.map(game => game.id).sort(), ['mahjong-wild', 'skygate-5000', 'uno-luck']);
-  assert.equal(blocked.length, 2);
+  assert.deepEqual(active.map(game => game.id).sort(), ['legend-ball-x1000', 'mahjong-wild', 'skygate-5000', 'uno-luck']);
+  assert.deepEqual(blocked.map(game => game.id), ['gachamon']);
   const health = await fetchLocal('/api/health');
   assert.equal(health.status, 200, 'local production server must be ready before acceptance checks');
   if (!args.has('--browser-only')) await httpChecks();

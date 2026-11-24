@@ -1,0 +1,32 @@
+name: LegendBallX XDPLAY portal release gate
+on:
+  push:
+    branches: [release/legendballx-demo-portal-20261124]
+  pull_request:
+    branches: [rebrand/xdplay-public-20261112]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: node --test scripts/legendballx-registry-gate.test.mjs
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Run isolated launcher HTTP acceptance
+        run: |
+          set -euo pipefail
+          npm run start -- -p 3000 >/tmp/xdplay-legendballx.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 50); do
+            if curl -fsS http://127.0.0.1:3000/api/health >/dev/null; then break; fi
+            sleep 1
+          done
+          QA_BASE_URL=http://127.0.0.1:3000 node scripts/game-viewer-qa.mjs --http-only
